@@ -255,8 +255,9 @@
       const PANEL_MIN_OFFSET = 100; // Minimum offset from the point to ensure no overlap
       const panelPositions = ['right', 'left', 'top', 'bottom']; // Possible positions
 
-      // URL for the RapidSOS logo
+      // URLs for logos
       const RAPIDSOS_LOGO_URL = "https://rapidsos.com/wp-content/uploads/2023/01/rapidsos-horizontal-logo.png";
+      const IAMRESPONDING_LOGO_URL = "https://www.iamresponding.com/wp-content/uploads/2024/02/IamResponding-a-RapidSOS-Solution-logo.svg";
 
       // The specific fields we want to display in the info panel
       const DISPLAY_FIELDS = {
@@ -500,55 +501,120 @@
         const screenWidth = window.innerWidth;
         const screenHeight = window.innerHeight;
         const panelWidth = 350; // Width of the info panel
-        const panelHeight = 300; // Approximate height of the info panel
 
-        // Get a position based on the feature index to create variety
-        // This ensures different points get different panel positions
-        const positionIndex = currentFeatureIndex % panelPositions.length;
-        let position = panelPositions[positionIndex];
+        // Dynamically estimate panel height based on expected content
+        // You might need to adjust this depending on your content
+        const estimatedLineHeight = 22; // approximate line height in pixels
+        const estimatedTitleLines = 2;
+        const estimatedQuoteLines = 5;
+        const estimatedOtherElements = 80; // pixels for margins, borders, etc.
+        const panelHeight = (estimatedTitleLines + estimatedQuoteLines) * estimatedLineHeight + estimatedOtherElements;
 
-        // Determine the best position to avoid the point itself
-        // First, try using the "natural" quadrant-based position
+        // Increase minimum offset from point to panel
+        const PANEL_MIN_OFFSET = 120; // Increased from 100 to ensure no overlap
+
+        // Define point "territory" - area around point that should be avoided
+        const pointRadius = 40; // The outermost animated circle radius
+
+        // Get a position preference based on map quadrant
+        let preferredPosition;
+
         if (pointScreenLocation.x < screenWidth / 2) {
-          // Point is in left half of screen, so place panel to the right
-          if (pointScreenLocation.y < screenHeight / 2) {
-            // Upper left quadrant - place to right or below
-            position = (positionIndex % 2 === 0) ? 'right' : 'bottom';
-          } else {
-            // Lower left quadrant - place to right or above
-            position = (positionIndex % 2 === 0) ? 'right' : 'top';
-          }
+          // Point is in left half of screen, prefer right
+          preferredPosition = 'right';
         } else {
-          // Point is in right half of screen, so place panel to the left
-          if (pointScreenLocation.y < screenHeight / 2) {
-            // Upper right quadrant - place to left or below
-            position = (positionIndex % 2 === 0) ? 'left' : 'bottom';
-          } else {
-            // Lower right quadrant - place to left or above
-            position = (positionIndex % 2 === 0) ? 'left' : 'top';
+          // Point is in right half of screen, prefer left
+          preferredPosition = 'left';
+        }
+
+        // Create position candidates and score them
+        const positions = ['right', 'left', 'top', 'bottom'];
+        const positionScores = {};
+
+        // Calculate scores for each position (higher is better)
+        for (const pos of positions) {
+          let score = 0;
+          let testLeft, testTop;
+
+          // Calculate test position
+          switch (pos) {
+            case 'right':
+              testLeft = pointScreenLocation.x + PANEL_MIN_OFFSET;
+              testTop = pointScreenLocation.y - (panelHeight / 2);
+              break;
+            case 'left':
+              testLeft = pointScreenLocation.x - panelWidth - PANEL_MIN_OFFSET;
+              testTop = pointScreenLocation.y - (panelHeight / 2);
+              break;
+            case 'top':
+              testLeft = pointScreenLocation.x - (panelWidth / 2);
+              testTop = pointScreenLocation.y - panelHeight - PANEL_MIN_OFFSET;
+              break;
+            case 'bottom':
+              testLeft = pointScreenLocation.x - (panelWidth / 2);
+              testTop = pointScreenLocation.y + PANEL_MIN_OFFSET;
+              break;
+          }
+
+          // Clamp to screen bounds
+          testLeft = Math.max(PANEL_MARGIN, Math.min(testLeft, screenWidth - panelWidth - PANEL_MARGIN));
+          testTop = Math.max(PANEL_MARGIN, Math.min(testTop, screenHeight - panelHeight - PANEL_MARGIN));
+
+          // Preferred position gets a bonus
+          if (pos === preferredPosition) {
+            score += 100;
+          }
+
+          // Check screen edge proximity (penalize if too close)
+          if (testLeft < PANEL_MARGIN * 2) score -= 50;
+          if (testLeft + panelWidth > screenWidth - PANEL_MARGIN * 2) score -= 50;
+          if (testTop < PANEL_MARGIN * 2) score -= 50;
+          if (testTop + panelHeight > screenHeight - PANEL_MARGIN * 2) score -= 50;
+
+          // Most important: Calculate distance from panel border to point center
+          let minDistToPoint;
+
+          switch (pos) {
+            case 'right':
+              minDistToPoint = testLeft - pointScreenLocation.x;
+              break;
+            case 'left':
+              minDistToPoint = pointScreenLocation.x - (testLeft + panelWidth);
+              break;
+            case 'top':
+              minDistToPoint = pointScreenLocation.y - (testTop + panelHeight);
+              break;
+            case 'bottom':
+              minDistToPoint = testTop - pointScreenLocation.y;
+              break;
+          }
+
+          // If any part of panel would overlap with point territory, heavily penalize
+          if (minDistToPoint < pointRadius) {
+            score -= 500;
+          }
+
+          // Add distance score - further from point is generally better
+          score += minDistToPoint / 5;
+
+          positionScores[pos] = score;
+        }
+
+        // Select the position with highest score
+        let bestPosition = 'right'; // Default
+        let bestScore = -1000;
+
+        for (const [pos, score] of Object.entries(positionScores)) {
+          if (score > bestScore) {
+            bestPosition = pos;
+            bestScore = score;
           }
         }
 
-        // Override if point is very close to an edge
-        const edgeMargin = panelWidth + 20; // Safety margin
-        if (pointScreenLocation.x < edgeMargin) {
-          // Too close to left edge, force right position
-          position = 'right';
-        } else if (pointScreenLocation.x > screenWidth - edgeMargin) {
-          // Too close to right edge, force left position
-          position = 'left';
-        } else if (pointScreenLocation.y < panelHeight + 20) {
-          // Too close to top edge, force bottom position
-          position = 'bottom';
-        } else if (pointScreenLocation.y > screenHeight - panelHeight - 20) {
-          // Too close to bottom edge, force top position
-          position = 'top';
-        }
-
-        // Calculate the panel position based on determined position
+        // Calculate final position with the best position
         let left, top;
 
-        switch (position) {
+        switch (bestPosition) {
           case 'right':
             left = pointScreenLocation.x + PANEL_MIN_OFFSET;
             top = pointScreenLocation.y - (panelHeight / 2);
@@ -567,14 +633,38 @@
             break;
         }
 
-        // Ensure the panel stays within the screen bounds
+        // Final clamp to screen bounds
         left = Math.max(PANEL_MARGIN, Math.min(left, screenWidth - panelWidth - PANEL_MARGIN));
         top = Math.max(PANEL_MARGIN, Math.min(top, screenHeight - panelHeight - PANEL_MARGIN));
+
+        // If we're using top/bottom position, make one final adjustment
+        // to ensure horizontal position avoids the point
+        if (bestPosition === 'top' || bestPosition === 'bottom') {
+          const panelCenter = left + (panelWidth / 2);
+          const horizontalDist = Math.abs(panelCenter - pointScreenLocation.x);
+
+          // If panel center is close to point, shift it left or right
+          if (horizontalDist < pointRadius) {
+            const shiftAmount = pointRadius - horizontalDist + 10; // Extra 10px buffer
+
+            // Choose direction with most screen space
+            if (pointScreenLocation.x < screenWidth / 2) {
+              // Point in left half, shift panel right
+              left += shiftAmount;
+            } else {
+              // Point in right half, shift panel left
+              left -= shiftAmount;
+            }
+
+            // Final clamp again
+            left = Math.max(PANEL_MARGIN, Math.min(left, screenWidth - panelWidth - PANEL_MARGIN));
+          }
+        }
 
         return {
           left: left,
           top: top,
-          position: position
+          position: bestPosition
         };
       }
 
@@ -619,9 +709,13 @@
         // Add product name
         content += `<div class="product-used">${productUsed}</div>`;
 
-        // Check if product is RapidSOS and add logo if it is
-        if (productUsed && productUsed.toLowerCase().includes("rapidsos")) {
-          content += `<div class="product-logo"><img src="${RAPIDSOS_LOGO_URL}" alt="RapidSOS Logo"></div>`;
+        // Check product name and add appropriate logo
+        if (productUsed) {
+          if (productUsed.toLowerCase().includes("rapidsos")) {
+            content += `<div class="product-logo"><img src="${RAPIDSOS_LOGO_URL}" alt="RapidSOS Logo"></div>`;
+          } else if (productUsed.toLowerCase().includes("iamresponding") || productUsed.toLowerCase().includes("iam responding")) {
+            content += `<div class="product-logo"><img src="${IAMRESPONDING_LOGO_URL}" alt="IamResponding Logo"></div>`;
+          }
         }
 
         // Add story quote
