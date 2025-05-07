@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>RapidSOS Map with Auto-Cycling Point Information</title>
+  <!-- Add Open Sans font -->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    html, body, #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    .cycle-controls {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      padding: 10px;
+      background-color: #FFFFFF;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      z-index: 999;
+      display: none; /* Initially hidden until cycling starts */
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    .cycle-controls button {
+      margin-right: 8px;
+      padding: 5px 10px;
+      background-color: #29A8DD; /* Safety Blue */
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 600;
+      transition: background-color 0.3s ease;
+    }
+
+    .cycle-controls button:hover {
+      background-color: #005eFF; /* Glow */
+    }
+
+    .cycle-controls input {
+      width: 50px;
+      font-family: 'Open Sans', sans-serif;
+      border: 1px solid #29A8DD;
+      border-radius: 3px;
+      padding: 3px;
+    }
+
+    .info-panel {
+      position: absolute;
+      width: 350px;
+      background-color: #FFFFFF;
+      padding: 15px;
+      border-radius: 4px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+      z-index: 999;
+      display: none; /* Initially hidden */
+      font-family: 'Open Sans', sans-serif;
+      max-height: 80%;
+      overflow-y: auto;
+      transition: all 0.3s ease-in-out;
+    }
+
+    /* Different border styles for different positions */
+    .info-panel.position-right {
+      border-left: 3px solid #29A8DD; /* Safety Blue */
+    }
+
+    .info-panel.position-left {
+      border-right: 3px solid #29A8DD; /* Safety Blue */
+    }
+
+    .info-panel.position-top {
+      border-bottom: 3px solid #29A8DD; /* Safety Blue */
+    }
+
+    .info-panel.position-bottom {
+      border-top: 3px solid #29A8DD; /* Safety Blue */
+    }
+
+    .info-panel h2 {
+      margin-top: 0;
+      margin-bottom: 10px;
+      font-size: 20px;
+      border-bottom: 1px solid #e1e1e1;
+      padding-bottom: 8px;
+      color: #001559; /* Royal Blue */
+      font-family: 'Open Sans', sans-serif;
+      font-weight: 700;
+    }
+
+    .product-used {
+      font-weight: 600;
+      margin-bottom: 12px;
+      font-size: 16px;
+      font-family: 'Open Sans', sans-serif;
+      color: #29A8DD; /* Safety Blue */
+    }
+
+    .product-logo {
+      display: block;
+      margin: 10px 0;
+      text-align: center;
+    }
+
+    .product-logo img {
+      height: 30px;
+      width: auto;
+    }
+
+    .story-quote {
+      font-style: italic;
+      margin-top: 12px;
+      padding: 12px;
+      background-color: #f5f5f5;
+      border-left: 3px solid #001559; /* Royal Blue */
+      line-height: 1.5;
+      font-size: 14px;
+      font-family: 'Open Sans', sans-serif;
+      color: #333333;
+    }
+
+    .status-panel {
+      position: absolute;
+      left: 20px;
+      bottom: 70px;
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 8px 12px;
+      border-radius: 4px;
+      border-left: 3px solid #005eFF; /* Glow */
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      font-size: 14px;
+      z-index: 998;
+      max-width: 300px;
+      display: none;
+      font-family: 'Open Sans', sans-serif;
+      color: #001559; /* Royal Blue */
+    }
+
+    /* Hide zoom control */
+    .zoom-control {
+      display: none;
+    }
+
+    /* Style the Home button */
+    .esri-home {
+      background-color: #FFFFFF;
+    }
+
+    .esri-home__button {
+      color: #29A8DD !important; /* Safety Blue */
+    }
+
+    .esri-home__button:hover {
+      background-color: #f0f0f0 !important;
+    }
+
+    /* Override ESRI widget styles to match RapidSOS branding */
+    .esri-widget {
+      font-family: 'Open Sans', sans-serif !important;
+    }
+
+    .esri-widget button {
+      color: #29A8DD !important; /* Safety Blue */
+    }
+
+    /* Point indicator animation */
+    @keyframes pulse {
+      0% {
+        opacity: 1;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.6;
+        transform: scale(1.5);
+      }
+      100% {
+        opacity: 0.2;
+        transform: scale(2);
+      }
+    }
+  </style>
+
+  <!-- Load the ArcGIS API for JavaScript -->
+  <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.32/"></script>
+
+  <script>
+    require([
+      "esri/views/MapView",
+      "esri/WebMap",
+      "esri/widgets/Home",
+      "esri/layers/FeatureLayer",
+      "esri/layers/GraphicsLayer",
+      "esri/Graphic",
+      "esri/core/reactiveUtils",
+      "esri/symbols/SimpleMarkerSymbol",
+      "esri/symbols/PictureMarkerSymbol"
+    ], function(MapView, WebMap, Home, FeatureLayer, GraphicsLayer, Graphic, reactiveUtils, SimpleMarkerSymbol, PictureMarkerSymbol) {
+
+      // Map ID for your specific map
+      const webmapId = "46e8cd509b1943eaa295ac62fed4efd3";
+
+      // Create a map from the referenced webmap item
+      const webmap = new WebMap({
+        portalItem: {
+          id: webmapId
+        }
+      });
+
+      // Create the highlight layer for the current point
+      const highlightLayer = new GraphicsLayer({
+        id: "highlightLayer"
+      });
+
+      // Add the highlight layer to the map
+      webmap.add(highlightLayer);
+
+      // Create the view
+      const view = new MapView({
+        container: "viewDiv",
+        map: webmap,
+        popup: {
+          autoOpenEnabled: false // Disable auto-opening popups
+        }
+      });
+
+      // Add a home button for the map
+      const homeBtn = new Home({
+        view: view
+      });
+      view.ui.add(homeBtn, "top-left");
+
+      // Variables to control cycling
+      let cycling = false;
+      let cycleInterval;
+      let currentFeatureIndex = 0;
+      let allFeatures = [];
+      let delaySeconds = 10; // Default delay in seconds (set to 10)
+      let zoomLevelIncrement = 4; // Zoom in 4 levels closer
+      let defaultZoomLevel = null; // Will store the initial zoom level
+      let autoStartDelay = 2000; // Delay in ms before auto-starting (2 seconds)
+      let currentHighlightGraphic = null;
+      let currentPanelPosition = null;
+
+      // Panel positioning variables
+      const PANEL_MARGIN = 20; // Margin from the edge of the screen
+      const PANEL_MIN_OFFSET = 100; // Minimum offset from the point to ensure no overlap
+      const panelPositions = ['right', 'left', 'top', 'bottom']; // Possible positions
+
+      // URL for the RapidSOS logo
+      const RAPIDSOS_LOGO_URL = "https://rapidsos.com/wp-content/uploads/2023/01/rapidsos-horizontal-logo.png";
+
+      // The specific fields we want to display in the info panel
+      const DISPLAY_FIELDS = {
+        "Agency_Name": "Agency Name",
+        "Product_Used": "Product Used",
+        "Story___Quote": "Story Quote" // Note the triple underscore here
+      };
+
+      // Alternative field names to check (in case the attribute names are different)
+      const ALTERNATIVE_FIELDS = {
+        "Agency_Name": ["AgencyName", "AGENCY_NAME", "agency_name", "AGENCYNAME", "agencyname"],
+        "Product_Used": ["ProductUsed", "PRODUCT_USED", "product_used", "PRODUCTUSED", "productused"],
+        "Story___Quote": ["Story_Quote", "StoryQuote", "STORY_QUOTE", "story_quote", "STORYQUOTE", "storyquote", "Quote", "QUOTE", "quote"]
+      };
+
+      // Create info panel
+      const infoPanel = document.createElement("div");
+      infoPanel.className = "info-panel";
+      infoPanel.id = "infoPanel";
+      document.body.appendChild(infoPanel);
+
+      // Add status panel
+      const statusPanel = document.createElement("div");
+      statusPanel.id = "statusPanel";
+      statusPanel.className = "status-panel";
+      statusPanel.innerText = "Loading map...";
+      document.body.appendChild(statusPanel);
+      statusPanel.style.display = "block";
+
+      // Add control panel
+      const controlDiv = document.createElement("div");
+      controlDiv.className = "cycle-controls";
+      controlDiv.id = "cycleControls";
+
+      // Add stop button
+      const stopButton = document.createElement("button");
+      stopButton.id = "stopButton";
+      stopButton.innerText = "Stop Cycling";
+      stopButton.addEventListener("click", stopCycling);
+      controlDiv.appendChild(stopButton);
+
+      // Add delay control
+      const delayLabel = document.createElement("span");
+      delayLabel.innerText = " Delay (seconds): ";
+      controlDiv.appendChild(delayLabel);
+
+      const delayInput = document.createElement("input");
+      delayInput.id = "delayInput";
+      delayInput.type = "number";
+      delayInput.min = "1";
+      delayInput.max = "30";
+      delayInput.value = delaySeconds.toString();
+      delayInput.addEventListener("change", function() {
+        delaySeconds = parseInt(this.value) || 10;
+
+        if (cycling) {
+          // Restart cycle with new delay
+          clearInterval(cycleInterval);
+          cycleInterval = setInterval(cycleToNextFeature, delaySeconds * 1000);
+          updateStatus(`Updated delay to ${delaySeconds} seconds`);
+        }
+      });
+      controlDiv.appendChild(delayInput);
+
+      document.body.appendChild(controlDiv);
+
+      // Wait for the view to load
+      view.when(() => {
+        console.log("Map view loaded");
+
+        // Store the default zoom level
+        defaultZoomLevel = view.zoom;
+        console.log("Default zoom level:", defaultZoomLevel);
+
+        // Load features
+        loadAllFeatures();
+      });
+
+      // Function to load all features from all layers
+      async function loadAllFeatures() {
+        updateStatus("Loading features from map...");
+
+        // Get all feature layers from the map
+        await webmap.load();
+        const featureLayers = webmap.allLayers.filter(layer => {
+          return layer.type === "feature";
+        });
+
+        console.log("Feature layers found:", featureLayers.length);
+
+        if (featureLayers.length === 0) {
+          updateStatus("No feature layers found in the map.");
+          return;
+        }
+
+        for (const layer of featureLayers) {
+          try {
+            console.log("Querying layer:", layer.title || "Unnamed layer");
+            await layer.load();
+
+            // Create a query for all features
+            const query = layer.createQuery();
+            query.outFields = ["*"];
+            query.returnGeometry = true;
+
+            const results = await layer.queryFeatures(query);
+            console.log("Features returned:", results.features?.length || 0);
+
+            if (results.features && results.features.length > 0) {
+              // Add layer reference to each feature for later use
+              results.features.forEach(feature => {
+                feature.sourceLayer = layer;
+
+                // Only add features with valid geometry and specifically point geometry
+                if (feature.geometry && feature.geometry.type === "point") {
+                  allFeatures.push(feature);
+                }
+              });
+            }
+          } catch (error) {
+            console.error("Error querying features:", error);
+            updateStatus(`Error loading some features.`);
+          }
+        }
+
+        console.log(`Loaded ${allFeatures.length} point features total`);
+
+        if (allFeatures.length > 0) {
+          // Log the first feature's attributes to help with debugging field names
+          console.log("Sample feature attributes:", allFeatures[0].attributes);
+
+          updateStatus(`Loaded ${allFeatures.length} point features. Auto-cycling will begin shortly...`);
+
+          // Auto-start cycling after a short delay to let the map fully render
+          setTimeout(() => {
+            // Show the controls
+            const controls = document.getElementById("cycleControls");
+            if (controls) {
+              controls.style.display = "block";
+            }
+
+            // Start the cycling
+            cycling = true;
+            startCycling();
+          }, autoStartDelay);
+        } else {
+          updateStatus(`No point features found with valid geometry.`);
+        }
+      }
+
+      // Helper function to find actual field name in attributes based on our expected names
+      function findActualFieldName(attributes, fieldName) {
+        // First check if the exact name exists
+        if (attributes.hasOwnProperty(fieldName)) {
+          return fieldName;
+        }
+
+        // Then check alternatives
+        if (ALTERNATIVE_FIELDS[fieldName]) {
+          for (const altName of ALTERNATIVE_FIELDS[fieldName]) {
+            if (attributes.hasOwnProperty(altName)) {
+              return altName;
+            }
+          }
+        }
+
+        // Finally, check if a case-insensitive version exists
+        const lcFieldName = fieldName.toLowerCase();
+        for (const key in attributes) {
+          if (key.toLowerCase() === lcFieldName) {
+            return key;
+          }
+        }
+
+        return null;
+      }
+
+      // Start cycling through features
+      function startCycling() {
+        if (allFeatures.length === 0) {
+          updateStatus("No point features to cycle through");
+          return;
+        }
+
+        // If already cycling, don't restart
+        if (cycleInterval) return;
+
+        // Reset to start from the beginning
+        currentFeatureIndex = 0;
+
+        // Immediately show the first feature
+        cycleToNextFeature();
+
+        // Set interval for subsequent features
+        cycleInterval = setInterval(cycleToNextFeature, delaySeconds * 1000);
+        updateStatus(`Auto-cycling active: ${allFeatures.length} point features, ${delaySeconds} second delay`);
+      }
+
+      // Stop cycling through features
+      function stopCycling() {
+        cycling = false;
+        clearInterval(cycleInterval);
+        cycleInterval = null;
+
+        // Hide the info panel
+        const infoPanel = document.getElementById("infoPanel");
+        if (infoPanel) {
+          infoPanel.style.display = "none";
+        }
+
+        // Clear the highlight
+        highlightLayer.removeAll();
+        currentHighlightGraphic = null;
+
+        // Return to default zoom level
+        view.goTo({
+          zoom: defaultZoomLevel
+        }, {
+          duration: 1000
+        });
+
+        updateStatus("Auto-cycling stopped. Click Stop Cycling again to restart.");
+
+        // Add event listener to the stop button to restart cycling
+        const stopButton = document.getElementById("stopButton");
+        if (stopButton) {
+          stopButton.innerText = "Start Cycling";
+          const oldClickHandler = stopButton.onclick;
+          stopButton.onclick = function() {
+            if (!cycling) {
+              startCycling();
+              stopButton.innerText = "Stop Cycling";
+              stopButton.onclick = oldClickHandler;
+            }
+          };
+        }
+      }
+
+      // Function to determine the info panel position based on the point's screen location
+      function calculatePanelPosition(pointScreenLocation) {
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        const panelWidth = 350; // Width of the info panel
+        const panelHeight = 300; // Approximate height of the info panel
+
+        // Get a position based on the feature index to create variety
+        // This ensures different points get different panel positions
+        const positionIndex = currentFeatureIndex % panelPositions.length;
+        let position = panelPositions[positionIndex];
+
+        // Determine the best position to avoid the point itself
+        // First, try using the "natural" quadrant-based position
+        if (pointScreenLocation.x < screenWidth / 2) {
+          // Point is in left half of screen, so place panel to the right
+          if (pointScreenLocation.y < screenHeight / 2) {
+            // Upper left quadrant - place to right or below
+            position = (positionIndex % 2 === 0) ? 'right' : 'bottom';
+          } else {
+            // Lower left quadrant - place to right or above
+            position = (positionIndex % 2 === 0) ? 'right' : 'top';
+          }
+        } else {
+          // Point is in right half of screen, so place panel to the left
+          if (pointScreenLocation.y < screenHeight / 2) {
+            // Upper right quadrant - place to left or below
+            position = (positionIndex % 2 === 0) ? 'left' : 'bottom';
+          } else {
+            // Lower right quadrant - place to left or above
+            position = (positionIndex % 2 === 0) ? 'left' : 'top';
+          }
+        }
+
+        // Override if point is very close to an edge
+        const edgeMargin = panelWidth + 20; // Safety margin
+        if (pointScreenLocation.x < edgeMargin) {
+          // Too close to left edge, force right position
+          position = 'right';
+        } else if (pointScreenLocation.x > screenWidth - edgeMargin) {
+          // Too close to right edge, force left position
+          position = 'left';
+        } else if (pointScreenLocation.y < panelHeight + 20) {
+          // Too close to top edge, force bottom position
+          position = 'bottom';
+        } else if (pointScreenLocation.y > screenHeight - panelHeight - 20) {
+          // Too close to bottom edge, force top position
+          position = 'top';
+        }
+
+        // Calculate the panel position based on determined position
+        let left, top;
+
+        switch (position) {
+          case 'right':
+            left = pointScreenLocation.x + PANEL_MIN_OFFSET;
+            top = pointScreenLocation.y - (panelHeight / 2);
+            break;
+          case 'left':
+            left = pointScreenLocation.x - panelWidth - PANEL_MIN_OFFSET;
+            top = pointScreenLocation.y - (panelHeight / 2);
+            break;
+          case 'top':
+            left = pointScreenLocation.x - (panelWidth / 2);
+            top = pointScreenLocation.y - panelHeight - PANEL_MIN_OFFSET;
+            break;
+          case 'bottom':
+            left = pointScreenLocation.x - (panelWidth / 2);
+            top = pointScreenLocation.y + PANEL_MIN_OFFSET;
+            break;
+        }
+
+        // Ensure the panel stays within the screen bounds
+        left = Math.max(PANEL_MARGIN, Math.min(left, screenWidth - panelWidth - PANEL_MARGIN));
+        top = Math.max(PANEL_MARGIN, Math.min(top, screenHeight - panelHeight - PANEL_MARGIN));
+
+        return {
+          left: left,
+          top: top,
+          position: position
+        };
+      }
+
+      // Function to display attribute information in the info panel
+      function displayFeatureInfo(feature, pointScreenLocation) {
+        const infoPanel = document.getElementById("infoPanel");
+        if (!infoPanel) return;
+
+        // Get attributes from the feature
+        const attributes = feature.attributes;
+        if (!attributes) {
+          infoPanel.innerHTML = "<h2>No information available</h2>";
+          return;
+        }
+
+        // Find the field names in the attributes
+        const agencyNameField = findActualFieldName(attributes, "Agency_Name");
+        const productUsedField = findActualFieldName(attributes, "Product_Used");
+        const storyQuoteField = findActualFieldName(attributes, "Story___Quote"); // Use triple underscore
+
+        // Set default values in case fields aren't found
+        let agencyName = "Unknown Agency";
+        let productUsed = "Unknown Product";
+        let storyQuote = "No story available";
+
+        // Get the actual values if fields exist
+        if (agencyNameField && attributes[agencyNameField]) {
+          agencyName = attributes[agencyNameField];
+        }
+
+        if (productUsedField && attributes[productUsedField]) {
+          productUsed = attributes[productUsedField];
+        }
+
+        if (storyQuoteField && attributes[storyQuoteField]) {
+          storyQuote = attributes[storyQuoteField];
+        }
+
+        // Create HTML content with new layout
+        let content = `<h2>${agencyName}</h2>`;
+
+        // Add product name
+        content += `<div class="product-used">${productUsed}</div>`;
+
+        // Check if product is RapidSOS and add logo if it is
+        if (productUsed && productUsed.toLowerCase().includes("rapidsos")) {
+          content += `<div class="product-logo"><img src="${RAPIDSOS_LOGO_URL}" alt="RapidSOS Logo"></div>`;
+        }
+
+        // Add story quote
+        content += `<div class="story-quote">${storyQuote}</div>`;
+
+        // Calculate the new position for the panel
+        const panelPos = calculatePanelPosition(pointScreenLocation);
+        currentPanelPosition = panelPos.position;
+
+        // Remove all position classes and add the current position class
+        infoPanel.className = "info-panel";
+        infoPanel.classList.add("position-" + panelPos.position);
+
+        // Position the panel
+        infoPanel.style.left = panelPos.left + 'px';
+        infoPanel.style.top = panelPos.top + 'px';
+
+        // Update the content
+        infoPanel.innerHTML = content;
+        infoPanel.style.display = "block";
+
+        return panelPos.position;
+      }
+
+      // Create highlight symbols for the current point
+      function createHighlightSymbols(point) {
+        // Clear any existing highlights
+        highlightLayer.removeAll();
+
+        // Create a main marker (smaller, bright)
+        const mainMarker = new SimpleMarkerSymbol({
+          color: "#29A8DD", // Safety Blue
+          outline: {
+            color: "#FFFFFF",
+            width: 2
+          },
+          size: 15
+        });
+
+        // Create the pulse effect (larger, transparent, animated)
+        const pulseMarker1 = new SimpleMarkerSymbol({
+          color: [41, 168, 221, 0.7], // Safety Blue with transparency
+          outline: {
+            color: [41, 168, 221, 0.5],
+            width: 1
+          },
+          size: 20
+        });
+
+        const pulseMarker2 = new SimpleMarkerSymbol({
+          color: [41, 168, 221, 0.3], // More transparent
+          outline: {
+            color: [41, 168, 221, 0.2],
+            width: 1
+          },
+          size: 30
+        });
+
+        // Create the outer ring (largest, very transparent)
+        const outerRing = new SimpleMarkerSymbol({
+          color: [0, 94, 255, 0.1], // Glow with high transparency
+          outline: {
+            color: [0, 94, 255, 0.2],
+            width: 1
+          },
+          size: 40
+        });
+
+        // Add the markers to the highlight layer
+        const mainHighlight = new Graphic({
+          geometry: point,
+          symbol: mainMarker
+        });
+
+        const pulseHighlight1 = new Graphic({
+          geometry: point,
+          symbol: pulseMarker1
+        });
+
+        const pulseHighlight2 = new Graphic({
+          geometry: point,
+          symbol: pulseMarker2
+        });
+
+        const outerHighlight = new Graphic({
+          geometry: point,
+          symbol: outerRing
+        });
+
+        // Add all highlights to the layer
+        highlightLayer.addMany([outerHighlight, pulseHighlight2, pulseHighlight1, mainHighlight]);
+
+        // Return the main highlight for reference
+        return mainHighlight;
+      }
+
+      // Function to cycle to the next feature
+      function cycleToNextFeature() {
+        if (allFeatures.length === 0) {
+          updateStatus("No point features to cycle through");
+          return;
+        }
+
+        // Get the current feature
+        const feature = allFeatures[currentFeatureIndex];
+
+        if (feature && feature.geometry) {
+          updateStatus(`Showing point ${currentFeatureIndex + 1} of ${allFeatures.length}`);
+
+          // Calculate zoom level - use the default + increment, but cap at a reasonable max level
+          const targetZoom = Math.min(defaultZoomLevel + zoomLevelIncrement, 20);
+          console.log("Zooming to level:", targetZoom, "from default:", defaultZoomLevel);
+
+          // Create highlight for the current point
+          currentHighlightGraphic = createHighlightSymbols(feature.geometry);
+
+          // Center the map on this feature with a closer zoom level
+          view.goTo({
+            target: feature.geometry,
+            zoom: targetZoom
+          }, {
+            duration: 1200,  // Slower animation for smoother transition
+            easing: "ease-in-out"  // Smoother easing
+          }).then(() => {
+            // Get screen location of the point to position info panel
+            view.whenLayerView(highlightLayer).then(layerView => {
+              // Convert the map point to screen coordinates
+              const screenPoint = view.toScreen(feature.geometry);
+
+              // Display feature information with dynamic positioning
+              displayFeatureInfo(feature, screenPoint);
+
+              // Add event listener to update the panel when the view is updated
+              view.watch("extent", function() {
+                const updatedScreenPoint = view.toScreen(feature.geometry);
+
+                // Update the panel position
+                const newPanelPos = calculatePanelPosition(updatedScreenPoint);
+
+                // Get panel element
+                const infoPanel = document.getElementById("infoPanel");
+                if (infoPanel) {
+                  // Update panel position
+                  infoPanel.style.left = newPanelPos.left + 'px';
+                  infoPanel.style.top = newPanelPos.top + 'px';
+
+                  // Remove all position classes and add the current position class
+                  infoPanel.className = "info-panel";
+                  infoPanel.classList.add("position-" + newPanelPos.position);
+
+                  // Update current panel position
+                  currentPanelPosition = newPanelPos.position;
+                }
+              });
+            });
+          }).catch(error => {
+            console.error("Error centering feature:", error);
+          });
+
+          // Increment for next cycle
+          currentFeatureIndex = (currentFeatureIndex + 1) % allFeatures.length;
+        } else {
+          // Skip invalid features
+          currentFeatureIndex = (currentFeatureIndex + 1) % allFeatures.length;
+          cycleToNextFeature(); // Recursively try the next feature
+        }
+      }
+
+      // Update status message
+      function updateStatus(message) {
+        const statusPanel = document.getElementById("statusPanel");
+        if (statusPanel) {
+          statusPanel.innerText = message;
+          statusPanel.style.display = "block";
+          console.log(message);
+        }
+      }
+    });
+  </script>
+</head>
+<body>
+  <div id="viewDiv"></div>
+</body>
+</html>
