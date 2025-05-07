@@ -703,13 +703,10 @@
           storyQuote = attributes[storyQuoteField];
         }
 
-        // Create HTML content with new layout
+        // Create HTML content with new layout - just the agency name as header
         let content = `<h2>${agencyName}</h2>`;
 
-        // Add product name
-        content += `<div class="product-used">${productUsed}</div>`;
-
-        // Check product name and add appropriate logo
+        // Check product name and add appropriate logo without showing the product name text
         if (productUsed) {
           if (productUsed.toLowerCase().includes("rapidsos")) {
             content += `<div class="product-logo"><img src="${RAPIDSOS_LOGO_URL}" alt="RapidSOS Logo"></div>`;
