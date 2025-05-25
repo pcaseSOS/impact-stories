@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>US PSAP Interactive Map</title>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toolbar button {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            min-width: 180px;
+            text-align: left;
+        }
+
+        .toolbar button:hover {
+            background: #005a87;
+        }
+
+        .toolbar button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .toolbar button.active {
+            background: #28a745;
+        }
+
+        .toolbar button.danger {
+            background: #dc3545;
+        }
+
+        .toolbar button.danger:hover {
+            background: #c82333;
+        }
+
+        .search-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .search-input-container {
+            display: flex;
+            width: 100%;
+        }
+
+        .search-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px 0 0 4px;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .search-button {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .search-button:hover {
+            background: #005a87;
+        }
+
+        .search-results {
+            background: white;
+            border-radius: 0 0 4px 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .search-result-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        .search-result-item:hover {
+            background: #f0f0f0;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        #selectedPanel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            z-index: 100;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            width: 280px;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100% - 150px);
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            font-size: 16px;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .selected-items {
+            overflow-y: auto;
+            padding: 0;
+            flex-grow: 1;
+        }
+
+        .selected-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .selected-item:hover {
+            background: #f8f9fa;
+        }
+
+        .selected-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-name {
+            font-weight: 500;
+            color: #333;
+            flex-grow: 1;
+        }
+
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .remove-btn:hover {
+            background: #c82333;
+        }
+
+        .panel-footer {
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+
+        .tooltip-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 3px;
+        }
+
+        .tooltip-content {
+            font-size: 11px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+
+    <!-- Search Bar -->
+    <div class="search-container">
+        <div class="search-input-container">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search for a PSAP...">
+            <button class="search-button" id="searchButton">🔍</button>
+        </div>
+        <div class="search-results" id="searchResults">
+            <!-- Search results will appear here -->
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button id="selectModeBtn">🔍 Select PSAPs</button>
+        <button id="downloadBtn" disabled>💾 Download Selected</button>
+        <button id="clearBtn" disabled>🗑️ Clear Selection</button>
+    </div>
+
+    <!-- Selected Items Panel -->
+    <div id="selectedPanel">
+        <div class="panel-header">Selected PSAPs (<span id="selectedCount">0</span>)</div>
+        <div class="selected-items" id="selectedItems">
+            <!-- Selected items will appear here -->
+        </div>
+        <div class="panel-footer">
+            Select PSAPs by clicking on them or searching by name
+        </div>
+    </div>
+
+    <div id="status">Ready to use</div>
+
+    <!-- Tooltip for hovering over PSAPs -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer",
+            "esri/widgets/Search",
+            "esri/Graphic",
+            "esri/tasks/support/Query",
+            "esri/geometry/support/webMercatorUtils",
+            "esri/symbols/SimpleFillSymbol",
+            "esri/renderers/SimpleRenderer",
+            "esri/symbols/SimpleLineSymbol",
+            "esri/tasks/Locator"
+        ], function(Map, MapView, FeatureLayer, Search, Graphic, Query, webMercatorUtils, SimpleFillSymbol, SimpleRenderer, SimpleLineSymbol, Locator) {
+            // Create the map
+            const map = new Map({
+                basemap: "streets-navigation-vector"
+            });
+
+            // Create the map view
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [-98.5795, 39.8283], // Center of US
+                zoom: 4
+            });
+
+            // Define renderer for the layer
+            const renderer = new SimpleRenderer({
+                symbol: new SimpleFillSymbol({
+                    color: [51, 51, 204, 0.3],
+                    outline: new SimpleLineSymbol({
+                        color: [51, 51, 204, 0.8],
+                        width: 1
+                    })
+                })
+            });
+
+            // Create the feature layer for PSAPs
+            const psapLayer = new FeatureLayer({
+                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
+                renderer: renderer,
+                outFields: ["*"]
+            });
+
+            // Add the layer to the map
+            map.add(psapLayer);
+
+            // Define the selection symbol
+            const selectionSymbol = new SimpleFillSymbol({
+                color: [255, 255, 0, 0.5],
+                outline: new SimpleLineSymbol({
+                    color: [255, 255, 0, 1],
+                    width: 2
+                })
+            });
+
+            // Define the highlight symbol
+            const highlightSymbol = new SimpleFillSymbol({
+                color: [255, 165, 0, 0.5],
+                outline: new SimpleLineSymbol({
+                    color: [255, 165, 0, 1],
+                    width: 2
+                })
+            });
+
+            // UI Elements
+            const selectModeBtn = document.getElementById('selectModeBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const status = document.getElementById('status');
+            const selectedItems = document.getElementById('selectedItems');
+            const selectedCount = document.getElementById('selectedCount');
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const searchResults = document.getElementById('searchResults');
+            const tooltip = document.getElementById('tooltip');
+
+            // Create locator for geocoding
+            const locator = new Locator({
+                url: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer"
+            });
+
+            // Variables to track state
+            let isSelectMode = false;
+            let selectedFeatures = [];
+            let highlightedFeatures = [];
+            let clickHandler = null;
+
+            // Function to toggle selection mode
+            function toggleSelectMode() {
+                isSelectMode = !isSelectMode;
+                
+                if (isSelectMode) {
+                    selectModeBtn.textContent = '✓ Selection Active';
+                    selectModeBtn.classList.add('active');
+                    status.textContent = 'Click on PSAPs to select them';
+                    
+                    // Set up click handler for selection
+                    clickHandler = view.on('click', handleMapClick);
+                } else {
+                    selectModeBtn.textContent = '🔍 Select PSAPs';
+                    selectModeBtn.classList.remove('active');
+                    status.textContent = 'Selection mode disabled';
+                    
+                    // Remove click handler
+                    if (clickHandler) {
+                        clickHandler.remove();
+                        clickHandler = null;
+                    }
+                }
+            }
+
+            // Function to handle map clicks for selection
+            function handleMapClick(event) {
+                // Perform a hitTest on the view at the clicked location
+                view.hitTest(event).then(function(response) {
+                    // Check if a feature from the PSAPs layer was clicked
+                    const psapFeature = response.results.find(result => {
+                        return result.graphic.layer === psapLayer;
+                    });
+                    
+                    if (psapFeature) {
+                        const feature = psapFeature.graphic;
+                        
+                        // Check if this feature is already selected
+                        const featureId = feature.attributes.OBJECTID;
+                        const alreadySelected = selectedFeatures.some(f => f.attributes.OBJECTID === featureId);
+                        
+                        if (alreadySelected) {
+                            // If already selected, remove it
+                            removeSelectedFeature(featureId);
+                        } else {
+                            // If not selected, add it
+                            addSelectedFeature(feature);
+                        }
+                    }
+                });
+            }
+            
+            // Function to add a selected feature
+            function addSelectedFeature(feature) {
+                // Clone the feature to prevent modifying the original
+                const clonedFeature = feature.clone();
+                
+                // Apply selection symbol
+                clonedFeature.symbol = selectionSymbol;
+                
+                // Add to selection
+                selectedFeatures.push(clonedFeature);
+                
+                // Add to graphics layer
+                view.graphics.add(clonedFeature);
+                
+                // Update UI
+                updateSelectedPanel();
+                
+                // Enable buttons
+                updateButtonStates();
+                
+                // Show status
+                const count = selectedFeatures.length;
+                status.textContent = `Selected ${count} PSAP${count !== 1 ? 's' : ''}`;
+            }
+            
+            // Function to remove a selected feature
+            function removeSelectedFeature(featureId) {
+                // Find the feature in our selection
+                const index = selectedFeatures.findIndex(f => f.attributes.OBJECTID === featureId);
+                
+                if (index !== -1) {
+                    // Remove from graphics layer
+                    view.graphics.remove(selectedFeatures[index]);
+                    
+                    // Remove from selection
+                    selectedFeatures.splice(index, 1);
+                    
+                    // Update UI
+                    updateSelectedPanel();
+                    
+                    // Update button states
+                    updateButtonStates();
+                    
+                    // Show status
+                    const count = selectedFeatures.length;
+                    status.textContent = `Deselected PSAP. ${count} PSAP${count !== 1 ? 's' : ''} remaining.`;
+                }
+            }
+            
+            // Function to clear all selections
+            function clearSelection() {
+                // Remove all graphics
+                selectedFeatures.forEach(feature => {
+                    view.graphics.remove(feature);
+                });
+                
+                // Clear arrays
+                selectedFeatures = [];
+                
+                // Update UI
+                updateSelectedPanel();
+                
+                // Update button states
+                updateButtonStates();
+                
+                // Show status
+                status.textContent = 'All selections cleared';
+            }
+            
+            // Function to update the selected panel
+            function updateSelectedPanel() {
+                // Clear current list
+                selectedItems.innerHTML = '';
+                
+                // Update count
+                selectedCount.textContent = selectedFeatures.length;
+                
+                // If no items, show message
+                if (selectedFeatures.length === 0) {
+                    const noItemsDiv = document.createElement('div');
+                    noItemsDiv.className = 'selected-item';
+                    noItemsDiv.textContent = 'No PSAPs selected';
+                    selectedItems.appendChild(noItemsDiv);
+                    return;
+                }
+                
+                // Add items to panel
+                selectedFeatures.forEach(feature => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'selected-item';
+                    
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'item-name';
+                    nameDiv.textContent = getPSAPName(feature.attributes);
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-btn';
+                    removeBtn.textContent = '✕';
+                    removeBtn.addEventListener('click', function() {
+                        removeSelectedFeature(feature.attributes.OBJECTID);
+                    });
+                    
+                    itemDiv.appendChild(nameDiv);
+                    itemDiv.appendChild(removeBtn);
+                    selectedItems.appendChild(itemDiv);
+                });
+            }
+            
+            // Function to get PSAP name from attributes
+            function getPSAPName(attributes) {
+                // Try different field combinations to get the best name
+                if (attributes.PSAP_NAME) {
+                    return attributes.PSAP_NAME;
+                } else if (attributes.STATE && attributes.COUNTY) {
+                    return `${attributes.COUNTY}, ${attributes.STATE}`;
+                } else if (attributes.STATE) {
+                    return `PSAP in ${attributes.STATE}`;
+                } else if (attributes.FCC_ID) {
+                    return `PSAP ID: ${attributes.FCC_ID}`;
+                } else {
+                    return `PSAP #${attributes.OBJECTID}`;
+                }
+            }
+            
+            // Function to create tooltip content for PSAP feature
+            function createPSAPTooltipContent(attributes) {
+                let content = '<div class="tooltip-title">' + getPSAPName(attributes) + '</div>';
+                content += '<div class="tooltip-content">';
+                
+                if (attributes.FCC_ID) {
+                    content += `<div>FCC ID: ${attributes.FCC_ID}</div>`;
+                }
+                
+                if (attributes.STATE) {
+                    content += `<div>State: ${attributes.STATE}</div>`;
+                }
+                
+                if (attributes.COUNTY) {
+                    content += `<div>County: ${attributes.COUNTY}</div>`;
+                }
+                
+                content += '</div>';
+                return content;
+            }
+            
+            // Function to update button states
+            function updateButtonStates() {
+                downloadBtn.disabled = selectedFeatures.length === 0;
+                clearBtn.disabled = selectedFeatures.length === 0;
+            }
+            
+            // Function to prepare data for download
+            function prepareDataForDownload() {
+                // Create GeoJSON structure
+                const geoJson = {
+                    type: "FeatureCollection",
+                    features: selectedFeatures.map(feature => {
+                        // Convert the geometry to GeoJSON
+                        const geometry = webMercatorUtils.webMercatorToGeographic(feature.geometry);
+                        
+                        // Create GeoJSON feature
+                        return {
+                            type: "Feature",
+                            properties: feature.attributes,
+                            geometry: {
+                                type: "Polygon",
+                                coordinates: geometry.rings
+                            }
+                        };
+                    })
+                };
+                
+                return geoJson;
+            }
+            
+            // Function to download selected features
+            function downloadSelected() {
+                if (selectedFeatures.length === 0) {
+                    status.textContent = 'No PSAPs selected for download';
+                    return;
+                }
+                
+                try {
+                    // Prepare data
+                    const geoJson = prepareDataForDownload();
+                    
+                    // Convert to string
+                    const dataStr = JSON.stringify(geoJson, null, 2);
+                    
+                    // Create download link
+                    const dataUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+                    
+                    // Create a link element
+                    const downloadLink = document.createElement('a');
+                    downloadLink.setAttribute('href', dataUri);
+                    downloadLink.setAttribute('download', 'selected_psaps.geojson');
+                    downloadLink.style.display = 'none';
+                    
+                    // Add to body and click
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    
+                    // Clean up
+                    document.body.removeChild(downloadLink);
+                    
+                    // Show status
+                    status.textContent = `Downloaded ${selectedFeatures.length} PSAPs as GeoJSON`;
+                } catch (error) {
+                    console.error("Download error:", error);
+                    status.textContent = 'Error preparing download';
+                }
+            }
+            
+            // Function to search for PSAPs
+            function searchPSAPs(searchText) {
+                if (!searchText || searchText.trim() === '') {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                // Clear previous results
+                searchResults.innerHTML = '';
+                
+                // Normalize search text
+                searchText = searchText.trim().toLowerCase();
+                
+                // Create a query for the PSAP layer
+                const query = new Query();
+                query.outFields = ["*"];
+                query.returnGeometry = true;
+                
+                // Build a where clause to search multiple fields
+                query.where = `LOWER(PSAP_NAME) LIKE '%${searchText}%' OR ` +
+                              `LOWER(FCC_ID) LIKE '%${searchText}%' OR ` +
+                              `LOWER(COUNTY) LIKE '%${searchText}%' OR ` +
+                              `LOWER(STATE) LIKE '%${searchText}%'`;
+                
+                // Execute query
+                psapLayer.queryFeatures(query).then(function(results) {
+                    // Show/hide results container
+                    searchResults.style.display = 'block';
+                    
+                    // Process results
+                    if (results.features.length > 0) {
+                        // Add each result to the dropdown
+                        results.features.forEach(function(feature) {
+                            const resultItem = document.createElement('div');
+                            resultItem.className = 'search-result-item';
+                            resultItem.textContent = getPSAPName(feature.attributes);
+                            
+                            // Add click handler to zoom to and select the feature
+                            resultItem.addEventListener('click', function() {
+                                // Zoom to the feature
+                                view.goTo({
+                                    target: feature.geometry,
+                                    zoom: 10
+                                }).then(function() {
+                                    // Add to selection if not already selected
+                                    const featureId = feature.attributes.OBJECTID;
+                                    const alreadySelected = selectedFeatures.some(f => f.attributes.OBJECTID === featureId);
+                                    
+                                    if (!alreadySelected) {
+                                        addSelectedFeature(feature);
+                                    }
+                                    
+                                    // Close search results
+                                    searchResults.style.display = 'none';
+                                    
+                                    // Update status
+                                    status.textContent = `Zoomed to ${getPSAPName(feature.attributes)}`;
+                                });
+                            });
+                            
+                            searchResults.appendChild(resultItem);
+                        });
+                    } else {
+                        // If no results, try geocoding
+                        status.textContent = "No matching PSAPs, trying map location search...";
+                        
+                        // Parameters for geocoding
+                        const params = {
+                            address: {
+                                "singleLine": searchText
+                            },
+                            countryCode: "USA",
+                            maxLocations: 5,
+                            outFields: ["*"]
+                        };
+                        
+                        locator.addressToLocations(params).then(function(locations) {
+                            if (locations.length > 0) {
+                                // Create a section header for geocoded results
+                                const geocodeHeader = document.createElement('div');
+                                geocodeHeader.className = 'search-result-item';
+                                geocodeHeader.style.fontWeight = 'bold';
+                                geocodeHeader.style.backgroundColor = '#f0f0f0';
+                                geocodeHeader.textContent = 'Map Locations (not PSAPs)';
+                                searchResults.appendChild(geocodeHeader);
+                                
+                                // Add geocoded results
+                                locations.forEach(function(location) {
+                                    const resultItem = document.createElement('div');
+                                    resultItem.className = 'search-result-item';
+                                    resultItem.textContent = location.attributes.LongLabel || location.attributes.ShortLabel || "Location";
+                                    
+                                    // Add click handler to zoom to location
+                                    resultItem.addEventListener('click', function() {
+                                        // Create a marker at the location
+                                        const point = {
+                                            type: "point",
+                                            longitude: location.location.longitude,
+                                            latitude: location.location.latitude
+                                        };
+                                        
+                                        const markerSymbol = {
+                                            type: "simple-marker",
+                                            color: [226, 119, 40],
+                                            outline: {
+                                                color: [255, 255, 255],
+                                                width: 2
+                                            }
+                                        };
+                                        
+                                        // Remove any existing temporary markers
+                                        view.graphics.removeMany(
+                                            view.graphics.filter(g => g.temp === true)
+                                        );
+                                        
+                                        // Add the marker
+                                        const graphic = new Graphic({
+                                            geometry: point,
+                                            symbol: markerSymbol,
+                                            attributes: location.attributes,
+                                            popupTemplate: {
+                                                title: location.attributes.LongLabel || "Location",
+                                                content: location.attributes.Address
+                                            }
+                                        });
+                                        
+                                        // Mark this as temporary
+                                        graphic.temp = true;
+                                        
+                                        view.graphics.add(graphic);
+                                        
+                                        // Zoom to the location
+                                        view.goTo({
+                                            target: point,
+                                            zoom: 12
+                                        }).then(function() {
+                                            // Show popup
+                                            view.popup.open({
+                                                features: [graphic],
+                                                location: point
+                                            });
+                                            
+                                            // Close search results
+                                            searchResults.style.display = 'none';
+                                            
+                                            // Update status
+                                            status.textContent = `Zoomed to location: ${location.attributes.LongLabel || "Location"}`;
+                                        });
+                                    });
+                                    
+                                    searchResults.appendChild(resultItem);
+                                });
+                            } else {
+                                // No results found at all
+                                const noResults = document.createElement('div');
+                                noResults.className = 'search-result-item';
+                                noResults.textContent = 'No matching PSAPs or locations found';
+                                searchResults.appendChild(noResults);
+                            }
+                        }).catch(function(error) {
+                            console.error("Geocoding error:", error);
+                            
+                            // If geocoding fails, show the original no results message
+                            searchResults.style.display = 'block';
+                            const noResults = document.createElement('div');
+                            noResults.className = 'search-result-item';
+                            noResults.textContent = 'No matching PSAPs found';
+                            searchResults.appendChild(noResults);
+                        });
+                    }
+                }).catch(function(error) {
+                    console.error('Search error:', error);
+                    status.textContent = 'Error searching for PSAPs';
+                });
+            }
+            
+            // Handle mouse move for hover effect on PSAPs
+            view.on("pointer-move", function(event) {
+                view.hitTest(event).then(function(response) {
+                    if (response.results.length > 0 &&
+                        response.results[0].graphic.layer === psapLayer) {
+                        
+                        const graphic = response.results[0].graphic;
+                        
+                        // Show tooltip with PSAP info
+                        tooltip.innerHTML = createPSAPTooltipContent(graphic.attributes);
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = event.x + 15 + 'px';
+                        tooltip.style.top = event.y - 15 + 'px';
+                        
+                        view.container.style.cursor = "pointer";
+                    } else {
+                        tooltip.style.display = 'none';
+                        view.container.style.cursor = "default";
+                    }
+                });
+            });
+            
+            // Handle mouse leave
+            view.on("pointer-leave", function() {
+                tooltip.style.display = 'none';
+                view.container.style.cursor = "default";
+            });
+            
+            // Hide search results when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('.search-container')) {
+                    searchResults.style.display = 'none';
+                }
+            });
+            
+            // Event listeners
+            selectModeBtn.addEventListener('click', toggleSelectMode);
+            downloadBtn.addEventListener('click', downloadSelected);
+            clearBtn.addEventListener('click', clearSelection);
+            
+            // Search button click event
+            searchButton.addEventListener('click', function() {
+                searchPSAPs(searchInput.value);
+            });
+            
+            // Search on Enter key
+            searchInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    searchPSAPs(searchInput.value);
+                }
+            });
+            
+            // Search as you type (with debounce)
+            let debounceTimeout;
+            searchInput.addEventListener('input', function() {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(function() {
+                    searchPSAPs(searchInput.value);
+                }, 300); // 300ms delay
+            });
+            
+            // When the view and layers are ready
+            view.when(function() {
+                status.textContent = "Loading PSAP data...";
+                
+                // Wait for layer to load
+                psapLayer.when(function() {
+                    status.textContent = "Map ready - select PSAPs by clicking on them";
+                    console.log("PSAP layer loaded");
+                    console.log("Fields available:", psapLayer.fields.map(f => f.name));
+                }).catch(function(error) {
+                    console.error("Error loading PSAP layer:", error);
+                    status.textContent = "Error loading PSAP data - check console";
+                });
+            });
+        });
+    </script>
+</body>
+</html>
