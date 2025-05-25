@@ -171,6 +171,7 @@
     <!-- Toolbar -->
     <div class="toolbar">
         <button id="selectModeBtn">🖱️ Single Select Mode</button>
+        <button id="lassoBtn">🎯 Lasso Select</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="clearAllBtn" disabled class="danger">🗑️ Clear All Selections</button>
     </div>
@@ -185,11 +186,11 @@
             <!-- Selected items will be populated here -->
         </div>
         <div class="panel-footer">
-            Hold Ctrl/Cmd + click OR use Multi-Select Mode button
+            Multiple selection: Hold Ctrl/Cmd + click, Multi-Select Mode, or Lasso Select
         </div>
     </div>
 
-    <div id="status">Single-click to select towns. For multiple selections: Hold Cmd/Ctrl or use Multi-Select Mode.</div>
+    <div id="status">Single-click to select towns. For multiple: Hold Cmd/Ctrl, Multi-Select Mode, or Lasso Select.</div>
 
     <script>
         require([
@@ -200,17 +201,23 @@
             "esri/symbols/SimpleLineSymbol",
             "esri/renderers/SimpleRenderer",
             "esri/Graphic",
-            "esri/geometry/geometryEngine"
-        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine) {
+            "esri/geometry/geometryEngine",
+            "esri/widgets/Sketch",
+            "esri/layers/GraphicsLayer"
+        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer) {
 
             let selectedFeatures = []; // Array to store multiple selected features
             let highlightSelections = []; // Array to store highlight handles
             let multiSelectMode = false;
+            let lassoMode = false;
+            let sketch = null;
+            let sketchLayer = null;
 
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
             const clearAllBtn = document.getElementById('clearAllBtn');
             const selectModeBtn = document.getElementById('selectModeBtn');
+            const lassoBtn = document.getElementById('lassoBtn');
             const selectionPanel = document.getElementById('selectionPanel');
             const selectionList = document.getElementById('selectionList');
             const selectionCount = document.getElementById('selectionCount');
@@ -251,14 +258,99 @@
             // Add the layer to the map
             map.add(canadaTownsLayer);
 
+            // Create graphics layer for sketch tool
+            sketchLayer = new GraphicsLayer({
+                title: "Selection Graphics"
+            });
+            map.add(sketchLayer);
+
+            // Create sketch widget for lasso selection
+            sketch = new Sketch({
+                layer: sketchLayer,
+                view: view,
+                creationMode: "update"
+            });
+
+            // Handle sketch complete event for lasso selection
+            sketch.on("create", function(event) {
+                if (event.state === "complete" && lassoMode) {
+                    handleLassoSelection(event.graphic.geometry);
+                    // Clear the drawn graphic after selection
+                    sketchLayer.removeAll();
+                }
+            });
+
             // Create tooltip element
             const tooltip = document.createElement('div');
             tooltip.className = 'tooltip';
             tooltip.style.display = 'none';
             document.body.appendChild(tooltip);
 
+            // Helper function to handle lasso selection
+            function handleLassoSelection(geometry) {
+                const query = canadaTownsLayer.createQuery();
+                query.geometry = geometry;
+                query.spatialRelationship = "intersects";
+                query.returnGeometry = true;
+                query.outFields = ["*"];
+
+                canadaTownsLayer.queryFeatures(query).then(function(result) {
+                    if (result.features.length > 0) {
+                        // Add all intersecting features to selection
+                        result.features.forEach(feature => {
+                            // Check if already selected
+                            const existingIndex = selectedFeatures.findIndex(f =>
+                                getFeatureId(f) === getFeatureId(feature)
+                            );
+
+                            if (existingIndex < 0) {
+                                // Not already selected, add it
+                                selectedFeatures.push(feature);
+
+                                // Highlight selected feature
+                                view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                                    const highlight = layerView.highlight(feature);
+                                    highlightSelections.push(highlight);
+                                });
+                            }
+                        });
+
+                        updateSelectionPanel();
+                        updateStatus();
+
+                        status.textContent = `Lasso selected ${result.features.length} towns. Total: ${selectedFeatures.length}`;
+                    } else {
+                        status.textContent = "No towns found in lasso area";
+                    }
+                }).catch(function(error) {
+                    console.error("Lasso selection error:", error);
+                    status.textContent = "Error during lasso selection";
+                });
+            }
+
+            // Helper function to get consistent feature ID
+            function getFeatureId(feature) {
+                return feature.attributes.OBJECTID ||
+                       feature.attributes.FID ||
+                       feature.attributes.ObjectId ||
+                       JSON.stringify(feature.attributes);
+            }
+
             // Helper function to get town name from attributes
             function getTownName(attributes) {
+                let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
+
+                Object.keys(attributes).forEach(key => {
+                    if ((key.toLowerCase().includes('name') ||
+                         key.toLowerCase().includes('town') ||
+                         key.toLowerCase().includes('city')) &&
+                         attributes[key] && townName === 'Unknown Town') {
+                        townName = attributes[key];
+                    }
+                });
+
+                return townName;
+            }
                 let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
 
                 Object.keys(attributes).forEach(key => {
@@ -346,16 +438,21 @@
             // Helper function to update status message
             function updateStatus() {
                 if (selectedFeatures.length === 0) {
-                    if (multiSelectMode) {
+                    if (lassoMode) {
+                        status.textContent = '🎯 Lasso mode: Draw a polygon to select multiple towns';
+                    } else if (multiSelectMode) {
                         status.textContent = '🔄 Multi-select mode active: Click towns to add/remove from selection';
                     } else {
                         // Detect if user is on Mac for better instructions
                         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
                         const modifierKey = isMac ? 'Cmd' : 'Ctrl';
-                        status.textContent = `Single-click to select towns. Hold ${modifierKey} or use Multi-Select Mode for multiple selections.`;
+                        status.textContent = `Single-click to select towns. Hold ${modifierKey} or use Multi-Select/Lasso for multiple selections.`;
                     }
                 } else {
-                    const modeText = multiSelectMode ? ' (Multi-select mode)' : '';
+                    let modeText = '';
+                    if (lassoMode) modeText = ' (Lasso mode)';
+                    else if (multiSelectMode) modeText = ' (Multi-select mode)';
+
                     status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected${modeText}`;
                 }
             }
@@ -390,6 +487,9 @@
 
             // Handle click for selection
             view.on("click", function(event) {
+                // Don't handle clicks when in lasso mode
+                if (lassoMode) return;
+
                 view.hitTest(event).then(function(response) {
                     if (response.results.length > 0 &&
                         response.results[0].graphic.layer === canadaTownsLayer) {
@@ -404,36 +504,35 @@
                                                  (event.native.originalEvent.ctrlKey ||
                                                   event.native.originalEvent.metaKey));
 
-                        const isMultiSelect = multiSelectMode || isModifierPressed;
+                        const shouldMultiSelect = multiSelectMode || isModifierPressed;
 
-                        // Debug logging for Mac users
-                        console.log('Click event:', {
-                            ctrlKey: event.native.ctrlKey,
-                            metaKey: event.native.metaKey,
-                            shiftKey: event.native.shiftKey,
+                        console.log('Selection debug:', {
                             multiSelectMode: multiSelectMode,
-                            isMultiSelect: isMultiSelect
+                            isModifierPressed: isModifierPressed,
+                            shouldMultiSelect: shouldMultiSelect,
+                            currentSelectionCount: selectedFeatures.length
                         });
 
                         // Check if this feature is already selected
                         const existingIndex = selectedFeatures.findIndex(f =>
-                            f.attributes.OBJECTID === graphic.attributes.OBJECTID ||
-                            f.attributes.FID === graphic.attributes.FID ||
-                            JSON.stringify(f.attributes) === JSON.stringify(graphic.attributes)
+                            getFeatureId(f) === getFeatureId(graphic)
                         );
 
                         if (existingIndex >= 0) {
                             // Feature already selected - remove it (toggle behavior)
                             removeFromSelection(existingIndex);
+                            status.textContent = `Removed ${getTownName(graphic.attributes)} from selection`;
                         } else {
                             // New selection
-                            if (!isMultiSelect) {
-                                // Single select mode - clear previous selections
+                            if (!shouldMultiSelect && selectedFeatures.length > 0) {
+                                // Single select mode and we have existing selections - clear them first
+                                console.log('Clearing previous selections for single select');
                                 clearAllSelections();
                             }
 
                             // Add new selection
                             selectedFeatures.push(graphic);
+                            console.log('Added feature, total selections:', selectedFeatures.length);
 
                             // Highlight selected feature
                             view.whenLayerView(canadaTownsLayer).then(function(layerView) {
@@ -442,8 +541,10 @@
                             });
 
                             updateSelectionPanel();
+                            status.textContent = `Added ${getTownName(graphic.attributes)} to selection (${selectedFeatures.length} total)`;
                         }
 
+                        updateSelectionPanel();
                         updateStatus();
 
                     } else {
@@ -461,11 +562,42 @@
                 if (multiSelectMode) {
                     selectModeBtn.textContent = '🔄 Multi-Select: ON';
                     selectModeBtn.classList.add('active');
+                    // Turn off lasso mode if it's on
+                    if (lassoMode) {
+                        lassoMode = false;
+                        lassoBtn.textContent = '🎯 Lasso Select';
+                        lassoBtn.classList.remove('active');
+                        view.ui.remove(sketch);
+                    }
                 } else {
                     selectModeBtn.textContent = '🖱️ Single Select Mode';
                     selectModeBtn.classList.remove('active');
                 }
                 updateStatus();
+            });
+
+            lassoBtn.addEventListener('click', function() {
+                lassoMode = !lassoMode;
+                if (lassoMode) {
+                    lassoBtn.textContent = '🎯 Lasso: ON';
+                    lassoBtn.classList.add('active');
+                    view.ui.add(sketch, "top-right");
+                    sketch.create("polygon");
+                    status.textContent = "Draw a polygon to select multiple towns";
+
+                    // Turn off multi-select mode if it's on
+                    if (multiSelectMode) {
+                        multiSelectMode = false;
+                        selectModeBtn.textContent = '🖱️ Single Select Mode';
+                        selectModeBtn.classList.remove('active');
+                    }
+                } else {
+                    lassoBtn.textContent = '🎯 Lasso Select';
+                    lassoBtn.classList.remove('active');
+                    view.ui.remove(sketch);
+                    sketchLayer.removeAll();
+                    updateStatus();
+                }
             });
 
             clearAllBtn.addEventListener('click', function() {
