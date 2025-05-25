@@ -162,16 +162,89 @@
             max-width: 200px;
             word-wrap: break-word;
         }
+        
+        /* Search bar styles */
+        .search-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .search-input-container {
+            display: flex;
+            width: 100%;
+        }
+        
+        .search-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px 0 0 4px;
+            font-size: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .search-button {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        
+        .search-button:hover {
+            background: #005a87;
+        }
+        
+        .search-results {
+            background: white;
+            border-radius: 0 0 4px 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: none;
+        }
+        
+        .search-result-item {
+            padding: 10px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        
+        .search-result-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 
 <body>
     <div id="viewDiv"></div>
+    
+    <!-- Search Bar -->
+    <div class="search-container">
+        <div class="search-input-container">
+            <input type="text" class="search-input" id="searchInput" placeholder="Search for a town...">
+            <button class="search-button" id="searchButton">🔍</button>
+        </div>
+        <div class="search-results" id="searchResults">
+            <!-- Search results will appear here -->
+        </div>
+    </div>
 
     <!-- Toolbar -->
     <div class="toolbar">
         <button id="selectModeBtn">🖱️ Single Select Mode</button>
-        <button id="lassoBtn">🎯 Lasso Select</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="clearAllBtn" disabled class="danger">🗑️ Clear All Selections</button>
     </div>
@@ -186,11 +259,11 @@
             <!-- Selected items will be populated here -->
         </div>
         <div class="panel-footer">
-            Multiple selection: Hold Ctrl/Cmd + click, Multi-Select Mode, or Lasso Select
+            Multiple selection: Hold Ctrl/Cmd + click or Multi-Select Mode
         </div>
     </div>
 
-    <div id="status">Single-click to select towns. For multiple: Hold Cmd/Ctrl, Multi-Select Mode, or Lasso Select.</div>
+    <div id="status">Single-click to select towns. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
 
     <script>
         require([
@@ -211,15 +284,11 @@
             let selectedFeatures = []; // Array to store multiple selected features
             let highlightSelections = []; // Array to store highlight handles
             let multiSelectMode = false;
-            let lassoMode = false;
-            let sketch = null;
-            let sketchLayer = null;
 
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
             const clearAllBtn = document.getElementById('clearAllBtn');
             const selectModeBtn = document.getElementById('selectModeBtn');
-            const lassoBtn = document.getElementById('lassoBtn');
             const selectionPanel = document.getElementById('selectionPanel');
             const selectionList = document.getElementById('selectionList');
             const selectionCount = document.getElementById('selectionCount');
@@ -260,27 +329,7 @@
             // Add the layer to the map
             map.add(canadaTownsLayer);
 
-            // Create graphics layer for sketch tool
-            sketchLayer = new GraphicsLayer({
-                title: "Selection Graphics"
-            });
-            map.add(sketchLayer);
 
-            // Create sketch widget for lasso selection
-            sketch = new Sketch({
-                layer: sketchLayer,
-                view: view,
-                creationMode: "update"
-            });
-
-            // Handle sketch complete event for lasso selection
-            sketch.on("create", function(event) {
-                if (event.state === "complete" && lassoMode) {
-                    handleLassoSelection(event.graphic.geometry);
-                    // Clear the drawn graphic after selection
-                    sketchLayer.removeAll();
-                }
-            });
 
             // Create tooltip element
             const tooltip = document.createElement('div');
@@ -288,47 +337,7 @@
             tooltip.style.display = 'none';
             document.body.appendChild(tooltip);
 
-            // Helper function to handle lasso selection
-            function handleLassoSelection(geometry) {
-                const query = canadaTownsLayer.createQuery();
-                query.geometry = geometry;
-                query.spatialRelationship = "intersects";
-                query.returnGeometry = true;
-                query.outFields = ["*"];
 
-                canadaTownsLayer.queryFeatures(query).then(function(result) {
-                    if (result.features.length > 0) {
-                        // Add all intersecting features to selection
-                        result.features.forEach(feature => {
-                            // Check if already selected
-                            const existingIndex = selectedFeatures.findIndex(f =>
-                                getFeatureId(f) === getFeatureId(feature)
-                            );
-
-                            if (existingIndex < 0) {
-                                // Not already selected, add it
-                                selectedFeatures.push(feature);
-
-                                // Highlight selected feature
-                                view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                                    const highlight = layerView.highlight(feature);
-                                    highlightSelections.push(highlight);
-                                });
-                            }
-                        });
-
-                        updateSelectionPanel();
-                        updateStatus();
-
-                        status.textContent = `Lasso selected ${result.features.length} towns. Total: ${selectedFeatures.length}`;
-                    } else {
-                        status.textContent = "No towns found in lasso area";
-                    }
-                }).catch(function(error) {
-                    console.error("Lasso selection error:", error);
-                    status.textContent = "Error during lasso selection";
-                });
-            }
 
             // Helper function to get consistent feature ID
             function getFeatureId(feature) {
@@ -427,20 +436,17 @@
             // Helper function to update status message
             function updateStatus() {
                 if (selectedFeatures.length === 0) {
-                    if (lassoMode) {
-                        status.textContent = '🎯 Lasso mode: Draw a polygon to select multiple towns';
-                    } else if (multiSelectMode) {
+                    if (multiSelectMode) {
                         status.textContent = '🔄 Multi-select mode active: Click towns to add/remove from selection';
                     } else {
                         // Detect if user is on Mac for better instructions
                         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
                         const modifierKey = isMac ? 'Cmd' : 'Ctrl';
-                        status.textContent = `Single-click to select towns. Hold ${modifierKey} or use Multi-Select/Lasso for multiple selections.`;
+                        status.textContent = `Single-click to select towns. Hold ${modifierKey} or use Multi-Select Mode for multiple selections.`;
                     }
                 } else {
                     let modeText = '';
-                    if (lassoMode) modeText = ' (Lasso mode)';
-                    else if (multiSelectMode) modeText = ' (Multi-select mode)';
+                    if (multiSelectMode) modeText = ' (Multi-select mode)';
 
                     status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected${modeText}`;
                 }
@@ -476,8 +482,7 @@
 
             // Handle click for selection
             view.on("click", function(event) {
-                // Don't handle clicks when in lasso mode
-                if (lassoMode) return;
+
 
                 view.hitTest(event).then(function(response) {
                     if (response.results.length > 0 &&
@@ -551,13 +556,6 @@
                 if (multiSelectMode) {
                     selectModeBtn.textContent = '🔄 Multi-Select: ON';
                     selectModeBtn.classList.add('active');
-                    // Turn off lasso mode if it's on
-                    if (lassoMode) {
-                        lassoMode = false;
-                        lassoBtn.textContent = '🎯 Lasso Select';
-                        lassoBtn.classList.remove('active');
-                        view.ui.remove(sketch);
-                    }
                 } else {
                     selectModeBtn.textContent = '🖱️ Single Select Mode';
                     selectModeBtn.classList.remove('active');
@@ -565,32 +563,152 @@
                 updateStatus();
             });
 
-            lassoBtn.addEventListener('click', function() {
-                lassoMode = !lassoMode;
-                if (lassoMode) {
-                    lassoBtn.textContent = '🎯 Lasso: ON';
-                    lassoBtn.classList.add('active');
-                    view.ui.add(sketch, "top-right");
-                    sketch.create("polygon");
-                    status.textContent = "Draw a polygon to select multiple towns";
 
-                    // Turn off multi-select mode if it's on
-                    if (multiSelectMode) {
-                        multiSelectMode = false;
-                        selectModeBtn.textContent = '🖱️ Single Select Mode';
-                        selectModeBtn.classList.remove('active');
-                    }
-                } else {
-                    lassoBtn.textContent = '🎯 Lasso Select';
-                    lassoBtn.classList.remove('active');
-                    view.ui.remove(sketch);
-                    sketchLayer.removeAll();
-                    updateStatus();
-                }
-            });
 
             clearAllBtn.addEventListener('click', function() {
                 clearAllSelections();
+            });
+            
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            const searchButton = document.getElementById('searchButton');
+            const searchResults = document.getElementById('searchResults');
+            
+            // Function to search for towns
+            function searchTowns(searchText) {
+                if (!searchText.trim()) {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                const query = canadaTownsLayer.createQuery();
+                // Use wildcards to find partial matches
+                const searchPattern = searchText.replace(/\s+/g, '%');
+                let whereClause = '';
+                
+                // Find attributes that might contain town names
+                canadaTownsLayer.fields.forEach(field => {
+                    const fieldName = field.name;
+                    if (fieldName.toLowerCase().includes('name') || 
+                        fieldName.toLowerCase().includes('town') || 
+                        fieldName.toLowerCase().includes('city')) {
+                        if (whereClause) {
+                            whereClause += ` OR UPPER(${fieldName}) LIKE UPPER('%${searchPattern}%')`;
+                        } else {
+                            whereClause = `UPPER(${fieldName}) LIKE UPPER('%${searchPattern}%')`;
+                        }
+                    }
+                });
+                
+                // If no name fields found, search all string fields
+                if (!whereClause) {
+                    canadaTownsLayer.fields.forEach(field => {
+                        if (field.type === 'string') {
+                            if (whereClause) {
+                                whereClause += ` OR UPPER(${field.name}) LIKE UPPER('%${searchPattern}%')`;
+                            } else {
+                                whereClause = `UPPER(${field.name}) LIKE UPPER('%${searchPattern}%')`;
+                            }
+                        }
+                    });
+                }
+                
+                query.where = whereClause || '1=0'; // Use 1=0 if no valid fields (will return no results)
+                query.outFields = ['*'];
+                query.returnGeometry = true;
+                query.num = 10; // Limit to 10 results
+                
+                canadaTownsLayer.queryFeatures(query).then(function(result) {
+                    // Clear previous results
+                    searchResults.innerHTML = '';
+                    
+                    if (result.features.length > 0) {
+                        searchResults.style.display = 'block';
+                        
+                        // Create result items
+                        result.features.forEach(feature => {
+                            const townName = getTownName(feature.attributes);
+                            const resultItem = document.createElement('div');
+                            resultItem.className = 'search-result-item';
+                            resultItem.textContent = townName;
+                            
+                            // Add click event to zoom to the town
+                            resultItem.addEventListener('click', function() {
+                                // Zoom to the feature
+                                view.goTo({
+                                    target: feature.geometry,
+                                    zoom: 12
+                                }, {
+                                    duration: 1000,
+                                    easing: 'ease-out'
+                                }).then(function() {
+                                    // Highlight the feature
+                                    view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                                        // Clear previous search highlights
+                                        if (window.searchHighlight) {
+                                            window.searchHighlight.remove();
+                                        }
+                                        
+                                        // Highlight the feature
+                                        window.searchHighlight = layerView.highlight(feature);
+                                        
+                                        // Show status message
+                                        status.textContent = `Zoomed to: ${townName}`;
+                                    });
+                                });
+                                
+                                // Hide search results
+                                searchResults.style.display = 'none';
+                            });
+                            
+                            searchResults.appendChild(resultItem);
+                        });
+                    } else {
+                        searchResults.style.display = 'block';
+                        const noResults = document.createElement('div');
+                        noResults.className = 'search-result-item';
+                        noResults.textContent = 'No matching towns found';
+                        searchResults.appendChild(noResults);
+                    }
+                }).catch(function(error) {
+                    console.error('Search error:', error);
+                    status.textContent = 'Error searching for towns';
+                });
+            }
+            
+            // Search button click event
+            searchButton.addEventListener('click', function() {
+                searchTowns(searchInput.value);
+            });
+            
+            // Search on Enter key
+            searchInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    searchTowns(searchInput.value);
+                }
+            });
+            
+            // Hide search results when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('.search-container')) {
+                    searchResults.style.display = 'none';
+                }
+            });
+            
+            // Show search results when input is focused
+            searchInput.addEventListener('focus', function() {
+                if (searchInput.value.trim() && searchResults.children.length > 0) {
+                    searchResults.style.display = 'block';
+                }
+            });
+            
+            // Search as you type (with debounce)
+            let debounceTimeout;
+            searchInput.addEventListener('input', function() {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(function() {
+                    searchTowns(searchInput.value);
+                }, 300); // 300ms delay
             });
 
             panelToggle.addEventListener('click', function() {
