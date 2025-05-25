@@ -472,17 +472,47 @@
 
                 try {
                     // Create GeoJSON from all selected features
-                    const features = selectedFeatures.map(feature => ({
-                        type: "Feature",
-                        geometry: {
-                            type: feature.geometry.type === "polygon" ? "Polygon" : "MultiPolygon",
-                            coordinates: convertEsriGeometryToGeoJSON(feature.geometry)
-                        },
-                        properties: feature.attributes
-                    }));
+                    const features = selectedFeatures.map(feature => {
+                        // Ensure coordinates are in EPSG:4326 (WGS84)
+                        let coordinates = convertEsriGeometryToGeoJSON(feature.geometry);
+
+                        // If the original data is in a different CRS, the ArcGIS JS API
+                        // should have already projected it to the view's spatial reference
+                        // GeoJSON standard uses EPSG:4326 by default
+
+                        return {
+                            type: "Feature",
+                            geometry: {
+                                type: feature.geometry.type === "polygon" ? "Polygon" : "MultiPolygon",
+                                coordinates: coordinates
+                            },
+                            properties: {
+                                ...feature.attributes,
+                                // Add metadata about the export
+                                exported_date: new Date().toISOString(),
+                                original_crs: feature.geometry.spatialReference ?
+                                    `EPSG:${feature.geometry.spatialReference.wkid}` : 'Unknown'
+                            }
+                        };
+                    });
 
                     const geoJSON = {
                         type: "FeatureCollection",
+                        // Explicitly specify coordinate reference system as EPSG:4326
+                        crs: {
+                            type: "name",
+                            properties: {
+                                name: "EPSG:4326"
+                            }
+                        },
+                        // Add metadata
+                        metadata: {
+                            exported_by: "ArcGIS Canada Towns Interactive Map",
+                            export_date: new Date().toISOString(),
+                            coordinate_system: "EPSG:4326 (WGS84)",
+                            feature_count: features.length,
+                            source_service: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer"
+                        },
                         features: features
                     };
 
@@ -497,8 +527,8 @@
                     // Create filename
                     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
                     const filename = selectedFeatures.length === 1 ?
-                        `${getTownName(selectedFeatures[0].attributes).replace(/[^a-z0-9]/gi, '_').toLowerCase()}_polygon.geojson` :
-                        `canada_towns_${selectedFeatures.length}_polygons_${timestamp}.geojson`;
+                        `${getTownName(selectedFeatures[0].attributes).replace(/[^a-z0-9]/gi, '_').toLowerCase()}_EPSG4326.geojson` :
+                        `canada_towns_${selectedFeatures.length}_polygons_EPSG4326_${timestamp}.geojson`;
 
                     downloadLink.download = filename;
 
@@ -507,7 +537,7 @@
                     document.body.removeChild(downloadLink);
                     URL.revokeObjectURL(url);
 
-                    status.textContent = `Downloaded ${selectedFeatures.length} polygon${selectedFeatures.length > 1 ? 's' : ''}`;
+                    status.textContent = `Downloaded ${selectedFeatures.length} polygon${selectedFeatures.length > 1 ? 's' : ''} in EPSG:4326`;
 
                 } catch (error) {
                     console.error('Error downloading polygons:', error);
