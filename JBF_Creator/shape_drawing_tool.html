@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Canada JBF Creator - Shape Drawing Tool</title>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toolbar button {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            min-width: 180px;
+            text-align: left;
+        }
+
+        .toolbar button:hover {
+            background: #005a87;
+        }
+
+        .toolbar button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .toolbar button.active {
+            background: #28a745;
+        }
+
+        .toolbar button.danger {
+            background: #dc3545;
+        }
+
+        .toolbar button.danger:hover {
+            background: #c82333;
+        }
+
+        #drawingTools {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            padding: 15px;
+        }
+
+        .drawing-panel-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .drawing-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .drawing-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .drawing-option input[type=radio] {
+            margin: 0;
+        }
+
+        .drawing-option label {
+            cursor: pointer;
+        }
+
+        #status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #infoPanel {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            max-width: 300px;
+            z-index: 100;
+        }
+
+        .info-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .info-content {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+
+    <!-- Drawing Tools Panel -->
+    <div id="drawingTools">
+        <div class="drawing-panel-header">Drawing Tools</div>
+        <div class="drawing-options">
+            <div class="drawing-option">
+                <input type="radio" id="drawPolygon" name="drawingTool" value="polygon" checked>
+                <label for="drawPolygon">Draw Polygon</label>
+            </div>
+            <div class="drawing-option">
+                <input type="radio" id="drawLine" name="drawingTool" value="polyline">
+                <label for="drawLine">Draw Line</label>
+            </div>
+            <div class="drawing-option">
+                <input type="radio" id="drawPoint" name="drawingTool" value="point">
+                <label for="drawPoint">Draw Point</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button id="clearBtn" disabled>🗑️ Clear Drawing</button>
+        <button id="downloadBtn" disabled>📥 Download GeoJSON</button>
+    </div>
+
+    <div id="status">Select a drawing tool and start drawing on the map</div>
+
+    <div id="infoPanel">
+        <div class="info-title">How to Use This Tool</div>
+        <div class="info-content">
+            <p>1. Select a drawing type (polygon, line, or point)</p>
+            <p>2. Click on the map to create your shape</p>
+            <p>3. Double-click to finish drawing</p>
+            <p>4. Click "Download GeoJSON" to save your shape</p>
+            <p>The downloaded GeoJSON will be in WGS84 projection (EPSG:4326)</p>
+            <p><strong>Note:</strong> The PSAP 2017 layer is shown as a reference only</p>
+        </div>
+    </div>
+
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/widgets/Sketch",
+            "esri/layers/GraphicsLayer",
+            "esri/geometry/projection",
+            "esri/geometry/SpatialReference",
+            "esri/geometry/support/webMercatorUtils",
+            "esri/layers/FeatureLayer"
+        ], function(Map, MapView, Sketch, GraphicsLayer, projection, SpatialReference, webMercatorUtils, FeatureLayer) {
+            // Create a graphics layer for the drawn features
+            const graphicsLayer = new GraphicsLayer({
+                title: "User Drawings"
+            });
+
+            // Create the map
+            const map = new Map({
+                basemap: "streets-navigation-vector"
+            });
+            
+            // Add PSAP 2017 reference layer
+            const psapLayer = new FeatureLayer({
+                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
+                outFields: ["*"],
+                opacity: 0.6,
+                title: "PSAP 2017"
+            });
+            
+            // Add the reference layer to the map
+            map.add(psapLayer);
+
+            // Add the graphics layer to the map
+            map.add(graphicsLayer);
+
+            // Create the map view
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [-106.3468, 56.1304], // Center of Canada
+                zoom: 4
+            });
+
+            // UI Elements
+            const clearBtn = document.getElementById('clearBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const status = document.getElementById('status');
+            const drawingOptions = document.querySelectorAll('input[name="drawingTool"]');
+
+            // Create sketch widget
+            const sketch = new Sketch({
+                layer: graphicsLayer,
+                view: view,
+                creationMode: "single",
+                defaultCreateOptions: {
+                    mode: "hybrid" // freehand and click-by-click drawing
+                }
+            });
+
+            // Add the sketch widget to the view
+            view.ui.add(sketch, "top-left");
+
+            // Function to convert graphics to GeoJSON
+            async function graphicsToGeoJSON() {
+                // Get all graphics from the layer
+                const graphics = graphicsLayer.graphics.toArray();
+                
+                if (graphics.length === 0) {
+                    return null;
+                }
+                
+                // Load the projection module if needed
+                await projection.load();
+                
+                // Convert features to GeoJSON
+                const features = await Promise.all(graphics.map(async graphic => {
+                    // Ensure the geometry is in WGS84 (EPSG:4326)
+                    let geometry = graphic.geometry;
+                    
+                    // Convert to WGS84 if needed
+                    if (geometry.spatialReference.wkid !== 4326) {
+                        try {
+                            // Try using webMercatorUtils for common conversions
+                            if (webMercatorUtils.canProject(geometry)) {
+                                geometry = webMercatorUtils.webMercatorToGeographic(geometry);
+                            } else {
+                                // Use the projection engine for other projections
+                                const wgs84 = new SpatialReference({ wkid: 4326 });
+                                geometry = projection.project(geometry, wgs84);
+                            }
+                        } catch (error) {
+                            console.error("Projection error:", error);
+                            status.textContent = "Error projecting to WGS84";
+                        }
+                    }
+                    
+                    // Create a GeoJSON Feature
+                    const feature = {
+                        type: "Feature",
+                        properties: {},
+                        geometry: {
+                            type: getGeoJSONGeometryType(geometry.type),
+                            coordinates: getGeoJSONCoordinates(geometry)
+                        }
+                    };
+                    
+                    return feature;
+                }));
+                
+                // Create a GeoJSON FeatureCollection
+                const featureCollection = {
+                    type: "FeatureCollection",
+                    features: features
+                };
+                
+                return featureCollection;
+            }
+            
+            // Helper function to get GeoJSON geometry type
+            function getGeoJSONGeometryType(esriType) {
+                switch (esriType) {
+                    case "point":
+                        return "Point";
+                    case "polyline":
+                        return "LineString";
+                    case "polygon":
+                        return "Polygon";
+                    default:
+                        return "Polygon";
+                }
+            }
+            
+            // Helper function to get coordinates in GeoJSON format
+            function getGeoJSONCoordinates(geometry) {
+                if (geometry.type === "point") {
+                    return [geometry.x, geometry.y];
+                } else if (geometry.type === "polyline") {
+                    return geometry.paths[0];
+                } else if (geometry.type === "polygon") {
+                    return geometry.rings;
+                }
+                return [];
+            }
+            
+            // Function to download GeoJSON
+            async function downloadGeoJSON() {
+                const geojson = await graphicsToGeoJSON();
+                
+                if (!geojson) {
+                    status.textContent = "No drawings to download";
+                    return;
+                }
+                
+                // Create a download link
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "map_drawing.geojson");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                
+                status.textContent = "GeoJSON downloaded successfully";
+            }
+            
+            // Function to clear all drawings
+            function clearDrawings() {
+                graphicsLayer.removeAll();
+                clearBtn.disabled = true;
+                downloadBtn.disabled = true;
+                status.textContent = "Drawing cleared. Select a drawing tool and start drawing on the map";
+            }
+            
+            // Event listeners
+            clearBtn.addEventListener('click', clearDrawings);
+            downloadBtn.addEventListener('click', downloadGeoJSON);
+            
+            // Handle drawing option changes
+            drawingOptions.forEach(option => {
+                option.addEventListener('change', function() {
+                    if (this.checked) {
+                        // Set the sketch tool to the selected type
+                        sketch.create(this.value);
+                        status.textContent = `Drawing ${this.value} - click on the map to start`;
+                    }
+                });
+            });
+            
+            // Listen for sketch events
+            sketch.on("create", function(event) {
+                if (event.state === "complete") {
+                    // Enable the clear and download buttons
+                    clearBtn.disabled = false;
+                    downloadBtn.disabled = false;
+                    status.textContent = "Drawing complete - click Download to save as GeoJSON";
+                    
+                    // Start a new drawing of the same type
+                    const selectedTool = document.querySelector('input[name="drawingTool"]:checked').value;
+                    sketch.create(selectedTool);
+                }
+            });
+            
+            // Wait for the view to load
+            view.when(function() {
+                // Start with polygon drawing mode
+                sketch.create("polygon");
+                
+                // Set initial status
+                status.textContent = "Ready to draw - click on the map to start drawing a polygon";
+            });
+        });
+    </script>
+</body>
+</html>
