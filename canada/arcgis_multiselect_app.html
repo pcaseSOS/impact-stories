@@ -98,44 +98,29 @@
                 container: "viewDiv",
                 map: map,
                 center: [-106.3468, 56.1304], // Center of Canada
-                zoom: 4,
-                spatialReference: {
-                    wkid: 4326 // Ensure WGS84
-                }
+                zoom: 4
             });
 
             // Define renderer for the layer
             const renderer = new SimpleRenderer({
                 symbol: new SimpleFillSymbol({
-                    color: [255, 0, 0, 0.4], // Red with transparency to make it more visible
+                    color: [51, 51, 204, 0.3],
                     outline: new SimpleLineSymbol({
-                        color: [255, 0, 0, 0.8], // Red outline
-                        width: 2
+                        color: [51, 51, 204, 0.8],
+                        width: 1
                     })
                 })
             });
 
             // Create the feature layer
             const canadaTownsLayer = new FeatureLayer({
-                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer/0",
+                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
                 renderer: renderer,
-                outFields: ["*"],
-                spatialReference: {
-                    wkid: 4326 // WGS84
-                }
+                outFields: ["*"]
             });
 
             // Add the layer to the map
             map.add(canadaTownsLayer);
-
-            // Track the active layer (in case we switch to alternate)
-            let activeLayer = canadaTownsLayer;
-
-            // View ready handler
-            view.when(function() {
-                console.log("View is ready");
-                console.log("View spatial reference:", view.spatialReference);
-            });
 
             // Create tooltip element
             const tooltip = document.createElement('div');
@@ -147,7 +132,7 @@
             view.on("pointer-move", function(event) {
                 view.hitTest(event).then(function(response) {
                     if (response.results.length > 0 &&
-                        response.results[0].graphic.layer === activeLayer) {
+                        response.results[0].graphic.layer === canadaTownsLayer) {
 
                         const graphic = response.results[0].graphic;
                         const attributes = graphic.attributes;
@@ -194,13 +179,13 @@
                     }
 
                     if (response.results.length > 0 &&
-                        response.results[0].graphic.layer === activeLayer) {
+                        response.results[0].graphic.layer === canadaTownsLayer) {
 
                         const graphic = response.results[0].graphic;
                         selectedFeature = graphic;
 
                         // Highlight selected feature
-                        view.whenLayerView(activeLayer).then(function(layerView) {
+                        view.whenLayerView(canadaTownsLayer).then(function(layerView) {
                             highlightSelect = layerView.highlight(graphic);
                         });
 
@@ -298,50 +283,14 @@
             // Wait for layer to load and zoom to extent
             canadaTownsLayer.when(function() {
                 console.log("Canada Towns layer loaded successfully");
-                console.log("Layer spatial reference:", canadaTownsLayer.spatialReference);
-                console.log("Layer extent:", canadaTownsLayer.fullExtent);
 
-                // Wait for view to be ready, then zoom to layer extent
-                view.when(function() {
-                    if (canadaTownsLayer.fullExtent) {
-                        view.goTo(canadaTownsLayer.fullExtent).catch(function(error) {
-                            console.log("Could not zoom to layer extent, using default Canada view");
-                            view.goTo({
-                                center: [-106.3468, 56.1304],
-                                zoom: 4
-                            });
-                        });
-                    }
-                });
-
+                // Get layer extent and zoom to it
+                if (canadaTownsLayer.fullExtent) {
+                    view.goTo(canadaTownsLayer.fullExtent);
+                }
             }).catch(function(error) {
                 console.error("Error loading layer:", error);
-                console.log("Trying alternative approach...");
-                document.getElementById('status').textContent = 'Adjusting layer settings...';
-
-                // Try reloading the layer without spatial reference constraint
-                map.remove(canadaTownsLayer);
-
-                const alternateLayer = new FeatureLayer({
-                    url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer/0",
-                    renderer: renderer,
-                    outFields: ["*"]
-                });
-
-                map.add(alternateLayer);
-                activeLayer = alternateLayer; // Update the active layer reference
-
-                alternateLayer.when(function() {
-                    console.log("Alternate layer loaded successfully");
-                    document.getElementById('status').textContent = 'Layer loaded - Click a polygon to select it';
-
-                    if (alternateLayer.fullExtent) {
-                        view.goTo(alternateLayer.fullExtent);
-                    }
-                }).catch(function(altError) {
-                    console.error("Alternate layer also failed:", altError);
-                    document.getElementById('status').textContent = 'Error loading Canada Towns layer';
-                });
+                document.getElementById('status').textContent = 'Error loading Canada Towns layer';
             });
         });
     </script>
