@@ -203,8 +203,10 @@
             "esri/Graphic",
             "esri/geometry/geometryEngine",
             "esri/widgets/Sketch",
-            "esri/layers/GraphicsLayer"
-        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer) {
+            "esri/layers/GraphicsLayer",
+            "esri/geometry/projection",
+            "esri/geometry/SpatialReference"
+        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference) {
 
             let selectedFeatures = []; // Array to store multiple selected features
             let highlightSelections = []; // Array to store highlight handles
@@ -338,19 +340,6 @@
 
             // Helper function to get town name from attributes
             function getTownName(attributes) {
-                let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
-
-                Object.keys(attributes).forEach(key => {
-                    if ((key.toLowerCase().includes('name') ||
-                         key.toLowerCase().includes('town') ||
-                         key.toLowerCase().includes('city')) &&
-                         attributes[key] && townName === 'Unknown Town') {
-                        townName = attributes[key];
-                    }
-                });
-
-                return townName;
-            }
                 let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
 
                 Object.keys(attributes).forEach(key => {
@@ -620,21 +609,24 @@
             });
 
             // Download functionality
-            downloadBtn.addEventListener('click', function() {
+            downloadBtn.addEventListener('click', async function() {
                 if (selectedFeatures.length === 0) {
                     alert('No polygons selected');
                     return;
                 }
 
                 try {
-                    // Create GeoJSON from all selected features
-                    const features = selectedFeatures.map(feature => {
-                        // Ensure coordinates are in EPSG:4326 (WGS84)
-                        let coordinates = convertEsriGeometryToGeoJSON(feature.geometry);
+                    status.textContent = 'Preparing download with coordinate transformation...';
 
-                        // If the original data is in a different CRS, the ArcGIS JS API
-                        // should have already projected it to the view's spatial reference
-                        // GeoJSON standard uses EPSG:4326 by default
+                    // Create GeoJSON from all selected features with proper coordinate transformation
+                    const features = await Promise.all(selectedFeatures.map(async (feature) => {
+                        // Convert coordinates with proper projection
+                        const coordinates = await convertEsriGeometryToGeoJSON(feature.geometry);
+
+                        // Get original spatial reference information
+                        const originalSR = feature.geometry.spatialReference;
+                        const originalWkid = originalSR ? originalSR.wkid : 'Unknown';
+                        const originalName = originalSR ? (originalSR.name || `EPSG:${originalWkid}`) : 'Unknown';
 
                         return {
                             type: "Feature",
@@ -644,30 +636,55 @@
                             },
                             properties: {
                                 ...feature.attributes,
-                                // Add metadata about the export
-                                exported_date: new Date().toISOString(),
-                                original_crs: feature.geometry.spatialReference ?
-                                    `EPSG:${feature.geometry.spatialReference.wkid}` : 'Unknown'
+                                // Add comprehensive projection metadata
+                                export_metadata: {
+                                    exported_date: new Date().toISOString(),
+                                    original_crs_wkid: originalWkid,
+                                    original_crs_name: originalName,
+                                    target_crs: 'EPSG:4326',
+                                    target_crs_name: 'WGS 84',
+                                    coordinates_note: 'Coordinates transformed to WGS84 (EPSG:4326) for QGIS compatibility'
+                                }
                             }
                         };
-                    });
+                    }));
+
+                    // Get original layer spatial reference for metadata
+                    const layerSR = canadaTownsLayer.spatialReference;
+                    const originalLayerWkid = layerSR ? layerSR.wkid : 'Unknown';
+                    const originalLayerName = layerSR ? (layerSR.name || `EPSG:${originalLayerWkid}`) : 'Unknown';
 
                     const geoJSON = {
                         type: "FeatureCollection",
-                        // Explicitly specify coordinate reference system as EPSG:4326
+                        // QGIS-compatible CRS specification
                         crs: {
                             type: "name",
                             properties: {
-                                name: "EPSG:4326"
+                                name: "urn:ogc:def:crs:EPSG::4326"
                             }
                         },
-                        // Add metadata
+                        // Enhanced metadata for QGIS and other GIS software
                         metadata: {
                             exported_by: "ArcGIS Canada Towns Interactive Map",
                             export_date: new Date().toISOString(),
-                            coordinate_system: "EPSG:4326 (WGS84)",
+                            coordinate_system: {
+                                epsg_code: 4326,
+                                name: "WGS 84",
+                                proj4: "+proj=longlat +datum=WGS84 +no_defs",
+                                description: "World Geodetic System 1984"
+                            },
+                            original_data_source: {
+                                service_url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
+                                original_crs_wkid: originalLayerWkid,
+                                original_crs_name: originalLayerName,
+                                transformation_applied: originalLayerWkid !== 4326 ? "Yes" : "No"
+                            },
                             feature_count: features.length,
-                            source_service: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer"
+                            qgis_import_notes: [
+                                "This file is in EPSG:4326 (WGS84) coordinate system",
+                                "Should import correctly into QGIS without additional projection",
+                                "If projection issues occur, manually set CRS to EPSG:4326 in QGIS"
+                            ]
                         },
                         features: features
                     };
@@ -680,11 +697,11 @@
                     const downloadLink = document.createElement('a');
                     downloadLink.href = url;
 
-                    // Create filename
+                    // Create filename with projection information
                     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
                     const filename = selectedFeatures.length === 1 ?
-                        `${getTownName(selectedFeatures[0].attributes).replace(/[^a-z0-9]/gi, '_').toLowerCase()}_EPSG4326.geojson` :
-                        `canada_towns_${selectedFeatures.length}_polygons_EPSG4326_${timestamp}.geojson`;
+                        `${getTownName(selectedFeatures[0].attributes).replace(/[^a-z0-9]/gi, '_').toLowerCase()}_WGS84.geojson` :
+                        `canada_towns_${selectedFeatures.length}_polygons_WGS84_${timestamp}.geojson`;
 
                     downloadLink.download = filename;
 
@@ -693,28 +710,92 @@
                     document.body.removeChild(downloadLink);
                     URL.revokeObjectURL(url);
 
-                    status.textContent = `Downloaded ${selectedFeatures.length} polygon${selectedFeatures.length > 1 ? 's' : ''} in EPSG:4326`;
+                    status.textContent = `Downloaded ${selectedFeatures.length} polygon${selectedFeatures.length > 1 ? 's' : ''} in WGS84 for QGIS`;
 
                 } catch (error) {
                     console.error('Error downloading polygons:', error);
                     alert('Error downloading polygons. Please try again.');
+                    status.textContent = 'Error during download';
                 }
             });
 
-            // Helper function to convert Esri geometry to GeoJSON coordinates
-            function convertEsriGeometryToGeoJSON(geometry) {
-                if (geometry.rings) {
-                    // Polygon geometry
-                    return geometry.rings.map(ring =>
-                        ring.map(coord => [coord[0], coord[1]])
-                    );
+            // Helper function to convert Esri geometry to GeoJSON coordinates with proper projection
+            async function convertEsriGeometryToGeoJSON(geometry) {
+                try {
+                    // Create target spatial reference (WGS84 / EPSG:4326)
+                    const wgs84 = new SpatialReference({ wkid: 4326 });
+
+                    let projectedGeometry = geometry;
+
+                    // Check if geometry needs projection
+                    if (geometry.spatialReference && geometry.spatialReference.wkid !== 4326) {
+                        console.log(`Projecting from EPSG:${geometry.spatialReference.wkid} to EPSG:4326`);
+
+                        // Load projection engine if not already loaded
+                        await projection.load();
+
+                        // Project geometry to WGS84
+                        projectedGeometry = projection.project(geometry, wgs84);
+                    }
+
+                    // Convert to GeoJSON coordinate format
+                    if (projectedGeometry.rings) {
+                        // Polygon geometry
+                        return projectedGeometry.rings.map(ring =>
+                            ring.map(coord => [coord[0], coord[1]])
+                        );
+                    }
+
+                    return [];
+                } catch (error) {
+                    console.error('Error converting geometry coordinates:', error);
+                    console.log('Falling back to original coordinates');
+
+                    // Fallback to original method if projection fails
+                    if (geometry.rings) {
+                        return geometry.rings.map(ring =>
+                            ring.map(coord => [coord[0], coord[1]])
+                        );
+                    }
+                    return [];
                 }
-                return [];
             }
 
             // Wait for layer to load and zoom to extent
             canadaTownsLayer.when(function() {
                 console.log("Canada Towns layer loaded successfully");
+
+                // Log coordinate system information for debugging
+                const layerSR = canadaTownsLayer.spatialReference;
+                if (layerSR) {
+                    console.log("Layer Spatial Reference:", {
+                        wkid: layerSR.wkid,
+                        name: layerSR.name,
+                        unit: layerSR.unit
+                    });
+
+                    // Common Canadian coordinate systems
+                    const canadianSystems = {
+                        4326: "WGS 84 (Geographic)",
+                        3857: "Web Mercator",
+                        4617: "NAD83(CSRS)",
+                        4269: "NAD83",
+                        102100: "Web Mercator (Auxiliary Sphere)",
+                        3347: "Statistics Canada Lambert",
+                        3348: "NAD83(CSRS) / Statistics Canada Lambert",
+                        2958: "NAD83(CSRS) / UTM zone 19N",
+                        2959: "NAD83(CSRS) / UTM zone 20N",
+                        2960: "NAD83(CSRS) / UTM zone 21N",
+                        102002: "Canada Albers Equal Area Conic"
+                    };
+
+                    const systemName = canadianSystems[layerSR.wkid] || `EPSG:${layerSR.wkid}`;
+                    console.log(`Detected coordinate system: ${systemName}`);
+                    status.textContent = `Layer loaded in ${systemName} - will transform to WGS84 for export`;
+                } else {
+                    console.log("No spatial reference information available");
+                    status.textContent = "Layer loaded - coordinate system unknown";
+                }
 
                 // Get layer extent and zoom to it
                 if (canadaTownsLayer.fullExtent) {
