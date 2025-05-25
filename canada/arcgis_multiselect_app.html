@@ -185,11 +185,11 @@
             <!-- Selected items will be populated here -->
         </div>
         <div class="panel-footer">
-            Hold Ctrl/Cmd + click to select multiple towns
+            Hold Ctrl/Cmd + click OR use Multi-Select Mode button
         </div>
     </div>
 
-    <div id="status">Single-click to select towns. Hold Ctrl/Cmd for multiple selections.</div>
+    <div id="status">Single-click to select towns. For multiple selections: Hold Cmd/Ctrl or use Multi-Select Mode.</div>
 
     <script>
         require([
@@ -346,11 +346,17 @@
             // Helper function to update status message
             function updateStatus() {
                 if (selectedFeatures.length === 0) {
-                    status.textContent = multiSelectMode ?
-                        'Multi-select mode: Ctrl/Cmd + click to select multiple towns' :
-                        'Single-click to select towns. Hold Ctrl/Cmd for multiple selections.';
+                    if (multiSelectMode) {
+                        status.textContent = '🔄 Multi-select mode active: Click towns to add/remove from selection';
+                    } else {
+                        // Detect if user is on Mac for better instructions
+                        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+                        const modifierKey = isMac ? 'Cmd' : 'Ctrl';
+                        status.textContent = `Single-click to select towns. Hold ${modifierKey} or use Multi-Select Mode for multiple selections.`;
+                    }
                 } else {
-                    status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected`;
+                    const modeText = multiSelectMode ? ' (Multi-select mode)' : '';
+                    status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected${modeText}`;
                 }
             }
 
@@ -389,7 +395,25 @@
                         response.results[0].graphic.layer === canadaTownsLayer) {
 
                         const graphic = response.results[0].graphic;
-                        const isMultiSelect = event.native.ctrlKey || event.native.metaKey;
+
+                        // Check for multi-select: either explicit multi-select mode OR modifier keys
+                        const isModifierPressed = event.native.ctrlKey ||
+                                                event.native.metaKey ||
+                                                event.native.shiftKey ||
+                                                (event.native.originalEvent &&
+                                                 (event.native.originalEvent.ctrlKey ||
+                                                  event.native.originalEvent.metaKey));
+
+                        const isMultiSelect = multiSelectMode || isModifierPressed;
+
+                        // Debug logging for Mac users
+                        console.log('Click event:', {
+                            ctrlKey: event.native.ctrlKey,
+                            metaKey: event.native.metaKey,
+                            shiftKey: event.native.shiftKey,
+                            multiSelectMode: multiSelectMode,
+                            isMultiSelect: isMultiSelect
+                        });
 
                         // Check if this feature is already selected
                         const existingIndex = selectedFeatures.findIndex(f =>
@@ -399,7 +423,7 @@
                         );
 
                         if (existingIndex >= 0) {
-                            // Feature already selected - remove it
+                            // Feature already selected - remove it (toggle behavior)
                             removeFromSelection(existingIndex);
                         } else {
                             // New selection
@@ -424,7 +448,7 @@
 
                     } else {
                         // Clicked on empty area
-                        if (!event.native.ctrlKey && !event.native.metaKey) {
+                        if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
                             clearAllSelections();
                         }
                     }
@@ -435,7 +459,7 @@
             selectModeBtn.addEventListener('click', function() {
                 multiSelectMode = !multiSelectMode;
                 if (multiSelectMode) {
-                    selectModeBtn.textContent = '🖱️ Multi-Select Mode';
+                    selectModeBtn.textContent = '🔄 Multi-Select: ON';
                     selectModeBtn.classList.add('active');
                 } else {
                     selectModeBtn.textContent = '🖱️ Single Select Mode';
