@@ -337,12 +337,12 @@
             let selectedPSAPs = [];
             let highlightedPSAPs = [];
 
-            // Create sketch widget - polygon only
+            // Create sketch widget
             const sketch = new Sketch({
                 layer: graphicsLayer,
                 view: view,
                 creationMode: "single",
-                availableCreateTools: ["polygon"], // Restrict to polygon drawing only
+                availableCreateTools: ["polygon"], // Only allow polygon creation
                 defaultCreateOptions: {
                     mode: "hybrid" // freehand and click-by-click drawing
                 },
@@ -917,8 +917,8 @@
                             // Hide sketch widget, enable navigation mode
                             sketch.visible = false;
                             status.textContent = "Navigation mode - click and drag to pan, mouse wheel to zoom";
-                        } else if (this.value === 'polygon') {
-                            // Show sketch widget, start polygon drawing
+                        } else {
+                            // Show sketch widget, start polygon drawing (only option available)
                             sketch.visible = true;
                             sketch.create('polygon');
                             status.textContent = "Drawing polygon - click on the map to add points, double-click to complete";
@@ -993,7 +993,6 @@
             
             // Wait for the view to load and layer to be ready
             view.when(function() {
-                console.log("Map view loaded successfully");
                 // Start with navigation mode
                 sketch.visible = false;
                 
