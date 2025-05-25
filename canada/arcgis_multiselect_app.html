@@ -17,35 +17,132 @@
             font-family: Arial, sans-serif;
         }
 
-        #downloadBtn {
+        .toolbar {
             position: absolute;
             top: 20px;
             right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toolbar button {
             background: #0079c1;
             color: white;
             border: none;
-            padding: 12px 24px;
+            padding: 12px 16px;
             border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
-            z-index: 100;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            min-width: 180px;
+            text-align: left;
         }
 
-        #downloadBtn:hover {
+        .toolbar button:hover {
             background: #005a87;
         }
 
-        #downloadBtn:disabled {
+        .toolbar button:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
 
+        .toolbar button.active {
+            background: #28a745;
+        }
+
+        .toolbar button.danger {
+            background: #dc3545;
+        }
+
+        .toolbar button.danger:hover {
+            background: #c82333;
+        }
+
+        #selectionPanel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            max-height: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+            display: none;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: #0079c1;
+            color: white;
+            padding: 12px 16px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .selected-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+        }
+
+        .selected-item:hover {
+            background: #f8f9fa;
+        }
+
+        .selected-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-name {
+            font-weight: 500;
+            color: #333;
+            flex-grow: 1;
+        }
+
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .remove-btn:hover {
+            background: #c82333;
+        }
+
+        .panel-footer {
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
         #status {
             position: absolute;
-            top: 70px;
-            right: 20px;
-            background: rgba(255,255,255,0.9);
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
             padding: 8px 12px;
             border-radius: 4px;
             font-size: 12px;
@@ -70,8 +167,29 @@
 
 <body>
     <div id="viewDiv"></div>
-    <button id="downloadBtn" disabled>Download Selected Polygon</button>
-    <div id="status">Click a polygon to select it for download</div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button id="selectModeBtn">🖱️ Single Select Mode</button>
+        <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
+        <button id="clearAllBtn" disabled class="danger">🗑️ Clear All Selections</button>
+    </div>
+
+    <!-- Selection Panel -->
+    <div id="selectionPanel">
+        <div class="panel-header">
+            <span>Selected Towns (<span id="selectionCount">0</span>)</span>
+            <button id="panelToggle" style="background: none; border: none; color: white; cursor: pointer;">−</button>
+        </div>
+        <div class="panel-content" id="selectionList">
+            <!-- Selected items will be populated here -->
+        </div>
+        <div class="panel-footer">
+            Hold Ctrl/Cmd + click to select multiple towns
+        </div>
+    </div>
+
+    <div id="status">Single-click to select towns. Hold Ctrl/Cmd for multiple selections.</div>
 
     <script>
         require([
@@ -85,8 +203,19 @@
             "esri/geometry/geometryEngine"
         ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine) {
 
-            let selectedFeature = null;
-            let highlightSelect = null;
+            let selectedFeatures = []; // Array to store multiple selected features
+            let highlightSelections = []; // Array to store highlight handles
+            let multiSelectMode = false;
+
+            // UI Elements
+            const downloadBtn = document.getElementById('downloadBtn');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            const selectModeBtn = document.getElementById('selectModeBtn');
+            const selectionPanel = document.getElementById('selectionPanel');
+            const selectionList = document.getElementById('selectionList');
+            const selectionCount = document.getElementById('selectionCount');
+            const panelToggle = document.getElementById('panelToggle');
+            const status = document.getElementById('status');
 
             // Create the map
             const map = new Map({
@@ -128,6 +257,103 @@
             tooltip.style.display = 'none';
             document.body.appendChild(tooltip);
 
+            // Helper function to get town name from attributes
+            function getTownName(attributes) {
+                let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
+
+                Object.keys(attributes).forEach(key => {
+                    if ((key.toLowerCase().includes('name') ||
+                         key.toLowerCase().includes('town') ||
+                         key.toLowerCase().includes('city')) &&
+                         attributes[key] && townName === 'Unknown Town') {
+                        townName = attributes[key];
+                    }
+                });
+
+                return townName;
+            }
+
+            // Helper function to update selection panel
+            function updateSelectionPanel() {
+                selectionCount.textContent = selectedFeatures.length;
+                downloadBtn.textContent = `📥 Download Selected (${selectedFeatures.length})`;
+
+                if (selectedFeatures.length > 0) {
+                    selectionPanel.style.display = 'block';
+                    downloadBtn.disabled = false;
+                    clearAllBtn.disabled = false;
+                } else {
+                    selectionPanel.style.display = 'none';
+                    downloadBtn.disabled = true;
+                    clearAllBtn.disabled = true;
+                }
+
+                // Clear and rebuild selection list
+                selectionList.innerHTML = '';
+
+                selectedFeatures.forEach((feature, index) => {
+                    const townName = getTownName(feature.attributes);
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'selected-item';
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'item-name';
+                    nameSpan.textContent = townName;
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-btn';
+                    removeBtn.textContent = '×';
+                    removeBtn.title = 'Remove from selection';
+                    removeBtn.onclick = () => removeFromSelection(index);
+
+                    itemDiv.appendChild(nameSpan);
+                    itemDiv.appendChild(removeBtn);
+                    selectionList.appendChild(itemDiv);
+                });
+            }
+
+            // Helper function to remove item from selection
+            function removeFromSelection(index) {
+                if (index >= 0 && index < selectedFeatures.length) {
+                    // Remove highlight
+                    if (highlightSelections[index]) {
+                        highlightSelections[index].remove();
+                    }
+
+                    // Remove from arrays
+                    selectedFeatures.splice(index, 1);
+                    highlightSelections.splice(index, 1);
+
+                    updateSelectionPanel();
+                    updateStatus();
+                }
+            }
+
+            // Helper function to clear all selections
+            function clearAllSelections() {
+                // Remove all highlights
+                highlightSelections.forEach(highlight => {
+                    if (highlight) highlight.remove();
+                });
+
+                selectedFeatures = [];
+                highlightSelections = [];
+                updateSelectionPanel();
+                updateStatus();
+            }
+
+            // Helper function to update status message
+            function updateStatus() {
+                if (selectedFeatures.length === 0) {
+                    status.textContent = multiSelectMode ?
+                        'Multi-select mode: Ctrl/Cmd + click to select multiple towns' :
+                        'Single-click to select towns. Hold Ctrl/Cmd for multiple selections.';
+                } else {
+                    status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected`;
+                }
+            }
+
             // Handle mouse move for hover effect
             view.on("pointer-move", function(event) {
                 view.hitTest(event).then(function(response) {
@@ -135,20 +361,7 @@
                         response.results[0].graphic.layer === canadaTownsLayer) {
 
                         const graphic = response.results[0].graphic;
-                        const attributes = graphic.attributes;
-
-                        // Show tooltip with town name
-                        let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
-
-                        // Check other possible field names for town name
-                        Object.keys(attributes).forEach(key => {
-                            if ((key.toLowerCase().includes('name') ||
-                                 key.toLowerCase().includes('town') ||
-                                 key.toLowerCase().includes('city')) &&
-                                 attributes[key] && townName === 'Unknown Town') {
-                                townName = attributes[key];
-                            }
-                        });
+                        const townName = getTownName(graphic.attributes);
 
                         tooltip.innerHTML = `<strong>${townName}</strong>`;
                         tooltip.style.display = 'block';
@@ -172,66 +385,105 @@
             // Handle click for selection
             view.on("click", function(event) {
                 view.hitTest(event).then(function(response) {
-                    // Clear previous selection
-                    if (highlightSelect) {
-                        highlightSelect.remove();
-                        highlightSelect = null;
-                    }
-
                     if (response.results.length > 0 &&
                         response.results[0].graphic.layer === canadaTownsLayer) {
 
                         const graphic = response.results[0].graphic;
-                        selectedFeature = graphic;
+                        const isMultiSelect = event.native.ctrlKey || event.native.metaKey;
 
-                        // Highlight selected feature
-                        view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                            highlightSelect = layerView.highlight(graphic);
-                        });
+                        // Check if this feature is already selected
+                        const existingIndex = selectedFeatures.findIndex(f =>
+                            f.attributes.OBJECTID === graphic.attributes.OBJECTID ||
+                            f.attributes.FID === graphic.attributes.FID ||
+                            JSON.stringify(f.attributes) === JSON.stringify(graphic.attributes)
+                        );
 
-                        // Enable download button
-                        document.getElementById('downloadBtn').disabled = false;
-
-                        // Update status
-                        const attributes = graphic.attributes;
-                        let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Selected Town';
-                        Object.keys(attributes).forEach(key => {
-                            if ((key.toLowerCase().includes('name') ||
-                                 key.toLowerCase().includes('town') ||
-                                 key.toLowerCase().includes('city')) &&
-                                 attributes[key] && townName === 'Selected Town') {
-                                townName = attributes[key];
+                        if (existingIndex >= 0) {
+                            // Feature already selected - remove it
+                            removeFromSelection(existingIndex);
+                        } else {
+                            // New selection
+                            if (!isMultiSelect) {
+                                // Single select mode - clear previous selections
+                                clearAllSelections();
                             }
-                        });
 
-                        document.getElementById('status').textContent = `Selected: ${townName}`;
+                            // Add new selection
+                            selectedFeatures.push(graphic);
+
+                            // Highlight selected feature
+                            view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                                const highlight = layerView.highlight(graphic);
+                                highlightSelections.push(highlight);
+                            });
+
+                            updateSelectionPanel();
+                        }
+
+                        updateStatus();
+
                     } else {
-                        selectedFeature = null;
-                        document.getElementById('downloadBtn').disabled = true;
-                        document.getElementById('status').textContent = 'Click a polygon to select it for download';
+                        // Clicked on empty area
+                        if (!event.native.ctrlKey && !event.native.metaKey) {
+                            clearAllSelections();
+                        }
                     }
                 });
             });
 
+            // Button event listeners
+            selectModeBtn.addEventListener('click', function() {
+                multiSelectMode = !multiSelectMode;
+                if (multiSelectMode) {
+                    selectModeBtn.textContent = '🖱️ Multi-Select Mode';
+                    selectModeBtn.classList.add('active');
+                } else {
+                    selectModeBtn.textContent = '🖱️ Single Select Mode';
+                    selectModeBtn.classList.remove('active');
+                }
+                updateStatus();
+            });
+
+            clearAllBtn.addEventListener('click', function() {
+                clearAllSelections();
+            });
+
+            panelToggle.addEventListener('click', function() {
+                const content = document.querySelector('.panel-content');
+                const footer = document.querySelector('.panel-footer');
+
+                if (content.style.display === 'none') {
+                    content.style.display = 'block';
+                    footer.style.display = 'block';
+                    panelToggle.textContent = '−';
+                } else {
+                    content.style.display = 'none';
+                    footer.style.display = 'none';
+                    panelToggle.textContent = '+';
+                }
+            });
+
             // Download functionality
-            document.getElementById('downloadBtn').addEventListener('click', function() {
-                if (!selectedFeature) {
-                    alert('No polygon selected');
+            downloadBtn.addEventListener('click', function() {
+                if (selectedFeatures.length === 0) {
+                    alert('No polygons selected');
                     return;
                 }
 
                 try {
-                    // Create GeoJSON from the selected feature
+                    // Create GeoJSON from all selected features
+                    const features = selectedFeatures.map(feature => ({
+                        type: "Feature",
+                        geometry: {
+                            type: feature.geometry.type === "polygon" ? "Polygon" : "MultiPolygon",
+                            coordinates: convertEsriGeometryToGeoJSON(feature.geometry)
+                        },
+                        properties: feature.attributes
+                    }));
+
                     const geoJSON = {
                         type: "FeatureCollection",
-                        features: [{
-                            type: "Feature",
-                            geometry: {
-                                type: selectedFeature.geometry.type === "polygon" ? "Polygon" : "MultiPolygon",
-                                coordinates: convertEsriGeometryToGeoJSON(selectedFeature.geometry)
-                            },
-                            properties: selectedFeature.attributes
-                        }]
+                        features: features
                     };
 
                     // Create and download the file
@@ -242,30 +494,24 @@
                     const downloadLink = document.createElement('a');
                     downloadLink.href = url;
 
-                    // Get town name for filename
-                    const attributes = selectedFeature.attributes;
-                    let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'selected_town';
-                    Object.keys(attributes).forEach(key => {
-                        if ((key.toLowerCase().includes('name') ||
-                             key.toLowerCase().includes('town') ||
-                             key.toLowerCase().includes('city')) &&
-                             attributes[key] && townName === 'selected_town') {
-                            townName = attributes[key];
-                        }
-                    });
+                    // Create filename
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                    const filename = selectedFeatures.length === 1 ?
+                        `${getTownName(selectedFeatures[0].attributes).replace(/[^a-z0-9]/gi, '_').toLowerCase()}_polygon.geojson` :
+                        `canada_towns_${selectedFeatures.length}_polygons_${timestamp}.geojson`;
 
-                    // Clean filename
-                    townName = townName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                    downloadLink.download = `${townName}_polygon.geojson`;
+                    downloadLink.download = filename;
 
                     document.body.appendChild(downloadLink);
                     downloadLink.click();
                     document.body.removeChild(downloadLink);
                     URL.revokeObjectURL(url);
 
+                    status.textContent = `Downloaded ${selectedFeatures.length} polygon${selectedFeatures.length > 1 ? 's' : ''}`;
+
                 } catch (error) {
-                    console.error('Error downloading polygon:', error);
-                    alert('Error downloading polygon. Please try again.');
+                    console.error('Error downloading polygons:', error);
+                    alert('Error downloading polygons. Please try again.');
                 }
             });
 
@@ -288,9 +534,13 @@
                 if (canadaTownsLayer.fullExtent) {
                     view.goTo(canadaTownsLayer.fullExtent);
                 }
+
+                // Initialize UI
+                updateStatus();
+
             }).catch(function(error) {
                 console.error("Error loading layer:", error);
-                document.getElementById('status').textContent = 'Error loading Canada Towns layer';
+                status.textContent = 'Error loading Canada Towns layer';
             });
         });
     </script>
