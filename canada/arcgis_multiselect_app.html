@@ -1,330 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canada Towns - Multi-Select & Download Tool</title>
-    <meta name="description" content="Interactive map tool for selecting and downloading multiple Canadian town polygons">
-    
-    <!-- Google Fonts - Open Sans -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- ArcGIS Maps SDK for JavaScript -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Canada Towns Interactive Map</title>
+
     <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
     <script src="https://js.arcgis.com/4.28/"></script>
-    
-    <!-- JSZip for creating zip files -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    
-    <!-- FileSaver.js for better download support -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    
+
     <style>
-        * {
-            box-sizing: border-box;
-        }
-        
         html, body, #viewDiv {
             padding: 0;
             margin: 0;
             height: 100%;
             width: 100%;
-            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: Arial, sans-serif;
         }
-        
-        #toolbar {
+
+        #downloadBtn {
             position: absolute;
-            top: 15px;
-            left: 15px;
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(15px);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 21, 89, 0.15);
-            border: 1px solid rgba(41, 168, 221, 0.2);
-            z-index: 99;
-            min-width: 320px;
-            max-width: 400px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #29A8DD;
-        }
-        
-        .header h1 {
-            margin: 0;
-            font-size: 20px;
-            color: #001559;
-            font-weight: 700;
-            font-family: 'Open Sans', sans-serif;
-        }
-        
-        .header p {
-            margin: 8px 0 0 0;
-            font-size: 13px;
-            color: #29A8DD;
-            font-weight: 500;
-        }
-        
-        .tool-section {
-            margin-bottom: 20px;
-        }
-        
-        .tool-section h3 {
-            margin: 0 0 12px 0;
-            font-size: 15px;
-            color: #001559;
-            font-weight: 600;
-            font-family: 'Open Sans', sans-serif;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        button {
-            padding: 12px 18px;
-            margin: 6px 6px 6px 0;
+            top: 20px;
+            right: 20px;
+            background: #0079c1;
+            color: white;
             border: none;
-            border-radius: 8px;
+            padding: 12px 24px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 14px;
-            font-weight: 600;
-            font-family: 'Open Sans', sans-serif;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            text-transform: none;
-            letter-spacing: 0.3px;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        
-        button.primary {
-            background: linear-gradient(135deg, #001559, #29A8DD);
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 21, 89, 0.3);
+
+        #downloadBtn:hover {
+            background: #005a87;
         }
-        
-        button.primary:hover {
-            background: linear-gradient(135deg, #29A8DD, #005EFF);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 94, 255, 0.4);
-        }
-        
-        button.secondary {
-            background: #FFFFFF;
-            color: #001559;
-            border: 2px solid #29A8DD;
-            box-shadow: 0 2px 8px rgba(41, 168, 221, 0.2);
-        }
-        
-        button.secondary:hover {
-            background: #29A8DD;
-            color: #FFFFFF;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(41, 168, 221, 0.4);
-        }
-        
-        button.success {
-            background: linear-gradient(135deg, #29A8DD, #005EFF);
-            color: white;
-            box-shadow: 0 4px 15px rgba(41, 168, 221, 0.3);
-        }
-        
-        button.success:hover {
-            background: linear-gradient(135deg, #005EFF, #29A8DD);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 94, 255, 0.4);
-        }
-        
-        button.danger {
-            background: linear-gradient(135deg, #001559, #005EFF);
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 21, 89, 0.3);
-        }
-        
-        button.danger:hover {
-            background: linear-gradient(135deg, #005EFF, #001559);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 94, 255, 0.4);
-        }
-        
-        button:disabled {
-            opacity: 0.5;
+
+        #downloadBtn:disabled {
+            background: #ccc;
             cursor: not-allowed;
-            transform: none !important;
         }
-        
-        button:disabled:hover {
-            transform: none !important;
+
+        #status {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-        
-        #selectionInfo {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(41, 168, 221, 0.05));
-            padding: 18px;
-            border-radius: 10px;
-            margin-top: 15px;
-            border: 2px solid rgba(41, 168, 221, 0.3);
-            backdrop-filter: blur(10px);
-        }
-        
-        .status-text {
-            font-weight: 700;
-            color: #001559;
-            font-size: 15px;
-            font-family: 'Open Sans', sans-serif;
-        }
-        
-        .feature-list {
-            max-height: 120px;
-            overflow-y: auto;
-            margin-top: 12px;
-            font-size: 13px;
-            color: #29A8DD;
-            font-weight: 500;
-        }
-        
-        .feature-item {
-            padding: 6px 0;
-            border-bottom: 1px solid rgba(41, 168, 221, 0.2);
-            color: #001559;
-        }
-        
-        .feature-item:last-child {
-            border-bottom: none;
-        }
-        
-        #downloadStatus {
-            margin-top: 12px;
-            font-size: 14px;
-            font-weight: 600;
-            font-family: 'Open Sans', sans-serif;
-        }
-        
-        .loading {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 2px solid rgba(41, 168, 221, 0.3);
-            border-top: 2px solid #29A8DD;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .instructions {
-            background: linear-gradient(135deg, rgba(255, 243, 0, 0.1), rgba(255, 243, 0, 0.05));
-            border: 2px solid rgba(255, 243, 0, 0.4);
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 18px;
-            font-size: 13px;
-            color: #001559;
-            font-weight: 500;
-            font-family: 'Open Sans', sans-serif;
-        }
-        
-        .instructions strong {
-            color: #001559;
-            font-weight: 700;
-        }
-        
-        /* Mobile responsiveness */
-        @media (max-width: 768px) {
-            #toolbar {
-                top: 10px;
-                left: 10px;
-                right: 10px;
-                min-width: unset;
-                max-width: unset;
-                width: calc(100% - 20px);
-            }
-            
-            button {
-                width: 100%;
-                margin: 4px 0;
-                justify-content: center;
-            }
-        }
-        
-        /* Loading overlay */
-        .loading-overlay {
+
+        .tooltip {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, rgba(0, 21, 89, 0.9), rgba(41, 168, 221, 0.8));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
+            background: rgba(0,0,0,0.8);
             color: white;
-            font-size: 18px;
-            font-weight: 500;
-            font-family: 'Open Sans', sans-serif;
-        }
-        
-        .hidden {
-            display: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 200px;
+            word-wrap: break-word;
         }
     </style>
 </head>
+
 <body>
-    <div id="loadingOverlay" class="loading-overlay">
-        <div style="text-align: center;">
-            <div class="loading" style="width: 32px; height: 32px; border-width: 4px; border-color: rgba(255, 243, 0, 0.3); border-top-color: #FFF300;"></div>
-            <div style="margin-top: 15px; font-weight: 600;">Loading Canada Towns layer...</div>
-        </div>
-    </div>
-    
     <div id="viewDiv"></div>
-    
-    <div id="toolbar">
-        <div class="header">
-            <h1>🍁 Canada Towns Selector</h1>
-            <p>Multi-select and download tool</p>
-        </div>
-        
-        <div class="instructions">
-            <strong>How to use:</strong><br>
-            1. Click "Start Multi-Select"<br>
-            2. Click on map polygons to select them<br>
-            3. Click "Download Selected" to get your ZIP file
-        </div>
-        
-        <div class="tool-section">
-            <h3>🎯 Selection Tools</h3>
-            <button id="selectBtn" class="primary">
-                <span>▶️</span> Start Multi-Select
-            </button>
-            <button id="clearBtn" class="secondary">
-                <span>🗑️</span> Clear All
-            </button>
-        </div>
-        
-        <div class="tool-section">
-            <h3>📥 Download Options</h3>
-            <button id="downloadBtn" class="success" disabled>
-                <span>📦</span> Download Selected (ZIP)
-            </button>
-        </div>
-        
-        <div id="selectionInfo">
-            <div class="status-text">Ready to select polygons</div>
-            <div id="featureList" class="feature-list"></div>
-            <div id="downloadStatus"></div>
-        </div>
-    </div>
+    <button id="downloadBtn" disabled>Download Selected Polygon</button>
+    <div id="status">Click a polygon to select it for download</div>
 
     <script>
         require([
@@ -333,359 +80,218 @@
             "esri/layers/FeatureLayer",
             "esri/symbols/SimpleFillSymbol",
             "esri/symbols/SimpleLineSymbol",
-            "esri/Color",
-            "esri/geometry/Polygon",
-            "esri/tasks/QueryTask",
-            "esri/rest/support/Query",
-            "esri/widgets/Home",
-            "esri/widgets/ScaleBar",
-            "esri/widgets/Zoom"
-        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, Color, Polygon, QueryTask, Query, Home, ScaleBar, Zoom) {
-            
-            let selectedFeatures = [];
-            let isSelecting = false;
-            let canadaTownsLayer;
-            
+            "esri/renderers/SimpleRenderer",
+            "esri/Graphic",
+            "esri/geometry/geometryEngine"
+        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine) {
+
+            let selectedFeature = null;
+            let highlightSelect = null;
+
             // Create the map
             const map = new Map({
                 basemap: "streets-navigation-vector"
             });
-            
+
             // Create the map view
             const view = new MapView({
                 container: "viewDiv",
                 map: map,
-                center: [-96, 60], // Center on Canada
-                zoom: 4,
-                popup: {
-                    autoOpenEnabled: false
-                }
+                center: [-106.3468, 56.1304], // Center of Canada
+                zoom: 4
             });
-            
-            // Add map widgets
-            const homeWidget = new Home({
-                view: view
-            });
-            view.ui.add(homeWidget, "top-right");
-            
-            const scaleBar = new ScaleBar({
-                view: view,
-                unit: "metric"
-            });
-            view.ui.add(scaleBar, "bottom-left");
-            
-            // Create the Canada Towns feature layer with brand styling
-            canadaTownsLayer = new FeatureLayer({
-                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
-                outFields: ["*"],
-                popupEnabled: false,
-                renderer: {
-                    type: "simple",
-                    symbol: {
-                        type: "simple-fill",
-                        color: [41, 168, 221, 0.3], // Safety Blue with transparency
-                        outline: {
-                            color: [0, 21, 89, 0.8], // Royal Blue outline
-                            width: 1.5
-                        }
-                    }
-                }
-            });
-            
-            map.add(canadaTownsLayer);
-            
-            // Selection symbol using brand colors
-            const selectionSymbol = new SimpleFillSymbol({
-                color: new Color([255, 243, 0, 0.7]), // Safety Gap yellow with transparency
-                outline: new SimpleLineSymbol({
-                    color: new Color([0, 21, 89, 1]), // Royal Blue outline
-                    width: 3,
-                    style: "solid"
+
+            // Define renderer for the layer
+            const renderer = new SimpleRenderer({
+                symbol: new SimpleFillSymbol({
+                    color: [51, 51, 204, 0.3],
+                    outline: new SimpleLineSymbol({
+                        color: [51, 51, 204, 0.8],
+                        width: 1
+                    })
                 })
             });
-            
-            // UI Elements
-            const selectBtn = document.getElementById("selectBtn");
-            const clearBtn = document.getElementById("clearBtn");
-            const downloadBtn = document.getElementById("downloadBtn");
-            const selectionInfo = document.getElementById("selectionInfo");
-            const featureList = document.getElementById("featureList");
-            const downloadStatus = document.getElementById("downloadStatus");
-            const loadingOverlay = document.getElementById("loadingOverlay");
-            
-            // Toggle selection mode
-            selectBtn.addEventListener("click", function() {
-                isSelecting = !isSelecting;
-                if (isSelecting) {
-                    selectBtn.innerHTML = '<span>⏹️</span> Stop Selecting';
-                    selectBtn.className = "danger";
-                    view.container.style.cursor = "crosshair";
-                } else {
-                    selectBtn.innerHTML = '<span>▶️</span> Start Multi-Select';
-                    selectBtn.className = "primary";
-                    view.container.style.cursor = "default";
-                }
+
+            // Create the feature layer
+            const canadaTownsLayer = new FeatureLayer({
+                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
+                renderer: renderer,
+                outFields: ["*"]
             });
-            
-            // Clear selection
-            clearBtn.addEventListener("click", function() {
-                selectedFeatures = [];
-                view.graphics.removeAll();
-                updateSelectionInfo();
-                if (isSelecting) {
-                    isSelecting = false;
-                    selectBtn.innerHTML = '<span>▶️</span> Start Multi-Select';
-                    selectBtn.className = "primary";
-                    view.container.style.cursor = "default";
-                }
-            });
-            
-            // Download selected features
-            downloadBtn.addEventListener("click", function() {
-                if (selectedFeatures.length === 0) return;
-                downloadSelectedFeatures();
-            });
-            
-            // Handle map clicks for selection
-            view.on("click", function(event) {
-                if (!isSelecting) return;
-                
-                event.stopPropagation();
-                
-                // Query for features at click location
-                const query = canadaTownsLayer.createQuery();
-                query.geometry = event.mapPoint;
-                query.spatialRelationship = "intersects";
-                query.returnGeometry = true;
-                query.outFields = ["*"];
-                query.maxRecordCount = 1;
-                
-                canadaTownsLayer.queryFeatures(query).then(function(result) {
-                    if (result.features.length > 0) {
-                        const feature = result.features[0];
-                        
-                        // Check if already selected
-                        const existingIndex = selectedFeatures.findIndex(f => 
-                            f.attributes.OBJECTID === feature.attributes.OBJECTID
-                        );
-                        
-                        if (existingIndex === -1) {
-                            // Add to selection
-                            selectedFeatures.push(feature);
-                            
-                            // Add visual highlight
-                            const graphic = feature.clone();
-                            graphic.symbol = selectionSymbol;
-                            graphic.attributes.selectionId = feature.attributes.OBJECTID;
-                            view.graphics.add(graphic);
-                            
-                            updateSelectionInfo();
-                        } else {
-                            // Remove from selection (toggle off)
-                            selectedFeatures.splice(existingIndex, 1);
-                            
-                            // Remove visual highlight
-                            const graphicsToRemove = view.graphics.items.filter(g => 
-                                g.attributes && g.attributes.selectionId === feature.attributes.OBJECTID
-                            );
-                            view.graphics.removeMany(graphicsToRemove);
-                            
-                            updateSelectionInfo();
-                        }
+
+            // Add the layer to the map
+            map.add(canadaTownsLayer);
+
+            // Create tooltip element
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            tooltip.style.display = 'none';
+            document.body.appendChild(tooltip);
+
+            // Handle mouse move for hover effect
+            view.on("pointer-move", function(event) {
+                view.hitTest(event).then(function(response) {
+                    if (response.results.length > 0 &&
+                        response.results[0].graphic.layer === canadaTownsLayer) {
+
+                        const graphic = response.results[0].graphic;
+                        const attributes = graphic.attributes;
+
+                        // Show tooltip with town name
+                        let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
+
+                        // Check other possible field names for town name
+                        Object.keys(attributes).forEach(key => {
+                            if ((key.toLowerCase().includes('name') ||
+                                 key.toLowerCase().includes('town') ||
+                                 key.toLowerCase().includes('city')) &&
+                                 attributes[key] && townName === 'Unknown Town') {
+                                townName = attributes[key];
+                            }
+                        });
+
+                        tooltip.innerHTML = `<strong>${townName}</strong>`;
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = event.x + 15 + 'px';
+                        tooltip.style.top = event.y - 15 + 'px';
+
+                        view.container.style.cursor = "pointer";
+                    } else {
+                        tooltip.style.display = 'none';
+                        view.container.style.cursor = "default";
                     }
-                }).catch(function(error) {
-                    console.error("Selection query failed:", error);
                 });
             });
-            
-            function updateSelectionInfo() {
-                const count = selectedFeatures.length;
-                const statusText = document.querySelector('.status-text');
-                
-                if (count === 0) {
-                    statusText.textContent = isSelecting ? "Click on polygons to select them" : "Ready to select polygons";
-                    featureList.innerHTML = "";
-                } else {
-                    statusText.textContent = `Selected: ${count} polygon${count !== 1 ? 's' : ''}`;
-                    
-                    // Update feature list
-                    featureList.innerHTML = selectedFeatures.map((feature, index) => {
-                        const name = feature.attributes.NAME || 
-                                   feature.attributes.TOWN_NAME || 
-                                   feature.attributes.CITY_NAME || 
-                                   `Polygon ${index + 1}`;
-                        return `<div class="feature-item">${index + 1}. ${name}</div>`;
-                    }).join('');
+
+            // Handle mouse leave
+            view.on("pointer-leave", function() {
+                tooltip.style.display = 'none';
+                view.container.style.cursor = "default";
+            });
+
+            // Handle click for selection
+            view.on("click", function(event) {
+                view.hitTest(event).then(function(response) {
+                    // Clear previous selection
+                    if (highlightSelect) {
+                        highlightSelect.remove();
+                        highlightSelect = null;
+                    }
+
+                    if (response.results.length > 0 &&
+                        response.results[0].graphic.layer === canadaTownsLayer) {
+
+                        const graphic = response.results[0].graphic;
+                        selectedFeature = graphic;
+
+                        // Highlight selected feature
+                        view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                            highlightSelect = layerView.highlight(graphic);
+                        });
+
+                        // Enable download button
+                        document.getElementById('downloadBtn').disabled = false;
+
+                        // Update status
+                        const attributes = graphic.attributes;
+                        let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Selected Town';
+                        Object.keys(attributes).forEach(key => {
+                            if ((key.toLowerCase().includes('name') ||
+                                 key.toLowerCase().includes('town') ||
+                                 key.toLowerCase().includes('city')) &&
+                                 attributes[key] && townName === 'Selected Town') {
+                                townName = attributes[key];
+                            }
+                        });
+
+                        document.getElementById('status').textContent = `Selected: ${townName}`;
+                    } else {
+                        selectedFeature = null;
+                        document.getElementById('downloadBtn').disabled = true;
+                        document.getElementById('status').textContent = 'Click a polygon to select it for download';
+                    }
+                });
+            });
+
+            // Download functionality
+            document.getElementById('downloadBtn').addEventListener('click', function() {
+                if (!selectedFeature) {
+                    alert('No polygon selected');
+                    return;
                 }
-                
-                downloadBtn.disabled = count === 0;
-            }
-            
-            async function downloadSelectedFeatures() {
-                if (selectedFeatures.length === 0) return;
-                
-                const originalText = downloadBtn.innerHTML;
-                downloadBtn.innerHTML = '<div class="loading"></div> Preparing...';
-                downloadBtn.disabled = true;
-                downloadStatus.innerHTML = '';
-                
+
                 try {
-                    const zip = new JSZip();
-                    
-                    // Create GeoJSON for all selected features
-                    const geojson = {
+                    // Create GeoJSON from the selected feature
+                    const geoJSON = {
                         type: "FeatureCollection",
-                        name: "Canada_Towns_Selection",
-                        crs: {
-                            type: "name",
-                            properties: {
-                                name: "urn:ogc:def:crs:OGC:1.3:CRS84"
-                            }
-                        },
-                        features: selectedFeatures.map(feature => ({
+                        features: [{
                             type: "Feature",
-                            properties: feature.attributes,
                             geometry: {
-                                type: "Polygon",
-                                coordinates: feature.geometry.rings
-                            }
-                        }))
+                                type: selectedFeature.geometry.type === "polygon" ? "Polygon" : "MultiPolygon",
+                                coordinates: convertEsriGeometryToGeoJSON(selectedFeature.geometry)
+                            },
+                            properties: selectedFeature.attributes
+                        }]
                     };
-                    
-                    // Add combined GeoJSON to zip
-                    zip.file("canada_towns_combined.geojson", JSON.stringify(geojson, null, 2));
-                    
-                    // Create individual folder for separate files
-                    const individualFolder = zip.folder("individual_polygons");
-                    
-                    // Create individual GeoJSON files for each feature
-                    selectedFeatures.forEach((feature, index) => {
-                        const individualGeoJSON = {
-                            type: "Feature",
-                            properties: feature.attributes,
-                            geometry: {
-                                type: "Polygon",
-                                coordinates: feature.geometry.rings
-                            }
-                        };
-                        
-                        const baseName = feature.attributes.NAME || 
-                                       feature.attributes.TOWN_NAME || 
-                                       feature.attributes.CITY_NAME || 
-                                       `polygon_${index + 1}`;
-                        const fileName = baseName.replace(/[^a-zA-Z0-9\s\-_]/g, '').replace(/\s+/g, '_');
-                        
-                        individualFolder.file(`${fileName}.geojson`, JSON.stringify(individualGeoJSON, null, 2));
-                    });
-                    
-                    // Create summary file
-                    const summary = {
-                        export_info: {
-                            date: new Date().toISOString(),
-                            total_features: selectedFeatures.length,
-                            source_layer: "Canada_Town FeatureServer",
-                            source_url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
-                            format: "GeoJSON",
-                            coordinate_system: "WGS84 (EPSG:4326)"
-                        },
-                        features_summary: selectedFeatures.map((f, index) => ({
-                            index: index + 1,
-                            name: f.attributes.NAME || f.attributes.TOWN_NAME || f.attributes.CITY_NAME || 'Unnamed',
-                            objectid: f.attributes.OBJECTID,
-                            attributes_count: Object.keys(f.attributes).length
-                        })),
-                        attribute_fields: selectedFeatures.length > 0 ? Object.keys(selectedFeatures[0].attributes) : []
-                    };
-                    
-                    zip.file("README.json", JSON.stringify(summary, null, 2));
-                    
-                    // Create a simple text readme
-                    const readmeText = `Canada Towns Selection Export
-=================================
 
-Export Date: ${new Date().toLocaleDateString()}
-Total Features: ${selectedFeatures.length}
+                    // Create and download the file
+                    const dataStr = JSON.stringify(geoJSON, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    const url = URL.createObjectURL(dataBlob);
 
-Files Included:
-- canada_towns_combined.geojson: All selected polygons in one file
-- individual_polygons/: Separate GeoJSON file for each polygon
-- README.json: Detailed export information
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = url;
 
-This data was exported from the Canada Towns FeatureServer using a custom selection tool.
-All geometries are in WGS84 coordinate system (EPSG:4326).
-`;
-                    
-                    zip.file("README.txt", readmeText);
-                    
-                    downloadBtn.innerHTML = '<div class="loading"></div> Creating ZIP...';
-                    
-                    // Generate and download zip
-                    const content = await zip.generateAsync({
-                        type: "blob",
-                        compression: "DEFLATE",
-                        compressionOptions: {
-                            level: 6
+                    // Get town name for filename
+                    const attributes = selectedFeature.attributes;
+                    let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'selected_town';
+                    Object.keys(attributes).forEach(key => {
+                        if ((key.toLowerCase().includes('name') ||
+                             key.toLowerCase().includes('town') ||
+                             key.toLowerCase().includes('city')) &&
+                             attributes[key] && townName === 'selected_town') {
+                            townName = attributes[key];
                         }
                     });
-                    
-                    const fileName = `canada_towns_selection_${new Date().toISOString().split('T')[0]}_${selectedFeatures.length}features.zip`;
-                    
-                    // Use FileSaver.js for better browser compatibility
-                    if (typeof saveAs !== 'undefined') {
-                        saveAs(content, fileName);
-                    } else {
-                        // Fallback method
-                        const url = window.URL.createObjectURL(content);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = fileName;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        window.URL.revokeObjectURL(url);
-                    }
-                    
-                    downloadStatus.innerHTML = `✅ Successfully downloaded ${selectedFeatures.length} features!`;
-                    setTimeout(() => {
-                        downloadStatus.innerHTML = '';
-                    }, 5000);
-                    
+
+                    // Clean filename
+                    townName = townName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                    downloadLink.download = `${townName}_polygon.geojson`;
+
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    URL.revokeObjectURL(url);
+
                 } catch (error) {
-                    console.error("Download error:", error);
-                    downloadStatus.innerHTML = '❌ Download failed. Please try again.';
-                    setTimeout(() => {
-                        downloadStatus.innerHTML = '';
-                    }, 5000);
-                } finally {
-                    downloadBtn.innerHTML = originalText;
-                    downloadBtn.disabled = selectedFeatures.length === 0;
+                    console.error('Error downloading polygon:', error);
+                    alert('Error downloading polygon. Please try again.');
                 }
+            });
+
+            // Helper function to convert Esri geometry to GeoJSON coordinates
+            function convertEsriGeometryToGeoJSON(geometry) {
+                if (geometry.rings) {
+                    // Polygon geometry
+                    return geometry.rings.map(ring =>
+                        ring.map(coord => [coord[0], coord[1]])
+                    );
+                }
+                return [];
             }
-            
-            // Initialize the application
-            canadaTownsLayer.when(() => {
-                return canadaTownsLayer.queryExtent();
-            }).then(response => {
-                if (response.extent) {
-                    view.goTo(response.extent.expand(1.2));
+
+            // Wait for layer to load and zoom to extent
+            canadaTownsLayer.when(function() {
+                console.log("Canada Towns layer loaded successfully");
+
+                // Get layer extent and zoom to it
+                if (canadaTownsLayer.fullExtent) {
+                    view.goTo(canadaTownsLayer.fullExtent);
                 }
-                loadingOverlay.classList.add('hidden');
-                updateSelectionInfo();
-            }).catch(error => {
-                console.error("Layer failed to load:", error);
-                loadingOverlay.innerHTML = '<div style="text-align: center; font-family: \'Open Sans\', sans-serif;"><div style="font-size: 24px; margin-bottom: 15px;">❌</div><div style="font-weight: 600; margin-bottom: 10px;">Failed to load Canada Towns layer</div><div style="font-size: 16px; opacity: 0.9;">Please check your internet connection and try refreshing the page.</div></div>';
+            }).catch(function(error) {
+                console.error("Error loading layer:", error);
+                document.getElementById('status').textContent = 'Error loading Canada Towns layer';
             });
-            
-            // Handle escape key to stop selection
-            document.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape' && isSelecting) {
-                    isSelecting = false;
-                    selectBtn.innerHTML = '<span>▶️</span> Start Multi-Select';
-                    selectBtn.className = "primary";
-                    view.container.style.cursor = "default";
-                }
-            });
-            
         });
     </script>
 </body>
