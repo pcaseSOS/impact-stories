@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
-    <title>Canada JBF Creator - Shape Drawing Tool</title>
+    <title>US PSAP Creator - Shape Drawing Tool</title>
 
     <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
     <script src="https://js.arcgis.com/4.28/"></script>
@@ -324,7 +324,7 @@
             const view = new MapView({
                 container: "viewDiv",
                 map: map,
-                center: [-106.3468, 56.1304], // Center of Canada
+                center: [-98.5795, 39.8283], // Center of US
                 zoom: 4
             });
 
@@ -506,7 +506,42 @@
             
             // Helper function to get PSAP name from attributes
             function getPSAPName(attributes) {
-                return attributes.NAME || attributes.name || attributes.PSAP_NAME || attributes.FCCID || 'Unknown PSAP';
+                // Log attributes to console for debugging
+                console.log("PSAP attributes:", attributes);
+                
+                // Try various possible attribute fields
+                // Order matters - we check the most likely fields first
+                const possibleNameFields = [
+                    'NAME', 'name', 'PSAP_NAME', 'psapname', 'PSAPNAME',
+                    'LABEL', 'label', 'PSAP', 'psap', 'COUNTY', 'county',
+                    'FCCID', 'IDENTIFIER', 'ID'
+                ];
+                
+                for (const field of possibleNameFields) {
+                    if (attributes[field] && attributes[field].toString().trim() !== '') {
+                        return attributes[field];
+                    }
+                }
+                
+                // If none of the expected fields worked, find any field with 'name' in it
+                for (const key in attributes) {
+                    if (key.toLowerCase().includes('name') && 
+                        attributes[key] && 
+                        attributes[key].toString().trim() !== '') {
+                        return attributes[key];
+                    }
+                }
+                
+                // Last resort - use any non-empty string field
+                for (const key in attributes) {
+                    if (attributes[key] && 
+                        typeof attributes[key] === 'string' && 
+                        attributes[key].trim() !== '') {
+                        return `${attributes[key]} (${key})`;
+                    }
+                }
+                
+                return 'PSAP #' + (attributes.OBJECTID || attributes.FID || 'Unknown');
             }
             
             // Function to create tooltip content for a PSAP
@@ -514,16 +549,46 @@
                 let content = '<div class="tooltip-title">' + getPSAPName(attributes) + '</div>';
                 content += '<div class="tooltip-content">';
                 
-                if (attributes.FCCID) {
-                    content += `<strong>FCC ID:</strong> ${attributes.FCCID}<br>`;
-                }
+                // Add important PSAP identifiers if available
+                const importantFields = [
+                    { key: 'FCCID', label: 'FCC ID' },
+                    { key: 'STATE', label: 'State' },
+                    { key: 'COUNTY', label: 'County' },
+                    { key: 'PSAP_ID', label: 'PSAP ID' },
+                    { key: 'ID', label: 'ID' }
+                ];
                 
-                if (attributes.STATE) {
-                    content += `<strong>State:</strong> ${attributes.STATE}<br>`;
-                }
+                let fieldsAdded = 0;
                 
-                if (attributes.COUNTY) {
-                    content += `<strong>County:</strong> ${attributes.COUNTY}<br>`;
+                // First add the important fields
+                importantFields.forEach(field => {
+                    if (attributes[field.key] && attributes[field.key].toString().trim() !== '') {
+                        content += `<strong>${field.label}:</strong> ${attributes[field.key]}<br>`;
+                        fieldsAdded++;
+                    }
+                });
+                
+                // If no fields were found, try to add other potentially interesting fields
+                if (fieldsAdded === 0) {
+                    for (const key in attributes) {
+                        // Skip internal IDs and empty values
+                        if (key === 'OBJECTID' || key === 'FID' || key === 'Shape' || 
+                            key === 'SHAPE' || key === 'Shape_Length' || key === 'Shape_Area' ||
+                            !attributes[key] || attributes[key].toString().trim() === '') {
+                            continue;
+                        }
+                        
+                        // Format the field name for display
+                        const fieldLabel = key.replace(/_/g, ' ')
+                                             .replace(/([A-Z])/g, ' $1')
+                                             .replace(/^./, str => str.toUpperCase());
+                        
+                        content += `<strong>${fieldLabel}:</strong> ${attributes[key]}<br>`;
+                        fieldsAdded++;
+                        
+                        // Limit to 5 fields to avoid huge tooltips
+                        if (fieldsAdded >= 5) break;
+                    }
                 }
                 
                 content += '</div>';
@@ -605,13 +670,43 @@
                     return;
                 }
                 
+                // First, ensure the layer is loaded so we can access its fields
+                if (!psapLayer.loaded) {
+                    status.textContent = "Waiting for PSAP layer to load...";
+                    psapLayer.when(() => {
+                        // Now that the layer is loaded, try the search again
+                        searchPSAPs(searchText);
+                    }).catch(error => {
+                        console.error("Error loading PSAP layer:", error);
+                        status.textContent = "Error loading PSAP data";
+                    });
+                    return;
+                }
+                
                 const query = psapLayer.createQuery();
                 // Use wildcards to find partial matches
                 const searchPattern = searchText.replace(/\s+/g, '%');
-                let whereClause = '';
                 
-                // Search in name and ID fields
-                whereClause = `UPPER(NAME) LIKE UPPER('%${searchPattern}%') OR UPPER(FCCID) LIKE UPPER('%${searchPattern}%')`;
+                // Examine the fields to determine what's available
+                const searchableFields = psapLayer.fields
+                    .filter(field => {
+                        // Only text fields
+                        return field.type === "string" || field.type === "small-integer" || field.type === "integer";
+                    })
+                    .map(field => field.name);
+                
+                console.log("Available fields for search:", searchableFields);
+                
+                // Build WHERE clause with all searchable fields
+                let whereClause = searchableFields.map(fieldName => {
+                    return `UPPER(${fieldName}) LIKE UPPER('%${searchPattern}%')`;
+                }).join(" OR ");
+                
+                // Fallback if no fields found
+                if (!whereClause) {
+                    whereClause = "1=1"; // Return all as fallback
+                    console.warn("No searchable fields found in PSAP layer");
+                }
                 
                 query.where = whereClause;
                 query.outFields = ['*'];
@@ -790,13 +885,25 @@
                 });
             });
             
-            // Wait for the view to load
+            // Wait for the view to load and layer to be ready
             view.when(function() {
                 // Start with navigation mode
                 sketch.visible = false;
                 
                 // Set initial status
                 status.textContent = "Navigation mode - click a PSAP to select it or search by name";
+                
+                // Wait for PSAP layer to load and log field information for debugging
+                psapLayer.when(function() {
+                    console.log("PSAP layer loaded");
+                    console.log("Fields available:", psapLayer.fields.map(f => f.name));
+                    
+                    // Show layer info in status
+                    status.textContent = "PSAP layer loaded - ready to use";
+                }).catch(function(error) {
+                    console.error("Error loading PSAP layer:", error);
+                    status.textContent = "Error loading PSAP layer - check console for details";
+                });
             });
         });
     </script>
