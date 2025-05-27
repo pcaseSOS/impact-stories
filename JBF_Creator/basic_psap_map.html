@@ -245,6 +245,16 @@
             // Flag to track if the initial map load is complete
             let initialLoadComplete = false;
             
+            // Symbol for selected features
+            const selectedSymbol = {
+                type: "simple-fill",
+                color: [255, 243, 0, 0.8],  // Bright yellow
+                outline: {
+                    color: [0, 94, 255, 1],  // Blue outline
+                    width: 2
+                }
+            };
+            
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
             const clearBtn = document.getElementById('clearBtn');
@@ -283,16 +293,19 @@
                     outFields: ["*"],
                     opacity: 0.85, // Increased overall opacity
                     renderer: {
-                        type: "simple",
-                        symbol: {
+                        type: "unique-value",  // Use unique-value renderer to support selection highlighting
+                        field: "OBJECTID",    // This will be dynamically updated for selections
+                        defaultSymbol: {
                             type: "simple-fill",
-                            color: [41, 168, 221, 0.4], // Safety blue with improved opacity
+                            color: [41, 168, 221, 0.4], // Safety blue with improved opacity for unselected
                             outline: {
                                 color: [0, 21, 89, 1], // Royal blue with full opacity
                                 width: 1.5 // Thicker border for better visibility
                             }
-                        }
+                        },
+                        uniqueValueInfos: []
                     },
+                    definitionExpression: "1=1", // Show all features by default
                     // Enable popup for the layer
                     popupEnabled: true,
                     // Add a popup template to display all attributes
@@ -435,42 +448,50 @@
                     // Highlight handle to store references to highlights
                     let currentHighlights = [];
                     
-                    // Highlight selected features with a robust persistent approach
+                    // Highlight selected features using custom renderer
                     function highlightSelectedFeatures() {
-                        if (!psapLayerView || !initialLoadComplete) return;
+                        if (!psapLayer || !initialLoadComplete) return;
                         
-                        console.log("Applying highlights to", selectedFeatures.length, "features");
+                        console.log("Applying custom highlights to", selectedFeatures.length, "features");
                         
                         try {
-                            // Apply the globally defined highlight options with enhanced visibility
-                            psapLayerView.highlightOptions = highlightOptions;
-                            
-                            // Clear any existing highlights first
-                            psapLayerView.highlight();
-                            
-                            // Reset any feature effects to ensure all polygons are visible
-                            psapLayerView.featureEffect = null;
+                            // Create new renderer based on current selections
+                            const uniqueValueInfos = [];
                             
                             // Extract object IDs from the selected features
-                            const objectIds = selectedFeatures.map(feature => {
-                                return feature.attributes.ogc_fid || 
-                                      feature.attributes.OBJECTID || 
-                                      feature.attributes.FID;
-                            }).filter(id => id !== undefined);
+                            selectedFeatures.forEach(feature => {
+                                const objectId = feature.attributes.OBJECTID || 
+                                                feature.attributes.ogc_fid || 
+                                                feature.attributes.FID;
+                                                
+                                if (objectId !== undefined) {
+                                    // Add this feature to the unique value renderer
+                                    uniqueValueInfos.push({
+                                        value: objectId,
+                                        symbol: selectedSymbol
+                                    });
+                                }
+                            });
                             
-                            console.log("Selected object IDs:", objectIds);
+                            // Apply the updated renderer
+                            const renderer = {
+                                type: "unique-value",
+                                field: "OBJECTID",  // Using OBJECTID which all feature services have
+                                uniqueValueInfos: uniqueValueInfos,
+                                defaultSymbol: {
+                                    type: "simple-fill",
+                                    color: [41, 168, 221, 0.4], // Safety blue for unselected
+                                    outline: {
+                                        color: [0, 21, 89, 1],
+                                        width: 1.5
+                                    }
+                                }
+                            };
                             
-                            // Apply highlight if we have selected features
-                            if (objectIds.length > 0) {
-                                // Force highlightOptions to be applied again for extra persistence
-                                psapLayerView.highlightOptions = {...highlightOptions};
-                                
-                                // Apply the highlight with a slight delay to ensure it takes effect
-                                setTimeout(() => {
-                                    psapLayerView.highlight(objectIds);
-                                    console.log("Highlight applied to", objectIds.length, "features");
-                                }, 50);
-                            }
+                            // Update the renderer which will persist until changed
+                            psapLayer.renderer = renderer;
+                            
+                            console.log("Updated renderer with", uniqueValueInfos.length, "highlighted features");
                         } catch (error) {
                             console.error("Error in highlightSelectedFeatures:", error);
                         }
