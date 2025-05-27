@@ -47,6 +47,115 @@
             height: 40px;
             z-index: 99;
         }
+        
+        /* Download toolbar */
+        .toolbar {
+            position: absolute;
+            top: 70px;
+            right: 15px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toolbar button {
+            background: var(--royal-blue);
+            color: var(--white);
+            border: none;
+            padding: 10px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            min-width: 180px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .toolbar button:hover {
+            background: var(--glow);
+        }
+
+        .toolbar button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        /* Selection panel */
+        #selectionPanel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            max-height: 400px;
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 100;
+            display: none;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: var(--royal-blue);
+            color: var(--white);
+            padding: 12px 16px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-content {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .selected-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--white);
+        }
+
+        .selected-item:hover {
+            background: #f8f9fa;
+        }
+
+        .selected-item:last-child {
+            border-bottom: none;
+        }
+
+        .item-name {
+            font-weight: 500;
+            color: #333;
+            flex-grow: 1;
+        }
+
+        .remove-btn {
+            background: #dc3545;
+            color: var(--white);
+            border: none;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .panel-footer {
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-top: 1px solid #eee;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
 
         /* Custom styles for the search widget to match brand colors */
         .esri-search__container {
@@ -97,16 +206,49 @@
     <div id="searchDiv"></div>
     <div id="status">Loading map...</div>
     <div id="brandBadge">RapidSOS PSAP Map</div>
+    
+    <!-- Toolbar for downloads -->
+    <div class="toolbar">
+        <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
+        <button id="clearBtn" disabled>🗑️ Clear Selection</button>
+    </div>
+    
+    <!-- Selection Panel -->
+    <div id="selectionPanel">
+        <div class="panel-header">
+            <span>Selected PSAPs (<span id="selectionCount">0</span>)</span>
+            <button id="panelToggle" style="background: none; border: none; color: white; cursor: pointer;">−</button>
+        </div>
+        <div class="panel-content" id="selectionList">
+            <!-- Selected items will be populated here -->
+        </div>
+        <div class="panel-footer">
+            Click on map to select PSAPs
+        </div>
+    </div>
 
     <script>
         require([
             "esri/Map",
             "esri/views/MapView",
             "esri/layers/FeatureLayer",
-            "esri/widgets/Search"
-        ], function(Map, MapView, FeatureLayer, Search) {
+            "esri/widgets/Search",
+            "esri/geometry/projection",
+            "esri/geometry/SpatialReference"
+        ], function(Map, MapView, FeatureLayer, Search, projection, SpatialReference) {
             
             console.log("ArcGIS modules loaded");
+            
+            // Array to store selected features and their info
+            let selectedFeatures = [];
+            
+            // UI Elements
+            const downloadBtn = document.getElementById('downloadBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const selectionPanel = document.getElementById('selectionPanel');
+            const selectionList = document.getElementById('selectionList');
+            const selectionCount = document.getElementById('selectionCount');
+            const panelToggle = document.getElementById('panelToggle');
             
             // Create a simple map
             const map = new Map({
@@ -139,13 +281,17 @@
                         type: "simple",
                         symbol: {
                             type: "simple-fill", // For polygons/boundaries
-                            color: [41, 168, 221, 0.3], // Safety Blue with transparency
+                            color: [41, 168, 221, 0.5], // Safety Blue with increased opacity
                             outline: {
                                 color: "#001559", // Royal Blue
                                 width: 1.5
                             }
                         }
                     },
+                    // Enable selection on the layer
+                    popupEnabled: true,
+                    // Allow user to select features by clicking
+                    selectionEnabled: true,
                     // Add a popup template to display all attributes
                     popupTemplate: {
                         title: "{psap_name}",
@@ -215,7 +361,268 @@
                         });
                     });
                     
-                    console.log("Search widget created");
+                    // Helper function to get feature name
+                    function getFeatureName(attributes) {
+                        return attributes.psap_name || attributes.name || 'Unknown PSAP';
+                    }
+                    
+                    // Helper function to get feature ID
+                    function getFeatureId(feature) {
+                        return feature.attributes.ogc_fid || 
+                               feature.attributes.OBJECTID || 
+                               feature.attributes.FID || 
+                               JSON.stringify(feature.attributes);
+                    }
+                    
+                    // Update selection panel display
+                    function updateSelectionPanel() {
+                        selectionCount.textContent = selectedFeatures.length;
+                        downloadBtn.textContent = `📥 Download Selected (${selectedFeatures.length})`;
+
+                        if (selectedFeatures.length > 0) {
+                            selectionPanel.style.display = 'block';
+                            downloadBtn.disabled = false;
+                            clearBtn.disabled = false;
+                        } else {
+                            selectionPanel.style.display = 'none';
+                            downloadBtn.disabled = true;
+                            clearBtn.disabled = true;
+                        }
+
+                        // Clear and rebuild selection list
+                        selectionList.innerHTML = '';
+
+                        selectedFeatures.forEach((feature, index) => {
+                            const psapName = getFeatureName(feature.attributes);
+                            
+                            const itemDiv = document.createElement('div');
+                            itemDiv.className = 'selected-item';
+
+                            const nameSpan = document.createElement('span');
+                            nameSpan.className = 'item-name';
+                            nameSpan.textContent = psapName;
+
+                            const removeBtn = document.createElement('button');
+                            removeBtn.className = 'remove-btn';
+                            removeBtn.textContent = '×';
+                            removeBtn.title = 'Remove from selection';
+                            removeBtn.onclick = () => removeFromSelection(index);
+
+                            itemDiv.appendChild(nameSpan);
+                            itemDiv.appendChild(removeBtn);
+                            selectionList.appendChild(itemDiv);
+                        });
+                    }
+                    
+                    // Remove a feature from selection
+                    function removeFromSelection(index) {
+                        if (index >= 0 && index < selectedFeatures.length) {
+                            const feature = selectedFeatures[index];
+                            
+                            // Remove from array
+                            selectedFeatures.splice(index, 1);
+                            
+                            // Update the highlight
+                            psapLayer.highlight.remove(feature);
+                            
+                            // Update the panel
+                            updateSelectionPanel();
+                        }
+                    }
+                    
+                    // Clear all selections
+                    function clearAllSelections() {
+                        // Clear the highlight
+                        psapLayer.highlight.remove();
+                        
+                        // Clear the array
+                        selectedFeatures = [];
+                        
+                        // Update the panel
+                        updateSelectionPanel();
+                    }
+                    
+                    // Convert ArcGIS geometry to GeoJSON with projection
+                    async function convertToGeoJSON(geometry) {
+                        try {
+                            // Create target spatial reference (WGS84 / EPSG:4326)
+                            const wgs84 = new SpatialReference({ wkid: 4326 });
+
+                            let projectedGeometry = geometry;
+
+                            // Check if geometry needs projection
+                            if (geometry.spatialReference && geometry.spatialReference.wkid !== 4326) {
+                                console.log(`Projecting from EPSG:${geometry.spatialReference.wkid} to EPSG:4326`);
+
+                                // Load projection engine if not already loaded
+                                await projection.load();
+
+                                // Project geometry to WGS84
+                                projectedGeometry = projection.project(geometry, wgs84);
+                            }
+
+                            // Convert to GeoJSON coordinate format
+                            if (projectedGeometry.rings) {
+                                // Polygon geometry
+                                return projectedGeometry.rings.map(ring =>
+                                    ring.map(coord => [coord[0], coord[1]])
+                                );
+                            }
+
+                            return [];
+                        } catch (error) {
+                            console.error('Error converting geometry coordinates:', error);
+                            console.log('Falling back to original coordinates');
+
+                            // Fallback to original method if projection fails
+                            if (geometry.rings) {
+                                return geometry.rings.map(ring =>
+                                    ring.map(coord => [coord[0], coord[1]])
+                                );
+                            }
+                            return [];
+                        }
+                    }
+                    
+                    // Click event for feature selection
+                    view.on("click", function(event) {
+                        // Get the features at the clicked location
+                        view.hitTest(event).then(function(response) {
+                            // Find PSAP features from the hitTest results
+                            const psapResult = response.results.find(result => 
+                                result.graphic && result.graphic.layer === psapLayer
+                            );
+                            
+                            if (psapResult) {
+                                const clickedFeature = psapResult.graphic;
+                                const featureId = getFeatureId(clickedFeature);
+                                
+                                // Check if already selected
+                                const existingIndex = selectedFeatures.findIndex(f => 
+                                    getFeatureId(f) === featureId
+                                );
+                                
+                                if (existingIndex >= 0) {
+                                    // Already selected, so remove it
+                                    removeFromSelection(existingIndex);
+                                } else {
+                                    // Add to selection
+                                    selectedFeatures.push(clickedFeature);
+                                    psapLayer.highlight.add(clickedFeature);
+                                    updateSelectionPanel();
+                                }
+                            }
+                        });
+                    });
+                    
+                    // Panel toggle functionality
+                    panelToggle.addEventListener('click', function() {
+                        const content = document.querySelector('.panel-content');
+                        const footer = document.querySelector('.panel-footer');
+
+                        if (content.style.display === 'none') {
+                            content.style.display = 'block';
+                            footer.style.display = 'block';
+                            panelToggle.textContent = '−';
+                        } else {
+                            content.style.display = 'none';
+                            footer.style.display = 'none';
+                            panelToggle.textContent = '+';
+                        }
+                    });
+                    
+                    // Download button functionality
+                    downloadBtn.addEventListener('click', async function() {
+                        if (selectedFeatures.length === 0) {
+                            alert('No PSAPs selected');
+                            return;
+                        }
+                        
+                        try {
+                            status.textContent = 'Preparing download...';
+                            
+                            // Process each selected feature
+                            const features = await Promise.all(selectedFeatures.map(async (feature) => {
+                                // Convert coordinates with proper projection
+                                const coordinates = await convertToGeoJSON(feature.geometry);
+
+                                // Get original spatial reference information
+                                const originalSR = feature.geometry.spatialReference;
+                                const originalWkid = originalSR ? originalSR.wkid : 'Unknown';
+                                
+                                return {
+                                    type: "Feature",
+                                    geometry: {
+                                        type: feature.geometry.type === "polygon" ? "Polygon" : "MultiPolygon",
+                                        coordinates: coordinates
+                                    },
+                                    properties: {
+                                        ...feature.attributes,
+                                        // Add metadata
+                                        export_metadata: {
+                                            exported_date: new Date().toISOString(),
+                                            original_crs_wkid: originalWkid,
+                                            target_crs: 'EPSG:4326',
+                                            target_crs_name: 'WGS 84'
+                                        }
+                                    }
+                                };
+                            }));
+                            
+                            // Create GeoJSON object
+                            const geoJSON = {
+                                type: "FeatureCollection",
+                                crs: {
+                                    type: "name",
+                                    properties: {
+                                        name: "urn:ogc:def:crs:EPSG::4326"
+                                    }
+                                },
+                                metadata: {
+                                    exported_by: "RapidSOS PSAP Map",
+                                    export_date: new Date().toISOString(),
+                                    coordinate_system: {
+                                        epsg_code: 4326,
+                                        name: "WGS 84"
+                                    },
+                                    feature_count: features.length
+                                },
+                                features: features
+                            };
+
+                            // Create and download the file
+                            const dataStr = JSON.stringify(geoJSON, null, 2);
+                            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                            const url = URL.createObjectURL(dataBlob);
+
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = url;
+
+                            // Create filename with timestamp
+                            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                            const filename = `psap_boundaries_${selectedFeatures.length}_polygons_WGS84_${timestamp}.geojson`;
+
+                            downloadLink.download = filename;
+
+                            document.body.appendChild(downloadLink);
+                            downloadLink.click();
+                            document.body.removeChild(downloadLink);
+                            URL.revokeObjectURL(url);
+
+                            status.textContent = `Downloaded ${selectedFeatures.length} PSAP boundary polygons in WGS84 format`;
+                        } catch (error) {
+                            console.error('Error downloading polygons:', error);
+                            alert('Error downloading polygons. Please try again.');
+                            status.textContent = 'Error during download';
+                        }
+                    });
+                    
+                    // Clear selection button
+                    clearBtn.addEventListener('click', function() {
+                        clearAllSelections();
+                    });
+                    
+                    console.log("Search widget and selection tools created");
                     
                     // Wait for PSAP layer to load
                     psapLayer.when(function() {
