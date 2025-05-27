@@ -362,6 +362,14 @@
                     // Create a layerView variable we'll use for highlighting
                     let psapLayerView;
                     
+                    // Set highlight options globally to ensure consistency
+                    const highlightOptions = {
+                        color: [255, 243, 0, 0.5], // Safety Gap yellow from brand colors
+                        haloColor: [0, 94, 255],   // Glow blue from brand colors
+                        haloOpacity: 0.9,
+                        fillOpacity: 0.4
+                    };
+                    
                     // Helper function to get feature name
                     function getFeatureName(attributes) {
                         return attributes.psap_name || attributes.name || 'Unknown PSAP';
@@ -419,13 +427,11 @@
                     function highlightSelectedFeatures() {
                         if (!psapLayerView) return;
                         
-                        // Clear any existing highlights
-                        psapLayerView.highlightOptions = {
-                            color: [255, 243, 0, 0.5], // Safety Gap yellow from brand colors
-                            haloColor: [0, 94, 255],   // Glow blue from brand colors
-                            haloOpacity: 0.9,
-                            fillOpacity: 0.4
-                        };
+                        // Apply the globally defined highlight options
+                        psapLayerView.highlightOptions = highlightOptions;
+                        
+                        // Clear any existing highlights (necessary to reset before applying new highlights)
+                        psapLayerView.highlight();
                         
                         if (selectedFeatures.length > 0) {
                             // Create an array of ObjectIDs to highlight
@@ -436,6 +442,7 @@
                             }).filter(id => id !== undefined);
                             
                             if (objectIds.length > 0) {
+                                // Apply highlights and they will persist until explicitly cleared
                                 psapLayerView.highlight(objectIds);
                             }
                         }
@@ -549,8 +556,26 @@
                     view.whenLayerView(psapLayer).then(function(layerView) {
                         psapLayerView = layerView;
                         console.log("Layer view created for selection highlighting");
+                        
+                        // Set the highlight options immediately
+                        psapLayerView.highlightOptions = highlightOptions;
+                        
+                        // Apply any existing highlights if the map is refreshed
+                        if (selectedFeatures.length > 0) {
+                            highlightSelectedFeatures();
+                        }
                     }).catch(function(error) {
                         console.error("Error creating layer view:", error);
+                    });
+                    
+                    // Re-apply highlights when the view is updated (zoom, pan, etc.)
+                    view.watch("stationary", function(isStationary) {
+                        if (isStationary && selectedFeatures.length > 0) {
+                            // Small delay to ensure the view has completely settled
+                            setTimeout(function() {
+                                highlightSelectedFeatures();
+                            }, 100);
+                        }
                     });
                     
                     // Panel toggle functionality
