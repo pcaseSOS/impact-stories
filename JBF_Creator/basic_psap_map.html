@@ -369,10 +369,10 @@
                     
                     // Set highlight options globally to ensure consistency
                     const highlightOptions = {
-                        color: [255, 243, 0, 0.7],   // Safety Gap yellow with high opacity
+                        color: [255, 243, 0, 0.8],   // Safety Gap yellow with very high opacity
                         haloColor: [0, 94, 255],     // Glow blue from brand colors
                         haloOpacity: 1.0,            // Full opacity for halo
-                        fillOpacity: 0.6,            // Increased fill opacity for better contrast
+                        fillOpacity: 0.8,            // Higher fill opacity for better visibility
                         haloSize: 3                  // Larger halo for enhanced visibility
                     };
                     
@@ -435,41 +435,44 @@
                     // Highlight handle to store references to highlights
                     let currentHighlights = [];
                     
-                    // Apply visual effect to highlight selected features
+                    // Highlight selected features with a robust persistent approach
                     function highlightSelectedFeatures() {
                         if (!psapLayerView || !initialLoadComplete) return;
                         
-                        console.log("Applying effect to", selectedFeatures.length, "features");
+                        console.log("Applying highlights to", selectedFeatures.length, "features");
                         
-                        // Extract object IDs from the selected features
-                        const objectIds = selectedFeatures.map(feature => {
-                            return feature.attributes.ogc_fid || 
-                                   feature.attributes.OBJECTID || 
-                                   feature.attributes.FID;
-                        }).filter(id => id !== undefined);
-                        
-                        console.log("Selected object IDs:", objectIds);
-                        
-                        // Create a feature effect that highlights only the selected features
-                        if (objectIds.length > 0) {
-                            // First apply the filter to show only selected features with special styling
-                            featureFilter.objectIds = objectIds;
+                        try {
+                            // Apply the globally defined highlight options with enhanced visibility
+                            psapLayerView.highlightOptions = highlightOptions;
                             
-                            // Create a feature effect that highlights only the selected features
-                            const featureEffect = {
-                                filter: featureFilter,
-                                excludedEffect: "opacity(0.3)", // Make non-selected features more transparent
-                                includedEffect: "brightness(1.5)" // Make selected features brighter
-                            };
+                            // Clear any existing highlights first
+                            psapLayerView.highlight();
                             
-                            // Apply the feature effect
-                            psapLayerView.featureEffect = featureEffect;
-                            
-                            // Also apply highlight for extra visibility
-                            psapLayerView.highlight(objectIds);
-                        } else {
-                            // Clear feature effect when nothing is selected
+                            // Reset any feature effects to ensure all polygons are visible
                             psapLayerView.featureEffect = null;
+                            
+                            // Extract object IDs from the selected features
+                            const objectIds = selectedFeatures.map(feature => {
+                                return feature.attributes.ogc_fid || 
+                                      feature.attributes.OBJECTID || 
+                                      feature.attributes.FID;
+                            }).filter(id => id !== undefined);
+                            
+                            console.log("Selected object IDs:", objectIds);
+                            
+                            // Apply highlight if we have selected features
+                            if (objectIds.length > 0) {
+                                // Force highlightOptions to be applied again for extra persistence
+                                psapLayerView.highlightOptions = {...highlightOptions};
+                                
+                                // Apply the highlight with a slight delay to ensure it takes effect
+                                setTimeout(() => {
+                                    psapLayerView.highlight(objectIds);
+                                    console.log("Highlight applied to", objectIds.length, "features");
+                                }, 50);
+                            }
+                        } catch (error) {
+                            console.error("Error in highlightSelectedFeatures:", error);
                         }
                     }
                     
