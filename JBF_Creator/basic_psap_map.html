@@ -429,29 +429,45 @@
                         });
                     }
                     
+                    // Highlight handle to store references to highlights
+                    let currentHighlights = [];
+                    
                     // Highlight the selected features
                     function highlightSelectedFeatures() {
                         if (!psapLayerView || !initialLoadComplete) return;
                         
+                        console.log("Applying highlights to", selectedFeatures.length, "features");
+                        
+                        // Clear any existing highlight handles
+                        if (currentHighlights.length > 0) {
+                            currentHighlights.forEach(handle => {
+                                if (handle && typeof handle.remove === 'function') {
+                                    handle.remove();
+                                }
+                            });
+                            currentHighlights = [];
+                        }
+                        
                         // Apply the globally defined highlight options
                         psapLayerView.highlightOptions = highlightOptions;
                         
-                        // Clear any existing highlights (necessary to reset before applying new highlights)
-                        psapLayerView.highlight();
-                        
-                        if (selectedFeatures.length > 0) {
-                            // Create an array of ObjectIDs to highlight
-                            const objectIds = selectedFeatures.map(feature => {
-                                return feature.attributes.ogc_fid || 
-                                       feature.attributes.OBJECTID || 
-                                       feature.attributes.FID;
-                            }).filter(id => id !== undefined);
-                            
-                            if (objectIds.length > 0) {
-                                // Apply highlights and they will persist until explicitly cleared
-                                psapLayerView.highlight(objectIds);
+                        // Create highlights for each selected feature individually for better persistence
+                        selectedFeatures.forEach(feature => {
+                            try {
+                                const objectId = feature.attributes.ogc_fid || 
+                                               feature.attributes.OBJECTID || 
+                                               feature.attributes.FID;
+                                               
+                                if (objectId !== undefined) {
+                                    // Use individual highlighting which is more reliable
+                                    const highlightHandle = psapLayerView.highlight(objectId);
+                                    currentHighlights.push(highlightHandle);
+                                    console.log("Highlighted feature with ID:", objectId);
+                                }
+                            } catch (e) {
+                                console.error("Error highlighting feature:", e);
                             }
-                        }
+                        });
                     }
                     
                     // Remove a feature from selection
@@ -579,6 +595,16 @@
                                 highlightSelectedFeatures();
                             }
                         }, 1000);
+                        
+                        // Watch for suspended state changes (when layer view is suspended during map interaction)
+                        layerView.watch("suspended", function(suspended) {
+                            if (!suspended && selectedFeatures.length > 0) {
+                                console.log("Layer view no longer suspended, reapplying highlights");
+                                setTimeout(function() {
+                                    highlightSelectedFeatures();
+                                }, 100);
+                            }
+                        });
                     }).catch(function(error) {
                         console.error("Error creating layer view:", error);
                     });
@@ -588,8 +614,19 @@
                         if (isStationary && initialLoadComplete && selectedFeatures.length > 0) {
                             // Small delay to ensure the view has completely settled
                             setTimeout(function() {
+                                console.log("View is stationary, reapplying highlights");
                                 highlightSelectedFeatures();
-                            }, 100);
+                            }, 250); // Longer delay to ensure map is fully settled
+                        }
+                    });
+                    
+                    // Re-apply highlights when extent changes (zoom/pan)
+                    view.watch("extent", function() {
+                        if (initialLoadComplete && selectedFeatures.length > 0) {
+                            // Apply highlights after extent change is complete
+                            setTimeout(function() {
+                                highlightSelectedFeatures();
+                            }, 300);
                         }
                     });
                     
