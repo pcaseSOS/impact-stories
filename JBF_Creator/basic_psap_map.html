@@ -242,6 +242,9 @@
             // Array to store selected features and their info
             let selectedFeatures = [];
             
+            // Flag to track if the initial map load is complete
+            let initialLoadComplete = false;
+            
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
             const clearBtn = document.getElementById('clearBtn');
@@ -271,20 +274,22 @@
                 // Status element
                 const status = document.getElementById('status');
                 
-                // Create the PSAP feature layer
+                // Flag to track if the initial map load is complete
+                let initialLoadComplete = false;
+                
+                // Create the PSAP feature layer with improved visibility
                 const psapLayer = new FeatureLayer({
                     url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
                     outFields: ["*"],
-                    opacity: 0.7,
-                    // Apply RapidSOS brand colors to the boundary polygons
+                    opacity: 0.85, // Increased overall opacity
                     renderer: {
                         type: "simple",
                         symbol: {
-                            type: "simple-fill", // For polygons/boundaries
-                            color: [41, 168, 221, 0.5], // Safety Blue with increased opacity
+                            type: "simple-fill",
+                            color: [41, 168, 221, 0.4], // Safety blue with improved opacity
                             outline: {
-                                color: "#001559", // Royal Blue
-                                width: 1.5
+                                color: [0, 21, 89, 1], // Royal blue with full opacity
+                                width: 1.5 // Thicker border for better visibility
                             }
                         }
                     },
@@ -364,10 +369,11 @@
                     
                     // Set highlight options globally to ensure consistency
                     const highlightOptions = {
-                        color: [255, 243, 0, 0.5], // Safety Gap yellow from brand colors
-                        haloColor: [0, 94, 255],   // Glow blue from brand colors
-                        haloOpacity: 0.9,
-                        fillOpacity: 0.4
+                        color: [255, 243, 0, 0.7],   // Safety Gap yellow with high opacity
+                        haloColor: [0, 94, 255],     // Glow blue from brand colors
+                        haloOpacity: 1.0,            // Full opacity for halo
+                        fillOpacity: 0.6,            // Increased fill opacity for better contrast
+                        haloSize: 3                  // Larger halo for enhanced visibility
                     };
                     
                     // Helper function to get feature name
@@ -425,7 +431,7 @@
                     
                     // Highlight the selected features
                     function highlightSelectedFeatures() {
-                        if (!psapLayerView) return;
+                        if (!psapLayerView || !initialLoadComplete) return;
                         
                         // Apply the globally defined highlight options
                         psapLayerView.highlightOptions = highlightOptions;
@@ -560,17 +566,26 @@
                         // Set the highlight options immediately
                         psapLayerView.highlightOptions = highlightOptions;
                         
-                        // Apply any existing highlights if the map is refreshed
-                        if (selectedFeatures.length > 0) {
-                            highlightSelectedFeatures();
-                        }
+                        // Make sure to clear any potential auto-highlighting on load
+                        psapLayerView.highlight();
+                        
+                        // Only after the map is fully loaded should we allow highlighting
+                        setTimeout(function() {
+                            initialLoadComplete = true;
+                            console.log("Initial load complete, highlighting enabled");
+                            
+                            // Apply any existing highlights if the map is refreshed and we have selections
+                            if (selectedFeatures.length > 0) {
+                                highlightSelectedFeatures();
+                            }
+                        }, 1000);
                     }).catch(function(error) {
                         console.error("Error creating layer view:", error);
                     });
                     
                     // Re-apply highlights when the view is updated (zoom, pan, etc.)
                     view.watch("stationary", function(isStationary) {
-                        if (isStationary && selectedFeatures.length > 0) {
+                        if (isStationary && initialLoadComplete && selectedFeatures.length > 0) {
                             // Small delay to ensure the view has completely settled
                             setTimeout(function() {
                                 highlightSelectedFeatures();
