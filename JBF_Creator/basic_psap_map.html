@@ -27,19 +27,29 @@
             font-size: 14px;
             z-index: 100;
         }
+        #searchDiv {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 300px;
+            height: 40px;
+            z-index: 99;
+        }
     </style>
 </head>
 
 <body>
     <div id="viewDiv"></div>
+    <div id="searchDiv"></div>
     <div id="status">Loading map...</div>
 
     <script>
         require([
             "esri/Map",
             "esri/views/MapView",
-            "esri/layers/FeatureLayer"
-        ], function(Map, MapView, FeatureLayer) {
+            "esri/layers/FeatureLayer",
+            "esri/widgets/Search"
+        ], function(Map, MapView, FeatureLayer, Search) {
             
             console.log("ArcGIS modules loaded");
             
@@ -80,6 +90,30 @@
                 view.when(function() {
                     status.textContent = "Map loaded successfully!";
                     console.log("View ready");
+                    
+                    // Create and configure the search widget
+                    const searchWidget = new Search({
+                        view: view,
+                        container: "searchDiv",
+                        includeDefaultSources: false,
+                        sources: [
+                            {
+                                layer: psapLayer,
+                                searchFields: ["STATE", "COUNTY", "PSAP_NAME"],
+                                displayField: "PSAP_NAME",
+                                exactMatch: false,
+                                outFields: ["*"],
+                                name: "PSAP Locations",
+                                placeholder: "Search PSAP by name or location",
+                                maxResults: 10,
+                                maxSuggestions: 10,
+                                suggestionsEnabled: true,
+                                minSuggestCharacters: 2
+                            }
+                        ]
+                    });
+                    
+                    console.log("Search widget created");
                     
                     // Wait for PSAP layer to load
                     psapLayer.when(function() {
