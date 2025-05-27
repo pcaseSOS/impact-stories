@@ -78,7 +78,26 @@
                 const psapLayer = new FeatureLayer({
                     url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
                     outFields: ["*"],
-                    opacity: 0.7
+                    opacity: 0.7,
+                    // Add a popup template to display all attributes
+                    popupTemplate: {
+                        title: "{psap_name}",
+                        content: [
+                            {
+                                type: "fields",
+                                fieldInfos: [
+                                    { fieldName: "ogc_fid", label: "OGC FID" },
+                                    { fieldName: "name", label: "Name" },
+                                    { fieldName: "psap_name", label: "PSAP Name" },
+                                    { fieldName: "fcc_id", label: "FCC ID" },
+                                    { fieldName: "telephone", label: "Telephone" },
+                                    { fieldName: "state", label: "State" },
+                                    { fieldName: "account_id", label: "Account ID" },
+                                    { fieldName: "state_1", label: "State (Alt)" }
+                                ]
+                            }
+                        ]
+                    }
                 });
                 
                 console.log("PSAP layer created");
@@ -99,18 +118,34 @@
                         sources: [
                             {
                                 layer: psapLayer,
-                                searchFields: ["STATE", "COUNTY", "PSAP_NAME"],
-                                displayField: "PSAP_NAME",
+                                searchFields: ["state", "psap_name", "account_id", "name"],
+                                displayField: "psap_name",
                                 exactMatch: false,
                                 outFields: ["*"],
                                 name: "PSAP Locations",
-                                placeholder: "Search PSAP by name or location",
+                                placeholder: "Search by name, ID, or location",
                                 maxResults: 10,
                                 maxSuggestions: 10,
                                 suggestionsEnabled: true,
                                 minSuggestCharacters: 2
                             }
                         ]
+                    });
+                    
+                    // Add a debug message to see field names
+                    psapLayer.when(function() {
+                        psapLayer.queryFeatures({
+                            where: "1=1",
+                            returnGeometry: false,
+                            outFields: ["*"],
+                            num: 1
+                        }).then(function(results) {
+                            if (results && results.features && results.features.length > 0) {
+                                console.log("Field names in layer:", Object.keys(results.features[0].attributes));
+                            }
+                        }).catch(function(error) {
+                            console.error("Error querying field names:", error);
+                        });
                     });
                     
                     console.log("Search widget created");
