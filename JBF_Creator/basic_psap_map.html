@@ -133,18 +133,17 @@
                 const psapLayer = new FeatureLayer({
                     url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
                     outFields: ["*"],
-                    opacity: 0.8,
-                    // Apply RapidSOS brand colors to the feature layer
+                    opacity: 0.7,
+                    // Apply RapidSOS brand colors to the boundary polygons
                     renderer: {
                         type: "simple",
                         symbol: {
-                            type: "simple-marker",
-                            color: "#29A8DD", // Safety Blue
+                            type: "simple-fill", // For polygons/boundaries
+                            color: [41, 168, 221, 0.3], // Safety Blue with transparency
                             outline: {
                                 color: "#001559", // Royal Blue
                                 width: 1.5
-                            },
-                            size: 8
+                            }
                         }
                     },
                     // Add a popup template to display all attributes
