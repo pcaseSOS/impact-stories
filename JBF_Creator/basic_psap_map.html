@@ -288,10 +288,8 @@
                             }
                         }
                     },
-                    // Enable selection on the layer
+                    // Enable popup for the layer
                     popupEnabled: true,
-                    // Allow user to select features by clicking
-                    selectionEnabled: true,
                     // Add a popup template to display all attributes
                     popupTemplate: {
                         title: "{psap_name}",
@@ -361,6 +359,9 @@
                         });
                     });
                     
+                    // Create a layerView variable we'll use for highlighting
+                    let psapLayerView;
+                    
                     // Helper function to get feature name
                     function getFeatureName(attributes) {
                         return attributes.psap_name || attributes.name || 'Unknown PSAP';
@@ -414,16 +415,40 @@
                         });
                     }
                     
+                    // Highlight the selected features
+                    function highlightSelectedFeatures() {
+                        if (!psapLayerView) return;
+                        
+                        // Clear any existing highlights
+                        psapLayerView.highlightOptions = {
+                            color: [255, 243, 0, 0.5], // Safety Gap yellow from brand colors
+                            haloColor: [0, 94, 255],   // Glow blue from brand colors
+                            haloOpacity: 0.9,
+                            fillOpacity: 0.4
+                        };
+                        
+                        if (selectedFeatures.length > 0) {
+                            // Create an array of ObjectIDs to highlight
+                            const objectIds = selectedFeatures.map(feature => {
+                                return feature.attributes.ogc_fid || 
+                                       feature.attributes.OBJECTID || 
+                                       feature.attributes.FID;
+                            }).filter(id => id !== undefined);
+                            
+                            if (objectIds.length > 0) {
+                                psapLayerView.highlight(objectIds);
+                            }
+                        }
+                    }
+                    
                     // Remove a feature from selection
                     function removeFromSelection(index) {
                         if (index >= 0 && index < selectedFeatures.length) {
-                            const feature = selectedFeatures[index];
-                            
                             // Remove from array
                             selectedFeatures.splice(index, 1);
                             
-                            // Update the highlight
-                            psapLayer.highlight.remove(feature);
+                            // Update highlights
+                            highlightSelectedFeatures();
                             
                             // Update the panel
                             updateSelectionPanel();
@@ -432,11 +457,13 @@
                     
                     // Clear all selections
                     function clearAllSelections() {
-                        // Clear the highlight
-                        psapLayer.highlight.remove();
-                        
                         // Clear the array
                         selectedFeatures = [];
+                        
+                        // Clear highlights
+                        if (psapLayerView) {
+                            psapLayerView.highlight();
+                        }
                         
                         // Update the panel
                         updateSelectionPanel();
@@ -508,11 +535,22 @@
                                 } else {
                                     // Add to selection
                                     selectedFeatures.push(clickedFeature);
-                                    psapLayer.highlight.add(clickedFeature);
+                                    highlightSelectedFeatures();
                                     updateSelectionPanel();
+                                    
+                                    // Status message
+                                    status.textContent = `Selected ${getFeatureName(clickedFeature.attributes)}`;
                                 }
                             }
                         });
+                    });
+                    
+                    // Get a reference to the layer view for highlighting
+                    view.whenLayerView(psapLayer).then(function(layerView) {
+                        psapLayerView = layerView;
+                        console.log("Layer view created for selection highlighting");
+                    }).catch(function(error) {
+                        console.error("Error creating layer view:", error);
                     });
                     
                     // Panel toggle functionality
@@ -595,6 +633,9 @@
                             const dataBlob = new Blob([dataStr], {type: 'application/json'});
                             const url = URL.createObjectURL(dataBlob);
 
+                            console.log("Created download URL:", url);
+                            console.log("GeoJSON structure (first feature):", features[0]);
+
                             const downloadLink = document.createElement('a');
                             downloadLink.href = url;
 
@@ -604,6 +645,7 @@
 
                             downloadLink.download = filename;
 
+                            // Force the download to happen
                             document.body.appendChild(downloadLink);
                             downloadLink.click();
                             document.body.removeChild(downloadLink);
