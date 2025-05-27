@@ -376,6 +376,9 @@
                         haloSize: 3                  // Larger halo for enhanced visibility
                     };
                     
+                    // Create a feature filter for highlighting selected features
+                    let featureFilter = { objectIds: [] };
+                    
                     // Helper function to get feature name
                     function getFeatureName(attributes) {
                         return attributes.psap_name || attributes.name || 'Unknown PSAP';
@@ -432,42 +435,42 @@
                     // Highlight handle to store references to highlights
                     let currentHighlights = [];
                     
-                    // Highlight the selected features
+                    // Apply visual effect to highlight selected features
                     function highlightSelectedFeatures() {
                         if (!psapLayerView || !initialLoadComplete) return;
                         
-                        console.log("Applying highlights to", selectedFeatures.length, "features");
+                        console.log("Applying effect to", selectedFeatures.length, "features");
                         
-                        // Clear any existing highlight handles
-                        if (currentHighlights.length > 0) {
-                            currentHighlights.forEach(handle => {
-                                if (handle && typeof handle.remove === 'function') {
-                                    handle.remove();
-                                }
-                            });
-                            currentHighlights = [];
+                        // Extract object IDs from the selected features
+                        const objectIds = selectedFeatures.map(feature => {
+                            return feature.attributes.ogc_fid || 
+                                   feature.attributes.OBJECTID || 
+                                   feature.attributes.FID;
+                        }).filter(id => id !== undefined);
+                        
+                        console.log("Selected object IDs:", objectIds);
+                        
+                        // Create a feature effect that highlights only the selected features
+                        if (objectIds.length > 0) {
+                            // First apply the filter to show only selected features with special styling
+                            featureFilter.objectIds = objectIds;
+                            
+                            // Create a feature effect that highlights only the selected features
+                            const featureEffect = {
+                                filter: featureFilter,
+                                excludedEffect: "opacity(0.3)", // Make non-selected features more transparent
+                                includedEffect: "brightness(1.5)" // Make selected features brighter
+                            };
+                            
+                            // Apply the feature effect
+                            psapLayerView.featureEffect = featureEffect;
+                            
+                            // Also apply highlight for extra visibility
+                            psapLayerView.highlight(objectIds);
+                        } else {
+                            // Clear feature effect when nothing is selected
+                            psapLayerView.featureEffect = null;
                         }
-                        
-                        // Apply the globally defined highlight options
-                        psapLayerView.highlightOptions = highlightOptions;
-                        
-                        // Create highlights for each selected feature individually for better persistence
-                        selectedFeatures.forEach(feature => {
-                            try {
-                                const objectId = feature.attributes.ogc_fid || 
-                                               feature.attributes.OBJECTID || 
-                                               feature.attributes.FID;
-                                               
-                                if (objectId !== undefined) {
-                                    // Use individual highlighting which is more reliable
-                                    const highlightHandle = psapLayerView.highlight(objectId);
-                                    currentHighlights.push(highlightHandle);
-                                    console.log("Highlighted feature with ID:", objectId);
-                                }
-                            } catch (e) {
-                                console.error("Error highlighting feature:", e);
-                            }
-                        });
                     }
                     
                     // Remove a feature from selection
@@ -481,6 +484,9 @@
                             
                             // Update the panel
                             updateSelectionPanel();
+                            
+                            // Status message
+                            status.textContent = "Removed feature from selection";
                         }
                     }
                     
@@ -492,10 +498,14 @@
                         // Clear highlights
                         if (psapLayerView) {
                             psapLayerView.highlight();
+                            psapLayerView.featureEffect = null; // Also clear the feature effect
                         }
                         
                         // Update the panel
                         updateSelectionPanel();
+                        
+                        // Status message
+                        status.textContent = "Cleared all selections";
                     }
                     
                     // Convert ArcGIS geometry to GeoJSON with projection
@@ -629,6 +639,24 @@
                             }, 300);
                         }
                     });
+                    
+                    // Reapply highlights when the scale changes
+                    view.watch("scale", function() {
+                        if (initialLoadComplete && selectedFeatures.length > 0) {
+                            setTimeout(function() {
+                                console.log("Scale changed, reapplying highlights");
+                                highlightSelectedFeatures();
+                            }, 200);
+                        }
+                    });
+                    
+                    // Also check for highlights at regular intervals to ensure they're maintained
+                    setInterval(function() {
+                        if (initialLoadComplete && selectedFeatures.length > 0) {
+                            console.log("Interval check, ensuring highlights are maintained");
+                            highlightSelectedFeatures();
+                        }
+                    }, 2000); // Check every 2 seconds
                     
                     // Panel toggle functionality
                     panelToggle.addEventListener('click', function() {
