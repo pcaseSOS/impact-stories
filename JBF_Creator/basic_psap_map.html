@@ -42,7 +42,8 @@
         #searchDiv {
             position: absolute;
             top: 15px;
-            right: 15px;
+            left: 50%;
+            transform: translateX(-50%); /* Center horizontally */
             width: 300px;
             height: 40px;
             z-index: 99;
@@ -245,13 +246,23 @@
             // Flag to track if the initial map load is complete
             let initialLoadComplete = false;
             
-            // Symbol for selected features
+            // Symbols for features
+            const defaultSymbol = {
+                type: "simple-fill",
+                color: [41, 168, 221, 0.4], // Safety blue with transparency
+                outline: {
+                    color: [0, 21, 89, 1], // Royal blue
+                    width: 1.5
+                }
+            };
+            
+            // Symbol for selected features - very bright and distinctive
             const selectedSymbol = {
                 type: "simple-fill",
-                color: [255, 243, 0, 0.8],  // Bright yellow
+                color: [255, 243, 0, 0.8],  // Bright yellow with high opacity
                 outline: {
                     color: [0, 94, 255, 1],  // Blue outline
-                    width: 2
+                    width: 2.5              // Thicker outline for better visibility
                 }
             };
             
@@ -291,21 +302,11 @@
                 const psapLayer = new FeatureLayer({
                     url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
                     outFields: ["*"],
-                    opacity: 0.85, // Increased overall opacity
+                    opacity: 0.9, // Higher opacity for better visibility
                     renderer: {
-                        type: "unique-value",  // Use unique-value renderer to support selection highlighting
-                        field: "OBJECTID",    // This will be dynamically updated for selections
-                        defaultSymbol: {
-                            type: "simple-fill",
-                            color: [41, 168, 221, 0.4], // Safety blue with improved opacity for unselected
-                            outline: {
-                                color: [0, 21, 89, 1], // Royal blue with full opacity
-                                width: 1.5 // Thicker border for better visibility
-                            }
-                        },
-                        uniqueValueInfos: []
+                        type: "simple",
+                        symbol: defaultSymbol
                     },
-                    definitionExpression: "1=1", // Show all features by default
                     // Enable popup for the layer
                     popupEnabled: true,
                     // Add a popup template to display all attributes
@@ -448,50 +449,53 @@
                     // Highlight handle to store references to highlights
                     let currentHighlights = [];
                     
-                    // Highlight selected features using custom renderer
+                    // Create graphics layer for highlighting (will overlay the regular features)
+                    const highlightLayer = new FeatureLayer({
+                        source: [], // Empty initially, will be populated dynamically
+                        renderer: {
+                            type: "simple",
+                            symbol: selectedSymbol
+                        },
+                        opacity: 1.0
+                    });
+                    
+                    // Add highlight layer above the main layer
+                    map.add(highlightLayer, 1);
+                    
+                    // Highlight selected features by copying them to the highlight layer
                     function highlightSelectedFeatures() {
-                        if (!psapLayer || !initialLoadComplete) return;
+                        if (!initialLoadComplete) return;
                         
-                        console.log("Applying custom highlights to", selectedFeatures.length, "features");
+                        console.log("Applying highlights to", selectedFeatures.length, "features");
                         
                         try {
-                            // Create new renderer based on current selections
-                            const uniqueValueInfos = [];
+                            // Clear the current graphics from the highlight layer
+                            highlightLayer.source.removeAll();
                             
-                            // Extract object IDs from the selected features
-                            selectedFeatures.forEach(feature => {
-                                const objectId = feature.attributes.OBJECTID || 
-                                                feature.attributes.ogc_fid || 
-                                                feature.attributes.FID;
-                                                
-                                if (objectId !== undefined) {
-                                    // Add this feature to the unique value renderer
-                                    uniqueValueInfos.push({
-                                        value: objectId,
-                                        symbol: selectedSymbol
-                                    });
-                                }
+                            // If no selections, we're done
+                            if (selectedFeatures.length === 0) return;
+                            
+                            // Create a copy of each selected feature for the highlight layer
+                            const features = selectedFeatures.map(feature => {
+                                return {
+                                    geometry: feature.geometry,
+                                    attributes: {
+                                        // Add a unique ID for each highlight feature
+                                        OBJECTID: feature.attributes.OBJECTID || 
+                                                 feature.attributes.ogc_fid || 
+                                                 feature.attributes.FID,
+                                        // Store original feature ID for reference
+                                        originalId: feature.attributes.OBJECTID || 
+                                                   feature.attributes.ogc_fid || 
+                                                   feature.attributes.FID
+                                    }
+                                };
                             });
                             
-                            // Apply the updated renderer
-                            const renderer = {
-                                type: "unique-value",
-                                field: "OBJECTID",  // Using OBJECTID which all feature services have
-                                uniqueValueInfos: uniqueValueInfos,
-                                defaultSymbol: {
-                                    type: "simple-fill",
-                                    color: [41, 168, 221, 0.4], // Safety blue for unselected
-                                    outline: {
-                                        color: [0, 21, 89, 1],
-                                        width: 1.5
-                                    }
-                                }
-                            };
+                            // Add the features to the highlight layer
+                            highlightLayer.source.addMany(features);
                             
-                            // Update the renderer which will persist until changed
-                            psapLayer.renderer = renderer;
-                            
-                            console.log("Updated renderer with", uniqueValueInfos.length, "highlighted features");
+                            console.log("Added", features.length, "features to highlight layer");
                         } catch (error) {
                             console.error("Error in highlightSelectedFeatures:", error);
                         }
@@ -519,10 +523,9 @@
                         // Clear the array
                         selectedFeatures = [];
                         
-                        // Clear highlights
-                        if (psapLayerView) {
-                            psapLayerView.highlight();
-                            psapLayerView.featureEffect = null; // Also clear the feature effect
+                        // Clear highlight layer
+                        if (highlightLayer && highlightLayer.source) {
+                            highlightLayer.source.removeAll();
                         }
                         
                         // Update the panel
