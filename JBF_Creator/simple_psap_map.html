@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Simple PSAP Map</title>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+        #status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 100;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+    <div id="status">Loading map...</div>
+
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer"
+        ], function(Map, MapView, FeatureLayer) {
+            
+            // Create a simple map
+            const map = new Map({
+                basemap: "streets-navigation-vector"
+            });
+            
+            // Create the map view
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [-98.5795, 39.8283], // Center of US
+                zoom: 4
+            });
+            
+            // Status element
+            const status = document.getElementById('status');
+            
+            // Create the PSAP feature layer
+            const psapLayer = new FeatureLayer({
+                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
+                outFields: ["*"],
+                opacity: 0.7
+            });
+            
+            // Add the layer to the map
+            map.add(psapLayer);
+            
+            // When view is ready
+            view.when(function() {
+                status.textContent = "Map loaded!";
+                
+                // Wait for PSAP layer to load
+                psapLayer.when(function() {
+                    status.textContent = "PSAP data loaded successfully!";
+                    console.log("PSAP layer fields:", psapLayer.fields.map(f => f.name));
+                }).catch(function(error) {
+                    status.textContent = "Error loading PSAP layer: " + error.message;
+                    console.error("PSAP layer error:", error);
+                });
+            }).catch(function(error) {
+                status.textContent = "Error loading map view: " + error.message;
+                console.error("View error:", error);
+            });
+        });
+    </script>
+</body>
+</html>
