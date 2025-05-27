@@ -85,6 +85,10 @@
             cursor: not-allowed;
         }
         
+        .toolbar button.active {
+            background: #28a745;
+        }
+        
         /* Selection panel */
         #selectionPanel {
             position: absolute;
@@ -210,8 +214,9 @@
     
     <!-- Toolbar for downloads -->
     <div class="toolbar">
+        <button id="multiSelectBtn">🖱️ Single Select Mode</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
-        <button id="clearBtn" disabled>🗑️ Clear Selection</button>
+        <button id="clearBtn" disabled>❌ Clear Selection</button>
     </div>
     
     <!-- Selection Panel -->
@@ -224,7 +229,7 @@
             <!-- Selected items will be populated here -->
         </div>
         <div class="panel-footer">
-            Click on map to select PSAPs
+            Multiple selection: Hold Ctrl/Cmd + click or use Multi-Select Mode
         </div>
     </div>
 
@@ -245,6 +250,9 @@
             
             // Flag to track if the initial map load is complete
             let initialLoadComplete = false;
+            
+            // Flag to track if multi-select mode is active
+            let multiSelectMode = false;
             
             // Symbols for features
             const defaultSymbol = {
@@ -269,6 +277,7 @@
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
             const clearBtn = document.getElementById('clearBtn');
+            const multiSelectBtn = document.getElementById('multiSelectBtn');
             const selectionPanel = document.getElementById('selectionPanel');
             const selectionList = document.getElementById('selectionList');
             const selectionCount = document.getElementById('selectionCount');
@@ -590,6 +599,21 @@
                                 const clickedFeature = psapResult.graphic;
                                 const featureId = getFeatureId(clickedFeature);
                                 
+                                // Check for multi-select: either explicit multi-select mode OR modifier keys
+                                const isModifierPressed = event.native.ctrlKey || event.native.metaKey || 
+                                                      (event.native.originalEvent && 
+                                                       (event.native.originalEvent.ctrlKey || 
+                                                        event.native.originalEvent.metaKey));
+                                
+                                const shouldMultiSelect = multiSelectMode || isModifierPressed;
+                                
+                                console.log('Selection debug:', {
+                                    multiSelectMode: multiSelectMode,
+                                    isModifierPressed: isModifierPressed,
+                                    shouldMultiSelect: shouldMultiSelect,
+                                    currentSelectionCount: selectedFeatures.length
+                                });
+                                
                                 // Check if already selected
                                 const existingIndex = selectedFeatures.findIndex(f => 
                                     getFeatureId(f) === featureId
@@ -598,7 +622,15 @@
                                 if (existingIndex >= 0) {
                                     // Already selected, so remove it
                                     removeFromSelection(existingIndex);
+                                    status.textContent = `Removed ${getFeatureName(clickedFeature.attributes)} from selection`;
                                 } else {
+                                    // New selection
+                                    if (!shouldMultiSelect && selectedFeatures.length > 0) {
+                                        // Single select mode and we have existing selections - clear them first
+                                        console.log('Clearing previous selections for single select');
+                                        clearAllSelections();
+                                    }
+                                    
                                     // Add to selection
                                     selectedFeatures.push(clickedFeature);
                                     highlightSelectedFeatures();
@@ -606,6 +638,11 @@
                                     
                                     // Status message
                                     status.textContent = `Selected ${getFeatureName(clickedFeature.attributes)}`;
+                                }
+                            } else {
+                                // Clicked on empty area - clear selection if not in multi-select mode
+                                if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
+                                    clearAllSelections();
                                 }
                             }
                         });
@@ -788,6 +825,20 @@
                             console.error('Error downloading polygons:', error);
                             alert('Error downloading polygons. Please try again.');
                             status.textContent = 'Error during download';
+                        }
+                    });
+                    
+                    // Multi-select mode toggle button
+                    multiSelectBtn.addEventListener('click', function() {
+                        multiSelectMode = !multiSelectMode;
+                        if (multiSelectMode) {
+                            multiSelectBtn.textContent = '🔄 Multi-Select: ON';
+                            multiSelectBtn.classList.add('active');
+                            status.textContent = 'Multi-select mode active: Click PSAPs to add/remove from selection';
+                        } else {
+                            multiSelectBtn.textContent = '🖱️ Single Select Mode';
+                            multiSelectBtn.classList.remove('active');
+                            status.textContent = 'Single-click to select PSAPs. Hold Ctrl/Cmd for multiple selections.';
                         }
                     });
                     
