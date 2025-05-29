@@ -61,82 +61,97 @@
             background: #c82333;
         }
 
-        #selectionPanel {
+        .selection-panel {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 300px;
-            max-height: 400px;
+            bottom: 20px;
+            right: 20px;
             background: white;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            width: 300px;
+            max-height: 400px;
+            display: flex;
+            flex-direction: column;
             z-index: 100;
-            display: none;
             overflow: hidden;
         }
-
+        
         .panel-header {
-            background: #0079c1;
-            color: white;
-            padding: 12px 16px;
-            font-weight: bold;
+            background: #f5f5f5;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-weight: bold;
         }
-
-        .panel-content {
-            max-height: 300px;
+        
+        .selection-list {
+            flex: 1;
             overflow-y: auto;
             padding: 0;
         }
-
-        .selected-item {
-            padding: 12px 16px;
-            border-bottom: 1px solid #eee;
+        
+        .selection-layer-header {
+            padding: 8px 15px;
+            background-color: #f8f9fa;
+            font-size: 12px;
+            font-weight: bold;
+            color: #6c757d;
+            border-bottom: 1px solid #e9ecef;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        
+        .selection-item {
+            padding: 8px 15px 8px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: white;
-        }
-
-        .selected-item:hover {
-            background: #f8f9fa;
-        }
-
-        .selected-item:last-child {
-            border-bottom: none;
-        }
-
-        .item-name {
-            font-weight: 500;
-            color: #333;
-            flex-grow: 1;
-        }
-
-        .remove-btn {
-            background: #dc3545;
-            color: white;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 3px;
+            border-bottom: 1px solid #eee;
             cursor: pointer;
-            font-size: 12px;
+            transition: background-color 0.2s;
         }
-
+        
+        .selection-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .selection-name {
+            flex: 1;
+            margin-right: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #adb5bd;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 5px;
+            line-height: 1;
+            border-radius: 3px;
+            transition: all 0.2s;
+        }
+        
         .remove-btn:hover {
-            background: #c82333;
+            color: #dc3545;
+            background-color: rgba(220, 53, 69, 0.1);
         }
-
-        .panel-footer {
-            padding: 12px 16px;
-            background: #f8f9fa;
-            border-top: 1px solid #eee;
+        
+        .empty-selection {
+            padding: 20px 15px;
+            color: #6c757d;
             text-align: center;
-            font-size: 12px;
-            color: #666;
+            font-style: italic;
+            font-size: 14px;
         }
-
+        
+        /* Status message styling */
         #status {
             position: absolute;
             bottom: 20px;
@@ -145,9 +160,10 @@
             color: white;
             padding: 8px 12px;
             border-radius: 4px;
-            font-size: 12px;
-            z-index: 100;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            font-size: 14px;
+            z-index: 1000;
+            max-width: 300px;
+            pointer-events: none;
         }
 
         .tooltip {
@@ -353,17 +369,40 @@
                 })
             });
 
-            // Create the feature layer
+            // Create the Canada Towns layer
             const canadaTownsLayer = new FeatureLayer({
                 url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
-                renderer: renderer,
-                outFields: ["*"]
+                renderer: new SimpleRenderer({
+                    symbol: new SimpleFillSymbol({
+                        color: [51, 51, 204, 0.3],
+                        outline: new SimpleLineSymbol({
+                            color: [51, 51, 204, 0.8],
+                            width: 1
+                        })
+                    })
+                }),
+                outFields: ["*"],
+                title: "Canada Towns"
             });
 
-            // Add the layer to the map
-            map.add(canadaTownsLayer);
+            // Create the PSAP layer
+            const psapLayer = new FeatureLayer({
+                url: "https://services2.arcgis.com/8fY1lwl7Wf0qomfH/arcgis/rest/services/PSAP_Boundaries/FeatureServer/0",
+                renderer: new SimpleRenderer({
+                    symbol: new SimpleFillSymbol({
+                        color: [204, 51, 51, 0.3],
+                        outline: new SimpleLineSymbol({
+                            color: [204, 51, 51, 0.8],
+                            width: 1
+                        })
+                    })
+                }),
+                outFields: ["*"],
+                title: "PSAP Boundaries"
+            });
 
-
+            // Add the layers to the map
+            map.addMany([psapLayer, canadaTownsLayer]);
 
             // Create tooltip element
             const tooltip = document.createElement('div');
@@ -397,57 +436,105 @@
                 return townName;
             }
 
+            // Helper function to get feature name
+            function getFeatureName(feature) {
+                return getTownName(feature.attributes);
+            }
+
+            // Helper function to get layer name for a feature
+            function getLayerName(layer) {
+                if (layer === canadaTownsLayer) return 'Canada Town';
+                if (layer === psapLayer) return 'PSAP';
+                return 'Unknown Layer';
+            }
+
             // Helper function to update selection panel
             function updateSelectionPanel() {
-                selectionCount.textContent = selectedFeatures.length;
-                downloadBtn.textContent = `📥 Download Selected (${selectedFeatures.length})`;
-
-                if (selectedFeatures.length > 0) {
-                    selectionPanel.style.display = 'block';
-                    downloadBtn.disabled = false;
-                    clearAllBtn.disabled = false;
-                } else {
-                    selectionPanel.style.display = 'none';
-                    downloadBtn.disabled = true;
-                    clearAllBtn.disabled = true;
-                }
-
-                // Clear and rebuild selection list
                 selectionList.innerHTML = '';
 
+                if (selectedFeatures.length === 0) {
+                    selectionList.innerHTML = '<div class="empty-selection">No features selected</div>';
+                    selectionCount.textContent = '0 selected';
+                    return;
+                }
+
+                selectionCount.textContent = `${selectedFeatures.length} selected`;
+
+                // Sort selections by layer and then by name
+                selectedFeatures.sort((a, b) => {
+                    // First sort by layer
+                    const layerCompare = getLayerName(a.layer).localeCompare(getLayerName(b.layer));
+                    if (layerCompare !== 0) return layerCompare;
+
+                    // Then sort by name within the same layer
+                    const nameA = getFeatureName(a).toUpperCase();
+                    const nameB = getFeatureName(b).toUpperCase();
+                    return nameA.localeCompare(nameB);
+                });
+
+                let currentLayer = null;
+
+                // Add each selected feature to the panel
                 selectedFeatures.forEach((feature, index) => {
-                    const townName = getTownName(feature.attributes);
+                    // Add layer header if this is a new layer
+                    if (currentLayer !== feature.layer) {
+                        currentLayer = feature.layer;
+                        const layerHeader = document.createElement('div');
+                        layerHeader.className = 'selection-layer-header';
+                        layerHeader.textContent = getLayerName(feature.layer);
+                        selectionList.appendChild(layerHeader);
+                    }
 
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'selected-item';
+                    const item = document.createElement('div');
+                    item.className = 'selection-item';
 
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'item-name';
-                    nameSpan.textContent = townName;
+                    const name = document.createElement('span');
+                    name.className = 'selection-name';
+                    name.textContent = getFeatureName(feature);
 
                     const removeBtn = document.createElement('button');
                     removeBtn.className = 'remove-btn';
                     removeBtn.textContent = '×';
                     removeBtn.title = 'Remove from selection';
-                    removeBtn.onclick = () => removeFromSelection(index);
+                    removeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        removeFromSelection(index);
+                    });
 
-                    itemDiv.appendChild(nameSpan);
-                    itemDiv.appendChild(removeBtn);
-                    selectionList.appendChild(itemDiv);
+                    item.appendChild(name);
+                    item.appendChild(removeBtn);
+
+                    // Add click to zoom to feature
+                    item.addEventListener('click', () => {
+                        view.goTo({
+                            target: feature.geometry,
+                            zoom: 12
+                        });
+                    });
+
+                    selectionList.appendChild(item);
                 });
             }
 
             // Helper function to remove item from selection
             function removeFromSelection(index) {
                 if (index >= 0 && index < selectedFeatures.length) {
-                    // Remove highlight
-                    if (highlightSelections[index]) {
-                        highlightSelections[index].remove();
+                    const featureToRemove = selectedFeatures[index];
+                    
+                    // Find and remove the highlight for this feature
+                    const highlightIndex = highlightSelections.findIndex(h => 
+                        h && 
+                        h.feature.attributes.OBJECTID === featureToRemove.attributes.OBJECTID &&
+                        h.layer === featureToRemove.layer
+                    );
+                    
+                    if (highlightIndex !== -1) {
+                        highlightSelections[highlightIndex].remove();
+                        highlightSelections.splice(highlightIndex, 1);
                     }
 
-                    // Remove from arrays
+                    // Remove from selected features
                     selectedFeatures.splice(index, 1);
-                    highlightSelections.splice(index, 1);
 
                     updateSelectionPanel();
                     updateStatus();
@@ -458,13 +545,19 @@
             function clearAllSelections() {
                 // Remove all highlights
                 highlightSelections.forEach(highlight => {
-                    if (highlight) highlight.remove();
+                    if (highlight && typeof highlight.remove === 'function') {
+                        highlight.remove();
+                    } else if (highlight && highlight.remove && typeof highlight.remove.remove === 'function') {
+                        // Handle case where highlight is an object with a remove method
+                        highlight.remove.remove();
+                    }
                 });
 
                 selectedFeatures = [];
                 highlightSelections = [];
                 updateSelectionPanel();
                 updateStatus();
+                status.textContent = 'All selections cleared';
             }
 
             // Helper function to update status message
@@ -489,16 +582,16 @@
             // Handle mouse move for hover effect
             view.on("pointer-move", function(event) {
                 view.hitTest(event).then(function(response) {
-                    // Find the first graphic from the Canada towns layer
-                    const canadaTownResult = response.results.find(result => 
-                        result.graphic && result.graphic.layer === canadaTownsLayer
+                    // Find the first graphic from either layer
+                    const result = response.results.find(r => 
+                        r.graphic && (r.graphic.layer === canadaTownsLayer || r.graphic.layer === psapLayer)
                     );
 
-                    if (canadaTownResult) {
-                        const graphic = canadaTownResult.graphic;
-                        const townName = getTownName(graphic.attributes);
+                    if (result) {
+                        const graphic = result.graphic;
+                        const featureName = getFeatureName(graphic);
 
-                        tooltip.innerHTML = `<strong>${townName}</strong>`;
+                        tooltip.innerHTML = `<strong>${featureName}</strong>`;
                         tooltip.style.display = 'block';
                         tooltip.style.left = event.x + 15 + 'px';
                         tooltip.style.top = event.y - 15 + 'px';
@@ -517,68 +610,76 @@
                 view.container.style.cursor = "default";
             });
 
+            // Function to handle feature selection
+            function handleFeatureSelection(graphic, layer) {
+                // Check if already selected
+                const isSelected = selectedFeatures.some(f => 
+                    f.attributes.OBJECTID === graphic.attributes.OBJECTID && 
+                    f.layer === layer
+                );
+                
+                if (isSelected) {
+                    // If in multi-select mode and feature is already selected, remove it
+                    if (multiSelectMode || event.native.ctrlKey || event.native.metaKey) {
+                        selectedFeatures = selectedFeatures.filter(f => 
+                            !(f.attributes.OBJECTID === graphic.attributes.OBJECTID && f.layer === layer)
+                        );
+                        
+                        // Remove highlight
+                        const highlightIndex = highlightSelections.findIndex(h => 
+                            h.feature.attributes.OBJECTID === graphic.attributes.OBJECTID &&
+                            h.layer === layer
+                        );
+                        if (highlightIndex > -1) {
+                            highlightSelections[highlightIndex].remove();
+                            highlightSelections.splice(highlightIndex, 1);
+                        }
+                        
+                        status.textContent = `Removed ${getFeatureName(graphic)} from selection (${selectedFeatures.length} total)`;
+                    }
+                } else {
+                    // If not in multi-select mode, clear previous selections
+                    if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
+                        clearAllSelections();
+                    }
+                    
+                    // Add to selection
+                    selectedFeatures.push(graphic);
+                    
+                    // Highlight selected feature
+                    view.whenLayerView(layer).then(function(layerView) {
+                        const highlight = {
+                            remove: layerView.highlight(graphic),
+                            feature: graphic,
+                            layer: layer
+                        };
+                        highlightSelections.push(highlight);
+                    });
+
+                    updateSelectionPanel();
+                    status.textContent = `Added ${getFeatureName(graphic)} to selection (${selectedFeatures.length} total)`;
+                }
+
+                updateSelectionPanel();
+                updateStatus();
+            }
+            
             // Handle click for selection
             view.on("click", function(event) {
                 view.hitTest(event).then(function(response) {
-                    // Find the first graphic from the Canada towns layer
-                    const canadaTownResult = response.results.find(result => 
-                        result.graphic && result.graphic.layer === canadaTownsLayer
-                    );
-
-                    if (canadaTownResult) {
-                        const graphic = canadaTownResult.graphic;
-
-                        // Check for multi-select: either explicit multi-select mode OR modifier keys
-                        const isModifierPressed = event.native.ctrlKey ||
-                                                event.native.metaKey ||
-                                                event.native.shiftKey ||
-                                                (event.native.originalEvent &&
-                                                 (event.native.originalEvent.ctrlKey ||
-                                                  event.native.originalEvent.metaKey));
-
-                        const shouldMultiSelect = multiSelectMode || isModifierPressed;
-
-                        console.log('Selection debug:', {
-                            multiSelectMode: multiSelectMode,
-                            isModifierPressed: isModifierPressed,
-                            shouldMultiSelect: shouldMultiSelect,
-                            currentSelectionCount: selectedFeatures.length
-                        });
-
-                        // Check if this feature is already selected
-                        const existingIndex = selectedFeatures.findIndex(f =>
-                            getFeatureId(f) === getFeatureId(graphic)
-                        );
-
-                        if (existingIndex >= 0) {
-                            // Feature already selected - remove it (toggle behavior)
-                            removeFromSelection(existingIndex);
-                            status.textContent = `Removed ${getTownName(graphic.attributes)} from selection`;
+                    // Check if we clicked on a graphic
+                    if (response.results.length > 0) {
+                        const graphic = response.results[0].graphic;
+                        
+                        // Check which layer was clicked
+                        if (graphic.layer === canadaTownsLayer || graphic.layer === psapLayer) {
+                            handleFeatureSelection(graphic, graphic.layer);
                         } else {
-                            // New selection
-                            if (!shouldMultiSelect && selectedFeatures.length > 0) {
-                                // Single select mode and we have existing selections - clear them first
-                                console.log('Clearing previous selections for single select');
+                            // Clicked on something else (like basemap)
+                            if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
                                 clearAllSelections();
                             }
-
-                            // Add new selection
-                            selectedFeatures.push(graphic);
-                            console.log('Added feature, total selections:', selectedFeatures.length);
-
-                            // Highlight selected feature
-                            view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                                const highlight = layerView.highlight(graphic);
-                                highlightSelections.push(highlight);
-                            });
-
-                            updateSelectionPanel();
-                            status.textContent = `Added ${getTownName(graphic.attributes)} to selection (${selectedFeatures.length} total)`;
                         }
-
-                        updateSelectionPanel();
-                        updateStatus();
-
                     } else {
                         // Clicked on empty area
                         if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
@@ -587,8 +688,8 @@
                     }
                 });
             });
-
-            // Button event listeners
+            
+            // Toggle multi-select mode
             selectModeBtn.addEventListener('click', function() {
                 multiSelectMode = !multiSelectMode;
                 if (multiSelectMode) {
@@ -701,10 +802,10 @@
                 searchResults.style.display = 'block';
                 
                 try {
-                    // Search both layers in parallel
+                    // Search all layers in parallel
                     const results = await Promise.all([
-                        searchLayer(canadaTownsLayer, searchText, 'Canada Towns')
-                        // Add other layers here if needed
+                        searchLayer(canadaTownsLayer, searchText, 'Canada Towns'),
+                        searchLayer(psapLayer, searchText, 'PSAP Boundaries')
                     ]);
                     
                     // Process and display results
@@ -787,6 +888,20 @@
                 searchAllLayers(searchText);
             }
             
+            // Function to get the appropriate name for a feature based on its layer
+            function getFeatureName(feature) {
+                if (feature.layer === canadaTownsLayer) {
+                    return getTownName(feature.attributes);
+                } else if (feature.layer === psapLayer) {
+                    // Try common PSAP name fields
+                    return feature.attributes.NAME || 
+                           feature.attributes.PSAP_NAME || 
+                           feature.attributes.LABEL || 
+                           'Unnamed PSAP';
+                }
+                return 'Unnamed Feature';
+            }
+            
             // Search button click event
             searchButton.addEventListener('click', function() {
                 searchTowns(searchInput.value);
@@ -840,14 +955,17 @@
             // Download functionality
             downloadBtn.addEventListener('click', async function() {
                 if (selectedFeatures.length === 0) {
-                    alert('No polygons selected');
+                    alert('No features selected');
                     return;
                 }
 
                 try {
                     status.textContent = 'Preparing download with coordinate transformation...';
 
-                    // Create GeoJSON from all selected features with proper coordinate transformation
+                    // Group features by layer for better organization
+                    const featuresByLayer = {};
+                    
+                    // Process all features with proper coordinate transformation
                     const features = await Promise.all(selectedFeatures.map(async (feature) => {
                         // Convert coordinates with proper projection
                         const coordinates = await convertEsriGeometryToGeoJSON(feature.geometry);
@@ -856,6 +974,21 @@
                         const originalSR = feature.geometry.spatialReference;
                         const originalWkid = originalSR ? originalSR.wkid : 'Unknown';
                         const originalName = originalSR ? (originalSR.name || `EPSG:${originalWkid}`) : 'Unknown';
+                        
+                        // Determine layer name for grouping
+                        const layerName = feature.layer === canadaTownsLayer ? 'Canada_Towns' : 
+                                       (feature.layer === psapLayer ? 'PSAP_Boundaries' : 'Unknown_Layer');
+                        
+                        // Track features by layer for metadata
+                        if (!featuresByLayer[layerName]) {
+                            featuresByLayer[layerName] = {
+                                count: 0,
+                                originalWkid: originalWkid,
+                                originalName: originalName,
+                                serviceUrl: feature.layer.url || 'Unknown'
+                            };
+                        }
+                        featuresByLayer[layerName].count++;
 
                         return {
                             type: "Feature",
@@ -867,6 +1000,7 @@
                                 ...feature.attributes,
                                 // Add comprehensive projection metadata
                                 export_metadata: {
+                                    layer_name: layerName,
                                     exported_date: new Date().toISOString(),
                                     original_crs_wkid: originalWkid,
                                     original_crs_name: originalName,
@@ -878,10 +1012,15 @@
                         };
                     }));
 
-                    // Get original layer spatial reference for metadata
-                    const layerSR = canadaTownsLayer.spatialReference;
-                    const originalLayerWkid = layerSR ? layerSR.wkid : 'Unknown';
-                    const originalLayerName = layerSR ? (layerSR.name || `EPSG:${originalLayerWkid}`) : 'Unknown';
+                    // Generate metadata for each layer
+                    const layerMetadata = Object.entries(featuresByLayer).map(([layerName, data]) => ({
+                        layer_name: layerName,
+                        feature_count: data.count,
+                        original_crs_wkid: data.originalWkid,
+                        original_crs_name: data.originalName,
+                        service_url: data.serviceUrl,
+                        transformation_applied: data.originalWkid !== 4326 ? "Yes" : "No"
+                    }));
 
                     const geoJSON = {
                         type: "FeatureCollection",
@@ -894,7 +1033,7 @@
                         },
                         // Enhanced metadata for QGIS and other GIS software
                         metadata: {
-                            exported_by: "ArcGIS Canada Towns Interactive Map",
+                            exported_by: "ArcGIS Interactive Map",
                             export_date: new Date().toISOString(),
                             coordinate_system: {
                                 epsg_code: 4326,
@@ -902,13 +1041,8 @@
                                 proj4: "+proj=longlat +datum=WGS84 +no_defs",
                                 description: "World Geodetic System 1984"
                             },
-                            original_data_source: {
-                                service_url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
-                                original_crs_wkid: originalLayerWkid,
-                                original_crs_name: originalLayerName,
-                                transformation_applied: originalLayerWkid !== 4326 ? "Yes" : "No"
-                            },
-                            feature_count: features.length,
+                            layers: layerMetadata,
+                            total_feature_count: features.length,
                             qgis_import_notes: [
                                 "This file is in EPSG:4326 (WGS84) coordinate system",
                                 "Should import correctly into QGIS without additional projection",
@@ -926,11 +1060,20 @@
                     const downloadLink = document.createElement('a');
                     downloadLink.href = url;
 
-                    // Create filename with projection information
+                    // Create filename based on selected features
                     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-                    const filename = selectedFeatures.length === 1 ?
-                        `${getTownName(selectedFeatures[0].attributes).replace(/[^a-z0-9]/gi, '_').toLowerCase()}_WGS84.geojson` :
-                        `canada_towns_${selectedFeatures.length}_polygons_WGS84_${timestamp}.geojson`;
+                    let filename;
+                    
+                    if (selectedFeatures.length === 1) {
+                        const feature = selectedFeatures[0];
+                        const layerPrefix = feature.layer === canadaTownsLayer ? 'town' : 'psap';
+                        const name = getFeatureName(feature).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                        filename = `${layerPrefix}_${name}_WGS84.geojson`;
+                    } else {
+                        const layerTypes = Object.keys(featuresByLayer);
+                        const typeStr = layerTypes.length > 1 ? 'features' : layerTypes[0].toLowerCase();
+                        filename = `map_${typeStr}_${selectedFeatures.length}_WGS84_${timestamp}.geojson`;
+                    }
 
                     downloadLink.download = filename;
 
@@ -939,11 +1082,16 @@
                     document.body.removeChild(downloadLink);
                     URL.revokeObjectURL(url);
 
-                    status.textContent = `Downloaded ${selectedFeatures.length} polygon${selectedFeatures.length > 1 ? 's' : ''} in WGS84 for QGIS`;
+                    const layerTypes = Object.keys(featuresByLayer);
+                    const layerStr = layerTypes.length > 1 ? 
+                        `${layerTypes.length} different layers` : 
+                        layerTypes[0].replace('_', ' ');
+                        
+                    status.textContent = `Downloaded ${selectedFeatures.length} features from ${layerStr} in WGS84`;
 
                 } catch (error) {
-                    console.error('Error downloading polygons:', error);
-                    alert('Error downloading polygons. Please try again.');
+                    console.error('Error downloading features:', error);
+                    alert('Error downloading features. Please check console for details.');
                     status.textContent = 'Error during download';
                 }
             });
