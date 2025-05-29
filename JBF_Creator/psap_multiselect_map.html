@@ -1857,33 +1857,45 @@
             skipTutorialBtn.addEventListener('click', endTutorial);
             nextTutorialBtn.addEventListener('click', nextTutorialStep);
             
-            // Check localStorage to see if area selection has been made previously
-            let areaSelectionMade = localStorage.getItem('psapMapAreaSelected') === 'true';
+            // Function to handle showing the area selection modal ONE TIME ONLY
+            function handleAreaSelection() {
+                // Check if user has made a selection before (stored in localStorage)
+                if (localStorage.getItem('psapMapAreaSelected') === 'true') {
+                    console.log('Area already selected previously, not showing modal');
+                    return; // Skip showing the modal entirely
+                }
+                
+                // Show the modal only ONCE
+                console.log('Showing area selection modal');
+                areaSelectionModal.style.display = 'block';
+                
+                // Set up the area selection function to permanently mark selection as made
+                selectUSBtn.addEventListener('click', function() {
+                    // Mark selection as made FIRST
+                    localStorage.setItem('psapMapAreaSelected', 'true'); 
+                    selectArea('us');
+                    // No tutorial for now to keep it simple
+                });
+                
+                selectCanadaBtn.addEventListener('click', function() {
+                    // Mark selection as made FIRST
+                    localStorage.setItem('psapMapAreaSelected', 'true');
+                    selectArea('canada');
+                    // No tutorial for now to keep it simple
+                });
+                
+                selectDefaultBtn.addEventListener('click', function() {
+                    // Mark selection as made FIRST
+                    localStorage.setItem('psapMapAreaSelected', 'true');
+                    selectArea('default');
+                    // No tutorial for now to keep it simple
+                });
+            }
             
-            // Show area selection modal and start tutorial when the page is fully loaded
+            // Call the function ONE time at startup
             window.addEventListener('load', function() {
-                // Wait for the map to be fully loaded before showing the area selection modal
-                setTimeout(function() {
-                    // Only show the modal if an area hasn't been selected in this or previous sessions
-                    if (!areaSelectionMade) {
-                        areaSelectionModal.style.display = 'block';
-                        
-                        // The tutorial will start after the user selects an area
-                        // We'll add a callback to start the tutorial after area selection
-                        const originalSelectArea = selectArea;
-                        selectArea = function(area) {
-                            // Save to localStorage to remember the selection across page loads
-                            localStorage.setItem('psapMapAreaSelected', 'true');
-                            areaSelectionMade = true;
-                            originalSelectArea(area);
-                            
-                            // Start the tutorial after a short delay to allow the map to zoom
-                            setTimeout(function() {
-                                startTutorial();
-                            }, 1000);
-                        };
-                    }
-                }, 1500);
+                // Wait for the map to be fully loaded
+                setTimeout(handleAreaSelection, 1500);
             });
             
             // Add click handler for feature selection from both layers
