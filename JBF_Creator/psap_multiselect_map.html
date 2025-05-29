@@ -229,102 +229,6 @@
             border-bottom: none;
         }
         
-        /* Interactive Walkthrough Tutorial Styles */
-        #tutorialOverlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: transparent;
-            z-index: 1000;
-            pointer-events: none; /* Allow clicks to pass through by default */
-        }
-        
-        #tutorialOverlay.active {
-            background-color: rgba(0, 0, 0, 0.4);
-            pointer-events: auto; /* Block clicks when active */
-        }
-        
-        .tutorial-spotlight {
-            position: absolute;
-            border-radius: 8px;
-            /* Remove dark background box shadow */
-            box-shadow: none;
-            z-index: 1001;
-            pointer-events: none;
-            outline: 3px solid var(--royal-blue);
-            transition: all 0.5s ease-in-out;
-            animation: spotlight-glow 2s infinite alternate;
-        }
-        
-        @keyframes spotlight-glow {
-            from { box-shadow: 0 0 10px 5px rgba(0, 116, 217, 0.7); }
-            to { box-shadow: 0 0 20px 10px rgba(0, 116, 217, 0.9); }
-        }
-        
-        .tutorial-tooltip {
-            position: absolute;
-            background-color: white;
-            color: #333;
-            padding: 15px 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            width: 300px;
-            z-index: 1002;
-            pointer-events: auto;
-            transition: all 0.3s ease;
-        }
-        
-        .tutorial-tooltip h3 {
-            margin-top: 0;
-            color: var(--royal-blue);
-        }
-        
-        .tutorial-tooltip p {
-            margin-bottom: 15px;
-        }
-        
-        .tutorial-tooltip .buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 15px;
-        }
-        
-        .tutorial-tooltip button {
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            border: none;
-        }
-        
-        .tutorial-tooltip .next-btn {
-            background-color: var(--royal-blue);
-            color: white;
-        }
-        
-        .tutorial-tooltip .skip-btn {
-            background-color: #f0f0f0;
-            color: #666;
-        }
-        
-        .highlight-element {
-            position: relative;
-            z-index: 1002;
-            pointer-events: auto !important;
-            animation: pulse-highlight 1.5s infinite;
-            box-shadow: 0 0 0 5px rgba(0, 116, 217, 0.7);
-            outline: 3px solid var(--royal-blue);
-            border-radius: 4px;
-        }
-        
-        @keyframes pulse-highlight {
-            0% { box-shadow: 0 0 0 0 rgba(0, 116, 217, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(0, 116, 217, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(0, 116, 217, 0); }
-        }
-        
         /* Area Selection Modal Styles */
         .modal {
             display: block;
@@ -408,7 +312,6 @@
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
         <button id="clearAllBtn" disabled class="danger">❌ Clear Selection</button>
-        <button id="startTutorialBtn" class="esri-button--small">❓ Tutorial</button>
     </div>
     
     <!-- Selection Panel -->
@@ -440,18 +343,6 @@
         </div>
     </div>
 
-    <!-- Interactive Walkthrough Elements -->
-    <div id="tutorialOverlay" class="tutorial-overlay" style="display: none;"></div>
-    <div id="tutorialSpotlight" class="tutorial-spotlight" style="display: none;"></div>
-    <div id="tutorialTooltip" class="tutorial-tooltip" style="display: none;">
-        <h3 id="tooltipTitle">Welcome to the PSAP Map!</h3>
-        <p id="tooltipContent">This interactive tutorial will walk you through how to use this map effectively. Click 'Next' to begin.</p>
-        <div class="buttons">
-            <button id="skipTutorialBtn" class="skip-btn">Skip Tutorial</button>
-            <button id="nextTutorialBtn" class="next-btn">Next</button>
-        </div>
-    </div>
-
     <script>
         require([
             "esri/Map",
@@ -476,7 +367,6 @@
             let highlightSelections = [];
             let psapLayerView;
             let canadaTownsLayerView;
-            let initialLoadComplete = false;
             let activeLayer = 'psap'; // Default to PSAP layer
             let multiSelectMode = true; // Default multi-select to ON
             let drawnPolygons = [];
@@ -1491,395 +1381,7 @@
                 }
             }
             
-            // Interactive Walkthrough Tutorial Functionality
-            const startTutorialBtn = document.getElementById('startTutorialBtn');
-            const tutorialOverlay = document.getElementById('tutorialOverlay');
-            const tutorialSpotlight = document.getElementById('tutorialSpotlight');
-            const tutorialTooltip = document.getElementById('tutorialTooltip');
-            const tooltipTitle = document.getElementById('tooltipTitle');
-            const tooltipContent = document.getElementById('tooltipContent');
-            const skipTutorialBtn = document.getElementById('skipTutorialBtn');
-            const nextTutorialBtn = document.getElementById('nextTutorialBtn');
-            
-            // Tutorial steps - streamlined and focused on key features
-            const tutorialSteps = [
-                {
-                    title: 'Welcome to the PSAP & Canadian Towns Map',
-                    content: 'This tutorial will show you how to explore and work with both US PSAP boundaries and Canadian Towns. Let\'s get started!',
-                    target: null,
-                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
-                    spotlightSize: null,
-                    buttonText: 'Get Started'
-                },
-                {
-                    title: 'Navigating the Map',
-                    content: 'Pan by clicking and dragging. Zoom with the mouse wheel or the +/- buttons. Hold Shift to draw a box to zoom to a specific area.',
-                    target: '#viewDiv',
-                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
-                    spotlightSize: { width: '80%', height: '80%' },
-                    buttonText: 'Next'
-                },
-                {
-                    title: 'Layer Focus',
-                    content: 'Switch focus between US PSAPs and Canadian Towns. The focused layer will be more prominent while both remain visible.',
-                    target: '#layerSwitchBtn',
-                    position: { top: '75px', left: '200px' },
-                    spotlightSize: { width: '180px', height: '45px' },
-                    buttonText: 'Next'
-                },
-                {
-                    title: 'Search & Select',
-                    content: 'Search for locations by name or click directly on the map. Multi-select is enabled by default - hold Ctrl/Cmd to toggle selection.',
-                    target: '.search-container',
-                    position: { top: '75px', left: '50%', transform: 'translateX(-50%)' },
-                    spotlightSize: { width: '320px', height: '60px' },
-                    buttonText: 'Next'
-                },
-                {
-                    title: 'Working with Selections',
-                    content: 'Selected features appear here. Click × to remove or use the download button to export your selection as GeoJSON.',
-                    target: '#selectionPanel',
-                    position: { top: '150px', left: '250px' },
-                    spotlightSize: { width: '300px', height: '200px' },
-                    condition: function() { return selectedFeatures.length > 0; },
-                    retry: 'Please select a feature by clicking on the map first.',
-                    buttonText: 'Next'
-                },
-                {
-                    title: 'Drawing Tools (Optional)',
-                    content: 'Need to mark a custom area? The drawing tools let you create and download custom polygons.',
-                    target: '#drawPolygonBtn',
-                    position: { top: '75px', right: '340px' },
-                    spotlightSize: { width: '180px', height: '50px' },
-                    buttonText: 'Skip Drawing',
-                    secondaryButton: {
-                        text: 'Show Drawing',
-                        action: function() {
-                            const btn = document.querySelector('#drawPolygonBtn');
-                            if (btn) btn.click();
-                            return true; // Advance to next step
-                        }
-                    }
-                },
-                {
-                    title: 'All Set!',
-                    content: 'You\'re ready to explore the map! Click the help button (?) anytime to review these tips.',
-                    target: null,
-                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
-                    spotlightSize: null,
-                    buttonText: 'Start Exploring',
-                    isFinal: true
-                }
-            ];
-            
-            let currentStep = 0;
-            
-            // Function to start the tutorial
-            function startTutorial() {
-                currentStep = 0;
-                showTutorialStep();
-            }
-            
-            // Function to show a specific tutorial step
-            function showTutorialStep() {
-                const step = tutorialSteps[currentStep];
-                
-                // Check if step has a condition and if it's not met
-                if (step.condition && !step.condition()) {
-                    tooltipContent.textContent = step.retry || 'Please complete this step before continuing.';
-                    return;
-                }
-                
-                // Display overlay and make it interactive
-                tutorialOverlay.style.display = 'block';
-                tutorialOverlay.classList.add('active');
-                
-                // Reset any existing positions
-                resetTooltipAndSpotlightPositions();
-                
-                // Set tooltip content
-                tooltipTitle.textContent = step.title;
-                tooltipContent.textContent = step.content;
-                
-                // Update button text and visibility
-                nextTutorialBtn.textContent = step.buttonText || 'Next';
-                
-                // Special handling for the final step
-                if (step.isFinal) {
-                    skipTutorialBtn.style.display = 'none';
-                    // Make sure the Next button is visible and has the correct text
-                    nextTutorialBtn.style.display = 'inline-block';
-                    nextTutorialBtn.textContent = step.buttonText || 'Finish';
-                    // Update the click handler for the final step
-                    nextTutorialBtn.onclick = function() {
-                        endTutorial();
-                    };
-                } else {
-                    skipTutorialBtn.style.display = 'inline-block';
-                    // Reset the onclick handler for non-final steps
-                    nextTutorialBtn.onclick = nextTutorialStep;
-                }
-                
-                // Add secondary button if specified
-                if (step.secondaryButton) {
-                    if (!document.getElementById('secondaryTutorialBtn')) {
-                        const secondaryBtn = document.createElement('button');
-                        secondaryBtn.id = 'secondaryTutorialBtn';
-                        secondaryBtn.className = 'esri-button';
-                        secondaryBtn.style.marginLeft = '10px';
-                        nextTutorialBtn.parentNode.insertBefore(secondaryBtn, nextTutorialBtn.nextSibling);
-                    }
-                    const secondaryBtn = document.getElementById('secondaryTutorialBtn');
-                    secondaryBtn.textContent = step.secondaryButton.text;
-                    secondaryBtn.onclick = function() {
-                        if (step.secondaryButton.action && step.secondaryButton.action()) {
-                            nextTutorialStep();
-                        }
-                    };
-                    secondaryBtn.style.display = 'inline-block';
-                } else if (document.getElementById('secondaryTutorialBtn')) {
-                    document.getElementById('secondaryTutorialBtn').style.display = 'none';
-                }
-                
-                // If step has an action, perform it
-                if (step.action) {
-                    step.action();
-                }
-                
-                // Position spotlight and tooltip
-                if (step.target) {
-                    const targetElement = document.querySelector(step.target);
-                    if (targetElement) {
-                        // Add highlight class to make element interactive and bring to front
-                        targetElement.classList.add('highlight-element');
-                        
-                        // Make sure the element is visible by scrolling to it if needed
-                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-                        
-                        // Calculate position for spotlight
-                        const rect = targetElement.getBoundingClientRect();
-                        
-                        // Position spotlight
-                        tutorialSpotlight.style.display = 'block';
-                        
-                        // Add more padding to the spotlight for better visibility
-                        const spotlightPadding = 15; // increased padding for better visibility
-                        
-                        if (step.spotlightSize) {
-                            // Custom spotlight size
-                            let width, height;
-                            
-                            // Handle percentage or pixel values
-                            if (typeof step.spotlightSize.width === 'string' && step.spotlightSize.width.includes('%')) {
-                                const percentage = parseInt(step.spotlightSize.width) / 100;
-                                width = window.innerWidth * percentage;
-                            } else {
-                                width = step.spotlightSize.width.replace('px', '');
-                            }
-                            
-                            if (typeof step.spotlightSize.height === 'string' && step.spotlightSize.height.includes('%')) {
-                                const percentage = parseInt(step.spotlightSize.height) / 100;
-                                height = window.innerHeight * percentage;
-                            } else {
-                                height = step.spotlightSize.height.replace('px', '');
-                            }
-                            
-                            tutorialSpotlight.style.width = `${width}px`;
-                            tutorialSpotlight.style.height = `${height}px`;
-                            
-                            // Center spotlight on element
-                            tutorialSpotlight.style.top = `${rect.top - ((height - rect.height) / 2)}px`;
-                            tutorialSpotlight.style.left = `${rect.left - ((width - rect.width) / 2)}px`;
-                        } else {
-                            // Default spotlight size based on element with increased size for better visibility
-                            // Precise pixel positioning based on getBoundingClientRect
-                            // The spotlightPadding is used to make the spotlight larger than the element
-                            const elementCenterX = rect.left + (rect.width / 2);
-                            const elementCenterY = rect.top + (rect.height / 2);
-                            const spotlightWidth = rect.width + (spotlightPadding * 2.5);
-                            const spotlightHeight = rect.height + (spotlightPadding * 2.5);
-                            
-                            // Position from the center of the element for more accurate alignment
-                            tutorialSpotlight.style.top = `${elementCenterY - (spotlightHeight / 2)}px`;
-                            tutorialSpotlight.style.left = `${elementCenterX - (spotlightWidth / 2)}px`;
-                            tutorialSpotlight.style.width = `${spotlightWidth}px`;
-                            tutorialSpotlight.style.height = `${spotlightHeight}px`;
-                        }
-                        
-                        // Position tooltip - display it after positioning to avoid flicker
-                        positionTooltip(step, rect);
-                    }
-                } else {
-                    // No target, center the tooltip
-                    tutorialSpotlight.style.display = 'none';
-                    tutorialTooltip.style.display = 'block';
-                    
-                    if (step.position) {
-                        if (step.position.top) tutorialTooltip.style.top = step.position.top;
-                        if (step.position.left) tutorialTooltip.style.left = step.position.left;
-                        if (step.position.right) tutorialTooltip.style.right = step.position.right;
-                        if (step.position.bottom) tutorialTooltip.style.bottom = step.position.bottom;
-                        if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
-                    } else {
-                        tutorialTooltip.style.top = '50%';
-                        tutorialTooltip.style.left = '50%';
-                        tutorialTooltip.style.transform = 'translate(-50%, -50%)';
-                    }
-                }
-            }
-            
-            // Helper function to position the tooltip
-            function positionTooltip(step, targetRect) {
-                // Reset tooltip position
-                tutorialTooltip.style.display = 'block';
-                
-                // Apply custom positioning if provided
-                if (step.position) {
-                    if (step.position.top) tutorialTooltip.style.top = step.position.top;
-                    if (step.position.left) tutorialTooltip.style.left = step.position.left;
-                    if (step.position.right) tutorialTooltip.style.right = step.position.right;
-                    if (step.position.bottom) tutorialTooltip.style.bottom = step.position.bottom;
-                    if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
-                } else {
-                    // Default smarter positioning based on available space
-                    const tooltipRect = tutorialTooltip.getBoundingClientRect();
-                    const viewportHeight = window.innerHeight;
-                    const viewportWidth = window.innerWidth;
-                    
-                    // Clear any existing positions
-                    tutorialTooltip.style.top = '';
-                    tutorialTooltip.style.left = '';
-                    tutorialTooltip.style.right = '';
-                    tutorialTooltip.style.bottom = '';
-                    tutorialTooltip.style.transform = '';
-                    
-                    // Determine best position (above, below, left, or right of target)
-                    const spaceAbove = targetRect.top;
-                    const spaceBelow = viewportHeight - targetRect.bottom;
-                    const spaceLeft = targetRect.left;
-                    const spaceRight = viewportWidth - targetRect.right;
-                    
-                    // Find the direction with most space
-                    const maxSpace = Math.max(spaceAbove, spaceBelow, spaceLeft, spaceRight);
-                    
-                    // Position based on available space
-                    if (maxSpace === spaceBelow && spaceBelow >= tooltipRect.height) {
-                        // Position below
-                        tutorialTooltip.style.top = (targetRect.bottom + 10) + 'px';
-                        tutorialTooltip.style.left = (targetRect.left + (targetRect.width/2) - (tooltipRect.width/2)) + 'px';
-                    } else if (maxSpace === spaceAbove && spaceAbove >= tooltipRect.height) {
-                        // Position above
-                        tutorialTooltip.style.bottom = (viewportHeight - targetRect.top + 10) + 'px';
-                        tutorialTooltip.style.left = (targetRect.left + (targetRect.width/2) - (tooltipRect.width/2)) + 'px';
-                    } else if (maxSpace === spaceRight && spaceRight >= tooltipRect.width) {
-                        // Position to the right
-                        tutorialTooltip.style.left = (targetRect.right + 10) + 'px';
-                        tutorialTooltip.style.top = (targetRect.top + (targetRect.height/2) - (tooltipRect.height/2)) + 'px';
-                    } else if (maxSpace === spaceLeft && spaceLeft >= tooltipRect.width) {
-                        // Position to the left
-                        tutorialTooltip.style.right = (viewportWidth - targetRect.left + 10) + 'px';
-                        tutorialTooltip.style.top = (targetRect.top + (targetRect.height/2) - (tooltipRect.height/2)) + 'px';
-                    } else {
-                        // Fallback: center on screen if no good position
-                        tutorialTooltip.style.top = '50%';
-                        tutorialTooltip.style.left = '50%';
-                        tutorialTooltip.style.transform = 'translate(-50%, -50%)';
-                    }
-                }
-            }
-            
-            // Helper function to reset tooltip and spotlight positions
-            function resetTooltipAndSpotlightPositions() {
-                // Reset tooltip
-                tutorialTooltip.style.top = '';
-                tutorialTooltip.style.left = '';
-                tutorialTooltip.style.right = '';
-                tutorialTooltip.style.bottom = '';
-                tutorialTooltip.style.transform = '';
-                
-                // Reset spotlight
-                tutorialSpotlight.style.top = '';
-                tutorialSpotlight.style.left = '';
-                tutorialSpotlight.style.width = '';
-                tutorialSpotlight.style.height = '';
-            }
-            
-            // Function to advance to the next tutorial step
-            function nextTutorialStep() {
-                cleanupCurrentStep();
-                
-                // Move to next step
-                currentStep++;
-                
-                // Check if tutorial is complete
-                if (currentStep >= tutorialSteps.length) {
-                    endTutorial();
-                    return;
-                }
-                
-                // Show the next step
-                showTutorialStep();
-                
-                // Ensure the Next button is visible and has the correct handler
-                nextTutorialBtn.style.display = 'inline-block';
-                nextTutorialBtn.onclick = nextTutorialStep;
-            }
-            
-            // Function to clean up the current step
-            function cleanupCurrentStep() {
-                const step = tutorialSteps[currentStep];
-                if (!step) return;
-                
-                // Remove highlight class from any elements
-                document.querySelectorAll('.highlight-element').forEach(el => {
-                    el.classList.remove('highlight-element');
-                });
-                
-                // Call cleanup function if it exists
-                if (step.cleanup) {
-                    step.cleanup();
-                }
-            }
-            
-            // Function to end the tutorial
-            function endTutorial() {
-                cleanupCurrentStep();
-                tutorialOverlay.style.display = 'none';
-                tutorialOverlay.classList.remove('active');
-                currentStep = 0;
-                
-                // Remove any highlights from tutorial steps
-                document.querySelectorAll('.highlight-element').forEach(el => {
-                    el.classList.remove('highlight-element');
-                });
-                
-                // Reset any tutorial-specific styles or states
-                resetTooltipAndSpotlightPositions();
-                
-                // Reset the Next button for future tutorial starts
-                nextTutorialBtn.onclick = nextTutorialStep;
-                nextTutorialBtn.textContent = 'Next';
-                nextTutorialBtn.style.display = 'inline-block';
-                skipTutorialBtn.style.display = 'inline-block';
-            }
-            
-            // Helper functions for highlighting elements
-            function addHighlightClass(selector) {
-                const el = document.querySelector(selector);
-                if (el) el.classList.add('highlight-element');
-            }
-            
-            function removeHighlightClass(selector) {
-                const el = document.querySelector(selector);
-                if (el) el.classList.remove('highlight-element');
-            }
-            
-            // Event listeners for tutorial buttons
-            startTutorialBtn.addEventListener('click', startTutorial);
-            skipTutorialBtn.addEventListener('click', endTutorial);
-            nextTutorialBtn.addEventListener('click', nextTutorialStep);
-            
-            // Function to handle showing the area selection modal ONE TIME ONLY
+            // Area selection functionality
             function handleAreaSelection() {
                 // Check if user has made a selection before (stored in localStorage)
                 if (localStorage.getItem('psapMapAreaSelected') === 'true') {
@@ -1893,27 +1395,21 @@
                 
                 // Set up the area selection function to permanently mark selection as made
                 selectUSBtn.addEventListener('click', function() {
-                    // Mark selection as made FIRST
-                    localStorage.setItem('psapMapAreaSelected', 'true'); 
+                    // Mark selection as made
+                    localStorage.setItem('psapMapAreaSelected', 'true');
                     selectArea('us');
-                    // Start tutorial after a slight delay to allow the map to zoom
-                    setTimeout(startTutorial, 1200);
                 });
                 
                 selectCanadaBtn.addEventListener('click', function() {
-                    // Mark selection as made FIRST
+                    // Mark selection as made
                     localStorage.setItem('psapMapAreaSelected', 'true');
                     selectArea('canada');
-                    // Start tutorial after a slight delay to allow the map to zoom
-                    setTimeout(startTutorial, 1200);
                 });
                 
                 selectDefaultBtn.addEventListener('click', function() {
-                    // Mark selection as made FIRST
+                    // Mark selection as made
                     localStorage.setItem('psapMapAreaSelected', 'true');
                     selectArea('default');
-                    // Start tutorial after a slight delay to allow the map to zoom
-                    setTimeout(startTutorial, 1200);
                 });
             }
             
@@ -1925,8 +1421,8 @@
             
             // Add click handler for feature selection from both layers
             view.on("click", function(event) {
-                // Don't process clicks if drawing mode is active or if tutorial overlay is blocking
-                if (sketch || (tutorialOverlay.classList.contains('active') && !event.target.closest('#tutorialTooltip'))) {
+                // Don't process clicks if drawing mode is active
+                if (sketch) {
                     return;
                 }
                 
@@ -2047,40 +1543,18 @@
             psapLayer.visible = true;
             canadaTownsLayer.visible = true;
             
-            // Create layer views for both layers and start tutorial when all loaded
-            let psapViewLoaded = false;
-            let canadaViewLoaded = false;
-            
-            // Function to check if both layers are loaded and start tutorial
-            function checkLayersAndStartTutorial() {
-                if (psapViewLoaded && canadaViewLoaded) {
-                    console.log("Both layer views created, can start tutorial");
-                    // Auto-start tutorial when map is fully loaded
-                    // Slight delay to ensure everything is rendered
-                    setTimeout(startTutorial, 1000);
-                }
-            }
-            
+            // Create layer views for both layers
             view.whenLayerView(psapLayer).then(function(layerView) {
                 psapLayerView = layerView;
-                initialLoadComplete = true;
                 console.log("PSAP layer view created");
                 
                 // Highlight any selected features
                 highlightSelectedFeatures();
-                
-                // Mark PSAP layer as loaded
-                psapViewLoaded = true;
-                checkLayersAndStartTutorial();
             });
             
             view.whenLayerView(canadaTownsLayer).then(function(layerView) {
                 canadaTownsLayerView = layerView;
-                console.log("Canadian Towns layer view created");
-                
-                // Mark Canada Towns layer as loaded
-                canadaViewLoaded = true;
-                checkLayersAndStartTutorial();
+                console.log("Canada Towns layer view created");
             });
             
             // Area selection modal functionality
