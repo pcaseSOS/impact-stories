@@ -1604,11 +1604,20 @@
                 // Update button text and visibility
                 nextTutorialBtn.textContent = step.buttonText || 'Next';
                 
-                // Show/hide skip button based on step
+                // Special handling for the final step
                 if (step.isFinal) {
                     skipTutorialBtn.style.display = 'none';
+                    // Make sure the Next button is visible and has the correct text
+                    nextTutorialBtn.style.display = 'inline-block';
+                    nextTutorialBtn.textContent = step.buttonText || 'Finish';
+                    // Update the click handler for the final step
+                    nextTutorialBtn.onclick = function() {
+                        endTutorial();
+                    };
                 } else {
                     skipTutorialBtn.style.display = 'inline-block';
+                    // Reset the onclick handler for non-final steps
+                    nextTutorialBtn.onclick = nextTutorialStep;
                 }
                 
                 // Add secondary button if specified
@@ -1797,7 +1806,6 @@
             
             // Function to advance to the next tutorial step
             function nextTutorialStep() {
-                // Clean up current step
                 cleanupCurrentStep();
                 
                 // Move to next step
@@ -1811,11 +1819,16 @@
                 
                 // Show the next step
                 showTutorialStep();
+                
+                // Ensure the Next button is visible and has the correct handler
+                nextTutorialBtn.style.display = 'inline-block';
+                nextTutorialBtn.onclick = nextTutorialStep;
             }
             
             // Function to clean up the current step
             function cleanupCurrentStep() {
                 const step = tutorialSteps[currentStep];
+                if (!step) return;
                 
                 // Remove highlight class from any elements
                 document.querySelectorAll('.highlight-element').forEach(el => {
@@ -1842,6 +1855,12 @@
                 
                 // Reset any tutorial-specific styles or states
                 resetTooltipAndSpotlightPositions();
+                
+                // Reset the Next button for future tutorial starts
+                nextTutorialBtn.onclick = nextTutorialStep;
+                nextTutorialBtn.textContent = 'Next';
+                nextTutorialBtn.style.display = 'inline-block';
+                skipTutorialBtn.style.display = 'inline-block';
             }
             
             // Helper functions for highlighting elements
