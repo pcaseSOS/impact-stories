@@ -1535,32 +1535,32 @@
                     title: 'Layer Focus',
                     content: 'Click this button to switch focus between US PSAPs and Canadian Towns. Both layers remain visible, but the focused layer is highlighted.',
                     target: '#layerSwitchBtn',
-                    position: { top: '105px', left: '10px' },
-                    spotlightSize: null
+                    position: { top: '75px', left: '200px' },
+                    spotlightSize: { width: '180px', height: '45px' }
                 },
                 {
                     // Multi-select button
                     title: 'Multi-Select Mode',
                     content: 'Multi-select mode is ON by default, allowing you to select multiple features from either layer. Toggle this button to switch between single and multi-select modes.',
                     target: '#multiSelectBtn',
-                    position: { top: '105px', left: '220px' },
-                    spotlightSize: null
+                    position: { top: '75px', left: '360px' },
+                    spotlightSize: { width: '180px', height: '45px' }
                 },
                 {
                     // Search bar
                     title: 'Search Functionality',
                     content: 'You can search for specific US PSAPs or Canadian Towns by name using this search bar. The search works for whichever layer currently has focus.',
                     target: '.search-container',
-                    position: { top: '170px', left: '50%', transform: 'translateX(-50%)' },
-                    spotlightSize: null
+                    position: { top: '75px', left: '50%', transform: 'translateX(-50%)' },
+                    spotlightSize: { width: '320px', height: '60px' }
                 },
                 {
                     // Drawing button
                     title: 'Drawing Tool',
                     content: 'Click this button to enter drawing mode, which lets you create your own custom polygons over either layer.',
                     target: '#drawPolygonBtn',
-                    position: { top: '105px', left: '350px' },
-                    spotlightSize: null
+                    position: { top: '75px', left: '520px' },
+                    spotlightSize: { width: '180px', height: '45px' }
                 },
                 {
                     // Method 1: Selecting existing boundaries
@@ -1719,11 +1719,19 @@
                             tutorialSpotlight.style.top = `${rect.top - ((height - rect.height) / 2)}px`;
                             tutorialSpotlight.style.left = `${rect.left - ((width - rect.width) / 2)}px`;
                         } else {
-                            // Default spotlight size based on element
-                            tutorialSpotlight.style.top = `${rect.top - spotlightPadding}px`;
-                            tutorialSpotlight.style.left = `${rect.left - spotlightPadding}px`;
-                            tutorialSpotlight.style.width = `${rect.width + (spotlightPadding * 2)}px`;
-                            tutorialSpotlight.style.height = `${rect.height + (spotlightPadding * 2)}px`;
+                            // Default spotlight size based on element with increased size for better visibility
+                            // Precise pixel positioning based on getBoundingClientRect
+                            // The spotlightPadding is used to make the spotlight larger than the element
+                            const elementCenterX = rect.left + (rect.width / 2);
+                            const elementCenterY = rect.top + (rect.height / 2);
+                            const spotlightWidth = rect.width + (spotlightPadding * 2.5);
+                            const spotlightHeight = rect.height + (spotlightPadding * 2.5);
+                            
+                            // Position from the center of the element for more accurate alignment
+                            tutorialSpotlight.style.top = `${elementCenterY - (spotlightHeight / 2)}px`;
+                            tutorialSpotlight.style.left = `${elementCenterX - (spotlightWidth / 2)}px`;
+                            tutorialSpotlight.style.width = `${spotlightWidth}px`;
+                            tutorialSpotlight.style.height = `${spotlightHeight}px`;
                         }
                         
                         // Position tooltip - display it after positioning to avoid flicker
