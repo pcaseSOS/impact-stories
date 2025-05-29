@@ -455,10 +455,13 @@
             // Handle mouse move for hover effect
             view.on("pointer-move", function(event) {
                 view.hitTest(event).then(function(response) {
-                    if (response.results.length > 0 &&
-                        response.results[0].graphic.layer === canadaTownsLayer) {
+                    // Find the first graphic from the Canada towns layer
+                    const canadaTownResult = response.results.find(result => 
+                        result.graphic && result.graphic.layer === canadaTownsLayer
+                    );
 
-                        const graphic = response.results[0].graphic;
+                    if (canadaTownResult) {
+                        const graphic = canadaTownResult.graphic;
                         const townName = getTownName(graphic.attributes);
 
                         tooltip.innerHTML = `<strong>${townName}</strong>`;
@@ -482,13 +485,14 @@
 
             // Handle click for selection
             view.on("click", function(event) {
-
-
                 view.hitTest(event).then(function(response) {
-                    if (response.results.length > 0 &&
-                        response.results[0].graphic.layer === canadaTownsLayer) {
+                    // Find the first graphic from the Canada towns layer
+                    const canadaTownResult = response.results.find(result => 
+                        result.graphic && result.graphic.layer === canadaTownsLayer
+                    );
 
-                        const graphic = response.results[0].graphic;
+                    if (canadaTownResult) {
+                        const graphic = canadaTownResult.graphic;
 
                         // Check for multi-select: either explicit multi-select mode OR modifier keys
                         const isModifierPressed = event.native.ctrlKey ||
