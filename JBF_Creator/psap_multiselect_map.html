@@ -1534,7 +1534,7 @@
                     title: 'Search Functionality',
                     content: 'You can search for specific US PSAPs or Canadian Towns by name using this search bar. The search works for whichever layer currently has focus.',
                     target: '.search-container',
-                    position: { top: '130px', left: '50%', transform: 'translateX(-50%)' },
+                    position: { top: '170px', left: '50%', transform: 'translateX(-50%)' },
                     spotlightSize: null
                 },
                 {
@@ -2031,7 +2031,20 @@
             psapLayer.visible = true;
             canadaTownsLayer.visible = true;
             
-            // Create layer views for both layers
+            // Create layer views for both layers and start tutorial when all loaded
+            let psapViewLoaded = false;
+            let canadaViewLoaded = false;
+            
+            // Function to check if both layers are loaded and start tutorial
+            function checkLayersAndStartTutorial() {
+                if (psapViewLoaded && canadaViewLoaded) {
+                    console.log("Both layer views created, can start tutorial");
+                    // Auto-start tutorial when map is fully loaded
+                    // Slight delay to ensure everything is rendered
+                    setTimeout(startTutorial, 1000);
+                }
+            }
+            
             view.whenLayerView(psapLayer).then(function(layerView) {
                 psapLayerView = layerView;
                 initialLoadComplete = true;
@@ -2039,11 +2052,19 @@
                 
                 // Highlight any selected features
                 highlightSelectedFeatures();
+                
+                // Mark PSAP layer as loaded
+                psapViewLoaded = true;
+                checkLayersAndStartTutorial();
             });
             
             view.whenLayerView(canadaTownsLayer).then(function(layerView) {
                 canadaTownsLayerView = layerView;
                 console.log("Canadian Towns layer view created");
+                
+                // Mark Canada Towns layer as loaded
+                canadaViewLoaded = true;
+                checkLayersAndStartTutorial();
             });
             
             // Area selection modal functionality
