@@ -370,11 +370,18 @@
         }
         
         .search-result-item:hover {
-            background: #f0f0f0;
+            background-color: #f0f0f0;
         }
         
-        .search-result-item:last-child {
-            border-bottom: none;
+        .search-result-header {
+            padding: 8px 12px;
+            font-weight: bold;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            color: #555;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         /* Area Selection Modal Styles */
@@ -945,82 +952,112 @@
                 const searchTerm = searchInput.value.trim();
                 if (searchTerm.length < 2) return;
                 
-                // Different query based on active layer
-                if (activeLayer === 'psap') {
-                    // Query PSAP layer
-                    const query = psapLayer.createQuery();
-                    query.where = `psap_name LIKE '%${searchTerm}%' OR account_id LIKE '%${searchTerm}%' OR NAME LIKE '%${searchTerm}%'`;
-                    query.outFields = ["*"];
-                    query.returnGeometry = true;
-                    
-                    psapLayer.queryFeatures(query).then(result => {
-                        displaySearchResults(result.features, 'psap');
-                    }).catch(error => {
+                // Clear previous search results
+                searchResults.innerHTML = '';
+                
+                // Search PSAP layer
+                const psapQuery = psapLayer.createQuery();
+                psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
+                psapQuery.outFields = ["*"];
+                psapQuery.returnGeometry = true;
+                
+                // Search Canadian Towns layer
+                const canadaQuery = canadaTownsLayer.createQuery();
+                const possibleNameFields = ['NAME', 'name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM'];
+                let whereClause = '';
+                
+                possibleNameFields.forEach(field => {
+                    if (whereClause) whereClause += ' OR ';
+                    whereClause += `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`;
+                });
+                
+                canadaQuery.where = whereClause || "1=0";
+                canadaQuery.outFields = ["*"];
+                canadaQuery.returnGeometry = true;
+                
+                // Execute both queries in parallel
+                Promise.all([
+                    psapLayer.queryFeatures(psapQuery).catch(error => {
                         console.error("PSAP search error:", error);
-                    });
-                } else {
-                    // Query Canadian Towns layer
-                    const query = canadaTownsLayer.createQuery();
-                    
-                    // Create a more comprehensive search query for town names
-                    let whereClause = '';
-                    
-                    // Look for fields that might contain the town name
-                    const nameFields = ['NAME', 'TOWN_NAME', 'CITY_NAME', 'MUNICIPALITY'];
-                    nameFields.forEach(fieldName => {
-                        if (whereClause) {
-                            whereClause += ` OR ${fieldName} LIKE '%${searchTerm}%'`;
-                        } else {
-                            whereClause = `${fieldName} LIKE '%${searchTerm}%'`;
-                        }
-                    });
-                    
-                    query.where = whereClause || "1=0"; // Use 1=0 if no valid fields (will return no results)
-                    query.outFields = ["*"];
-                    query.returnGeometry = true;
-                    
-                    canadaTownsLayer.queryFeatures(query).then(result => {
-                        displaySearchResults(result.features, 'canada');
-                    }).catch(error => {
+                        return { features: [] }; // Return empty result on error
+                    }),
+                    canadaTownsLayer.queryFeatures(canadaQuery).catch(error => {
                         console.error("Canadian Towns search error:", error);
+                        return { features: [] }; // Return empty result on error
+                    })
+                ]).then(([psapResults, canadaResults]) => {
+                    // Combine and display results
+                    const allResults = [
+                        ...psapResults.features.map(f => ({ ...f, layerType: 'psap' })),
+                        ...canadaResults.features.map(f => ({ ...f, layerType: 'canada' }))
+                    ];
+                    
+                    // Sort results by name for better UX
+                    allResults.sort((a, b) => {
+                        const nameA = (a.attributes.psap_name || a.attributes.NAME || '').toLowerCase();
+                        const nameB = (b.attributes.psap_name || b.attributes.NAME || '').toLowerCase();
+                        return nameA.localeCompare(nameB);
                     });
-                }
+                    
+                    displaySearchResults(allResults);
+                });
             }
             
-            function displaySearchResults(features, layerType) {
+            function displaySearchResults(features) {
                 searchResults.innerHTML = '';
                 
                 if (features.length === 0) {
-                    const noResults = document.createElement('div');
-                    noResults.className = 'search-result-item';
-                    noResults.textContent = layerType === 'psap' ? 'No matching PSAPs found' : 'No matching towns found';
-                    searchResults.appendChild(noResults);
+                    searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+                    searchResults.style.display = 'block';
                     return;
                 }
                 
-                features.forEach(feature => {
-                    const resultItem = document.createElement('div');
-                    resultItem.className = 'search-result-item';
+                // Group results by layer type
+                const resultsByLayer = {
+                    psap: features.filter(f => f.layerType === 'psap'),
+                    canada: features.filter(f => f.layerType === 'canada')
+                };
+                
+                // Create sections for each layer type if they have results
+                if (resultsByLayer.psap.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'search-result-header';
+                    header.textContent = 'US PSAPs';
+                    searchResults.appendChild(header);
                     
-                    // Get name from attributes based on layer type
-                    let name;
+                    resultsByLayer.psap.forEach(feature => {
+                        createSearchResultItem(feature, 'psap');
+                    });
+                }
+                
+                if (resultsByLayer.canada.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'search-result-header';
+                    header.textContent = 'Canadian Towns';
+                    searchResults.appendChild(header);
+                    
+                    resultsByLayer.canada.forEach(feature => {
+                        createSearchResultItem(feature, 'canada');
+                    });
+                }
+                
+                // Create search result item helper function
+                function createSearchResultItem(feature, layerType) {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    
+                    // Get the appropriate name based on layer type
+                    let name = '';
                     if (layerType === 'psap') {
-                        name = feature.attributes.NAME || feature.attributes.PSAP_NAME || feature.attributes.psap_name || 
-                              `PSAP ${feature.attributes.OBJECTID || ''}`;
+                        name = feature.attributes.psap_name || feature.attributes.NAME || 'Unnamed PSAP';
                     } else {
-                        name = getTownName(feature.attributes);
+                        name = feature.attributes.NAME || feature.attributes.name || 'Unnamed Location';
                     }
-                    resultItem.textContent = name;
                     
-                    // Click to select
-                    resultItem.addEventListener('click', function() {
-                        // Close search results
-                        searchResults.innerHTML = '';
-                        searchInput.value = '';
-                        
-                        // Select the feature
+                    item.textContent = name;
+                    item.addEventListener('click', () => {
                         selectFeature(feature);
-                        
+                        searchResults.style.display = 'none';
                         // Zoom to the feature
                         view.goTo({
                             target: feature.geometry,
@@ -1028,11 +1065,8 @@
                         });
                     });
                     
-                    searchResults.appendChild(resultItem);
-                });
-                
-                // Make search results visible
-                searchResults.style.display = 'block';
+                    searchResults.appendChild(item);
+                }
             }
             
             // Hide search results when clicking elsewhere
