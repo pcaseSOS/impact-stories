@@ -228,6 +228,78 @@
         .search-result-item:last-child {
             border-bottom: none;
         }
+        
+        /* Interactive Walkthrough Tutorial Styles */
+        .tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        .tutorial-spotlight {
+            position: absolute;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 1001;
+            transition: all 0.3s ease;
+        }
+        
+        .tutorial-tooltip {
+            position: absolute;
+            background-color: white;
+            color: #333;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            width: 300px;
+            z-index: 1002;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+        }
+        
+        .tutorial-tooltip h3 {
+            margin-top: 0;
+            color: var(--royal-blue);
+        }
+        
+        .tutorial-tooltip p {
+            margin-bottom: 15px;
+        }
+        
+        .tutorial-tooltip .buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        
+        .tutorial-tooltip button {
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .tutorial-tooltip .next-btn {
+            background-color: var(--royal-blue);
+            color: white;
+        }
+        
+        .tutorial-tooltip .skip-btn {
+            background-color: #f0f0f0;
+            color: #666;
+        }
+        
+        .highlight-element {
+            position: relative;
+            z-index: 1002;
+            pointer-events: auto !important;
+        }
     </style>
 </head>
 
@@ -268,61 +340,18 @@
 
     <div id="status">Single-click to select PSAPs. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
     
-    <!-- Help Button -->
-    <button id="helpBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100;">❓ Tutorial</button>
+    <!-- Start Tutorial Button -->
+    <button id="startTutorialBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100;">❓ Start Interactive Tutorial</button>
     
-    <!-- Tutorial Modal -->
-    <div id="tutorialModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1000;">
-        <div style="position: relative; background-color: white; width: 80%; max-width: 800px; margin: 50px auto; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-            <span id="closeModal" style="position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer;">&times;</span>
-            <h2 style="color: #001559; margin-top: 0;">PSAP Map Tutorial</h2>
-            
-            <div style="display: flex; margin-bottom: 20px;">
-                <div style="flex: 1; cursor: pointer; font-weight: bold; text-align: center; padding: 10px; border-bottom: 3px solid #001559;" id="tab1">Option 1: Select Existing Boundaries</div>
-                <div style="flex: 1; cursor: pointer; text-align: center; padding: 10px; border-bottom: 3px solid #ccc;" id="tab2">Option 2: Draw Custom Polygon</div>
-            </div>
-            
-            <div id="tutorial1" style="display: block;">
-                <h3>How to Select and Download Existing PSAP Boundaries</h3>
-                <ol>
-                    <li><strong>Select PSAPs:</strong> Click directly on a PSAP boundary to select it. It will highlight in yellow.</li>
-                    <li><strong>Multi-Select:</strong> To select multiple PSAPs, either:
-                        <ul>
-                            <li>Hold Ctrl (Windows) or Cmd (Mac) while clicking additional PSAPs</li>
-                            <li>Click the "Single Select Mode" button to toggle to "Multi-Select: ON" mode</li>
-                        </ul>
-                    </li>
-                    <li><strong>Review Selection:</strong> Selected PSAPs appear in the panel on the left side</li>
-                    <li><strong>Download:</strong> Click "Download Selected" button to get a GeoJSON file containing all selected boundaries</li>
-                    <li><strong>Clear Selection:</strong> Use the "Clear Selection" button to start over</li>
-                </ol>
-                <p><strong>Tip:</strong> You can search for specific PSAPs using the search bar at the top.</p>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button id="nextBtn" class="esri-button esri-button--primary">Next: Drawing Custom Polygons →</button>
-                </div>
-            </div>
-            
-            <div id="tutorial2" style="display: none;">
-                <h3>How to Draw and Download Custom Polygons</h3>
-                <ol>
-                    <li><strong>Start Drawing Mode:</strong> Click the "Draw Polygon" button in the toolbar</li>
-                    <li><strong>Create Polygon:</strong> The drawing tools will appear in the bottom-right corner
-                        <ul>
-                            <li>Click the polygon tool in the sketch panel</li>
-                            <li>Click on the map to place each vertex of your polygon</li>
-                            <li>You can use existing PSAP boundaries as reference</li>
-                            <li>Double-click to complete your polygon</li>
-                        </ul>
-                    </li>
-                    <li><strong>Edit (if needed):</strong> Use the edit tools to modify your polygon</li>
-                    <li><strong>Download:</strong> Click "Download Drawn Polygon" button to get a GeoJSON file of your custom polygon</li>
-                    <li><strong>Exit Drawing Mode:</strong> Click "Exit Drawing Mode" when finished</li>
-                </ol>
-                <p><strong>Tip:</strong> You can draw multiple polygons before downloading, or clear and start over.</p>
-                <div style="text-align: center; margin-top: 20px;">
-                    <button id="prevBtn" class="esri-button esri-button--primary">← Back to Selecting Boundaries</button>
-                </div>
-            </div>
+    <!-- Interactive Walkthrough Elements -->
+    <div id="tutorialOverlay" class="tutorial-overlay" style="display: none;"></div>
+    <div id="tutorialSpotlight" class="tutorial-spotlight" style="display: none;"></div>
+    <div id="tutorialTooltip" class="tutorial-tooltip" style="display: none;">
+        <h3 id="tooltipTitle">Welcome to the PSAP Map!</h3>
+        <p id="tooltipContent">This interactive tutorial will walk you through how to use this map effectively. Click 'Next' to begin.</p>
+        <div class="buttons">
+            <button id="skipTutorialBtn" class="skip-btn">Skip Tutorial</button>
+            <button id="nextTutorialBtn" class="next-btn">Next</button>
         </div>
     </div>
 
@@ -1003,63 +1032,276 @@
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
             
-            // Tutorial functionality
-            const helpBtn = document.getElementById('helpBtn');
-            const tutorialModal = document.getElementById('tutorialModal');
-            const closeModal = document.getElementById('closeModal');
-            const tab1 = document.getElementById('tab1');
-            const tab2 = document.getElementById('tab2');
-            const tutorial1 = document.getElementById('tutorial1');
-            const tutorial2 = document.getElementById('tutorial2');
-            const nextBtn = document.getElementById('nextBtn');
-            const prevBtn = document.getElementById('prevBtn');
+            // Interactive Walkthrough Tutorial Functionality
+            const startTutorialBtn = document.getElementById('startTutorialBtn');
+            const tutorialOverlay = document.getElementById('tutorialOverlay');
+            const tutorialSpotlight = document.getElementById('tutorialSpotlight');
+            const tutorialTooltip = document.getElementById('tutorialTooltip');
+            const tooltipTitle = document.getElementById('tooltipTitle');
+            const tooltipContent = document.getElementById('tooltipContent');
+            const skipTutorialBtn = document.getElementById('skipTutorialBtn');
+            const nextTutorialBtn = document.getElementById('nextTutorialBtn');
             
-            // Show tutorial modal
-            helpBtn.addEventListener('click', function() {
-                tutorialModal.style.display = 'block';
-            });
-            
-            // Close tutorial modal
-            closeModal.addEventListener('click', function() {
-                tutorialModal.style.display = 'none';
-            });
-            
-            // Switch to tab 1
-            tab1.addEventListener('click', function() {
-                tab1.style.fontWeight = 'bold';
-                tab1.style.borderBottom = '3px solid #001559';
-                tab2.style.fontWeight = 'normal';
-                tab2.style.borderBottom = '3px solid #ccc';
-                tutorial1.style.display = 'block';
-                tutorial2.style.display = 'none';
-            });
-            
-            // Switch to tab 2
-            tab2.addEventListener('click', function() {
-                tab2.style.fontWeight = 'bold';
-                tab2.style.borderBottom = '3px solid #001559';
-                tab1.style.fontWeight = 'normal';
-                tab1.style.borderBottom = '3px solid #ccc';
-                tutorial2.style.display = 'block';
-                tutorial1.style.display = 'none';
-            });
-            
-            // Next button
-            nextBtn.addEventListener('click', function() {
-                tab2.click();
-            });
-            
-            // Previous button
-            prevBtn.addEventListener('click', function() {
-                tab1.click();
-            });
-            
-            // Close modal if clicked outside
-            window.addEventListener('click', function(event) {
-                if (event.target === tutorialModal) {
-                    tutorialModal.style.display = 'none';
+            // Tutorial steps
+            const tutorialSteps = [
+                {
+                    // Welcome step
+                    title: 'Welcome to the PSAP Map!',
+                    content: 'This interactive tutorial will guide you through using this map to work with PSAP boundaries. Ready to begin?',
+                    target: null,
+                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+                    spotlightSize: null
+                },
+                {
+                    // Map overview
+                    title: 'The Map',
+                    content: 'This map displays all Public Safety Answering Point (PSAP) boundaries across the US. You can interact with it in several ways.',
+                    target: '#viewDiv',
+                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+                    spotlightSize: { width: '80%', height: '80%' }
+                },
+                {
+                    // Search bar
+                    title: 'Search for PSAPs',
+                    content: 'You can search for specific PSAPs by name or ID using this search bar.',
+                    target: '.search-container',
+                    position: { top: '80px', left: '50%', transform: 'translateX(-50%)' },
+                    spotlightSize: null
+                },
+                {
+                    // Selection button
+                    title: 'Selection Mode',
+                    content: 'Click this button to toggle between single and multi-select modes. In multi-select mode, each click adds to your selection.',
+                    target: '#selectModeBtn',
+                    position: { top: '80px', right: '220px' },
+                    spotlightSize: null
+                },
+                {
+                    // Drawing button
+                    title: 'Drawing Tool',
+                    content: 'Click this button to enter drawing mode, which lets you create your own custom polygons.',
+                    target: '#drawPolygonBtn',
+                    position: { top: '110px', right: '220px' },
+                    spotlightSize: null
+                },
+                {
+                    // Method 1: Selecting existing boundaries
+                    title: 'Option 1: Select Existing Boundaries',
+                    content: 'You can click directly on PSAP boundaries to select them. Try clicking on a boundary now!',
+                    target: '#viewDiv',
+                    position: { top: '30%', left: '50%', transform: 'translateX(-50%)' },
+                    spotlightSize: { width: '50%', height: '50%' }
+                },
+                {
+                    // Selected panel
+                    title: 'Selected PSAPs Panel',
+                    content: 'Your selected PSAPs appear here. You can remove individual selections or download them all as GeoJSON.',
+                    target: '#selectionPanel',
+                    position: { top: '100px', left: '320px' },
+                    spotlightSize: null,
+                    condition: function() { return selectedFeatures.length > 0; },
+                    retry: 'Please select a PSAP boundary first by clicking on it, then continue.'
+                },
+                {
+                    // Download selected button
+                    title: 'Download Selected',
+                    content: 'Once you have selected PSAPs, click this button to download them as a GeoJSON file.',
+                    target: '#downloadBtn',
+                    position: { top: '140px', right: '220px' },
+                    spotlightSize: null
+                },
+                {
+                    // Method 2: Drawing custom polygons
+                    title: 'Option 2: Draw Custom Polygons',
+                    content: "Now let's learn how to draw your own custom polygons. Click 'Next' to continue.",
+                    target: null,
+                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+                    spotlightSize: null
+                },
+                {
+                    // Activate drawing mode
+                    title: 'Start Drawing Mode',
+                    content: 'Click the "Draw Polygon" button to activate drawing mode.',
+                    target: '#drawPolygonBtn',
+                    position: { top: '110px', right: '220px' },
+                    spotlightSize: null,
+                    action: function() {
+                        // Actually highlight the button
+                        addHighlightClass('#drawPolygonBtn');
+                    },
+                    cleanup: function() {
+                        removeHighlightClass('#drawPolygonBtn');
+                    }
+                },
+                {
+                    // Drawing tools instruction
+                    title: 'Drawing Tools',
+                    content: 'When in drawing mode, use the sketch widget that appears in the bottom-right corner to draw your polygon. Click on the map to create vertices, and double-click to complete your polygon.',
+                    target: '#viewDiv',
+                    position: { bottom: '120px', right: '120px' },
+                    spotlightSize: { width: '300px', height: '200px' }
+                },
+                {
+                    // Download drawn polygon
+                    title: 'Download Your Polygon',
+                    content: 'After drawing a polygon, the "Download Drawn Polygon" button will appear. Click it to save your custom polygon as a GeoJSON file.',
+                    target: '#downloadDrawnBtn',
+                    position: { top: '170px', right: '220px' },
+                    spotlightSize: null
+                },
+                {
+                    // Final step
+                    title: 'Tutorial Complete!',
+                    content: 'You now know how to select existing PSAP boundaries and draw your own custom polygons. Click "Finish" to start using the map.',
+                    target: null,
+                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+                    spotlightSize: null,
+                    buttonText: 'Finish'
                 }
-            });
+            ];
+            
+            let currentStep = 0;
+            
+            // Function to start the tutorial
+            function startTutorial() {
+                currentStep = 0;
+                showTutorialStep();
+            }
+            
+            // Function to show a specific tutorial step
+            function showTutorialStep() {
+                const step = tutorialSteps[currentStep];
+                
+                // Check if step has a condition and if it's not met
+                if (step.condition && !step.condition()) {
+                    tooltipContent.textContent = step.retry || 'Please complete this step before continuing.';
+                    return;
+                }
+                
+                // Display overlay
+                tutorialOverlay.style.display = 'block';
+                
+                // Set tooltip content
+                tooltipTitle.textContent = step.title;
+                tooltipContent.textContent = step.content;
+                
+                // Update button text if specified
+                nextTutorialBtn.textContent = step.buttonText || 'Next';
+                
+                // If step has an action, perform it
+                if (step.action) {
+                    step.action();
+                }
+                
+                // Position spotlight and tooltip
+                if (step.target) {
+                    const targetElement = document.querySelector(step.target);
+                    if (targetElement) {
+                        // Add highlight class to make element interactive
+                        targetElement.classList.add('highlight-element');
+                        
+                        // Calculate position for spotlight
+                        const rect = targetElement.getBoundingClientRect();
+                        
+                        // Position spotlight
+                        tutorialSpotlight.style.display = 'block';
+                        tutorialSpotlight.style.top = rect.top + 'px';
+                        tutorialSpotlight.style.left = rect.left + 'px';
+                        tutorialSpotlight.style.width = step.spotlightSize ? step.spotlightSize.width : rect.width + 'px';
+                        tutorialSpotlight.style.height = step.spotlightSize ? step.spotlightSize.height : rect.height + 'px';
+                        
+                        // Position tooltip
+                        tutorialTooltip.style.display = 'block';
+                        
+                        if (step.position) {
+                            if (step.position.top) tutorialTooltip.style.top = step.position.top;
+                            if (step.position.left) tutorialTooltip.style.left = step.position.left;
+                            if (step.position.right) tutorialTooltip.style.right = step.position.right;
+                            if (step.position.bottom) tutorialTooltip.style.bottom = step.position.bottom;
+                            if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
+                        } else {
+                            // Default positioning below the element
+                            tutorialTooltip.style.top = (rect.bottom + 10) + 'px';
+                            tutorialTooltip.style.left = rect.left + 'px';
+                        }
+                    }
+                } else {
+                    // No target, center the tooltip
+                    tutorialSpotlight.style.display = 'none';
+                    tutorialTooltip.style.display = 'block';
+                    
+                    if (step.position) {
+                        if (step.position.top) tutorialTooltip.style.top = step.position.top;
+                        if (step.position.left) tutorialTooltip.style.left = step.position.left;
+                        if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
+                    } else {
+                        tutorialTooltip.style.top = '50%';
+                        tutorialTooltip.style.left = '50%';
+                        tutorialTooltip.style.transform = 'translate(-50%, -50%)';
+                    }
+                }
+            }
+            
+            // Function to advance to the next tutorial step
+            function nextTutorialStep() {
+                // Clean up current step
+                cleanupCurrentStep();
+                
+                // Move to next step
+                currentStep++;
+                
+                // Check if tutorial is complete
+                if (currentStep >= tutorialSteps.length) {
+                    endTutorial();
+                    return;
+                }
+                
+                // Show the next step
+                showTutorialStep();
+            }
+            
+            // Function to clean up the current step
+            function cleanupCurrentStep() {
+                const step = tutorialSteps[currentStep];
+                
+                // Remove highlight class from any elements
+                document.querySelectorAll('.highlight-element').forEach(el => {
+                    el.classList.remove('highlight-element');
+                });
+                
+                // Call cleanup function if it exists
+                if (step.cleanup) {
+                    step.cleanup();
+                }
+            }
+            
+            // Function to end the tutorial
+            function endTutorial() {
+                tutorialOverlay.style.display = 'none';
+                tutorialSpotlight.style.display = 'none';
+                tutorialTooltip.style.display = 'none';
+                
+                // Remove any highlight classes
+                document.querySelectorAll('.highlight-element').forEach(el => {
+                    el.classList.remove('highlight-element');
+                });
+            }
+            
+            // Helper functions for highlighting elements
+            function addHighlightClass(selector) {
+                const el = document.querySelector(selector);
+                if (el) el.classList.add('highlight-element');
+            }
+            
+            function removeHighlightClass(selector) {
+                const el = document.querySelector(selector);
+                if (el) el.classList.remove('highlight-element');
+            }
+            
+            // Event listeners for tutorial buttons
+            startTutorialBtn.addEventListener('click', startTutorial);
+            skipTutorialBtn.addEventListener('click', endTutorial);
+            nextTutorialBtn.addEventListener('click', nextTutorialStep);
             
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
