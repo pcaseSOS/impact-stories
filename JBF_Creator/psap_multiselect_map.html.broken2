@@ -1079,103 +1079,10 @@
                 }
             }
             
-            // Define the function references for event handlers
-            function toggleMultiSelectMode() {
-                multiSelectMode = !multiSelectMode;
-                
-                if (multiSelectMode) {
-                    selectModeBtn.textContent = '🔄 Multi-Select: ON';
-                    selectModeBtn.classList.add('active');
-                } else {
-                    selectModeBtn.textContent = '🖱️ Single Select Mode';
-                    selectModeBtn.classList.remove('active');
-                }
-                
-                updateStatus();
-            }
-            
-            function downloadSelected() {
-                if (selectedFeatures.length === 0) return;
-                
-                try {
-                    status.textContent = 'Preparing download...';
-                    
-                    // Process each selected feature
-                    Promise.all(selectedFeatures.map(async feature => {
-                        // Convert coordinates with proper projection
-                        const coordinates = await convertEsriGeometryToGeoJSON(feature.geometry);
-                        
-                        return {
-                            type: "Feature",
-                            geometry: {
-                                type: "Polygon",
-                                coordinates: coordinates
-                            },
-                            properties: {
-                                ...feature.attributes,
-                                // Add metadata about projection
-                                export_metadata: {
-                                    exported_date: new Date().toISOString(),
-                                    original_crs: feature.geometry.spatialReference ? 
-                                        `EPSG:${feature.geometry.spatialReference.wkid}` : 'Unknown',
-                                    target_crs: 'EPSG:4326',
-                                    target_crs_name: 'WGS 84'
-                                }
-                            }
-                        };
-                    })).then(features => {
-                        // Create GeoJSON object
-                        const geoJSON = {
-                            type: "FeatureCollection",
-                            crs: {
-                                type: "name",
-                                properties: {
-                                    name: "urn:ogc:def:crs:EPSG::4326"
-                                }
-                            },
-                            metadata: {
-                                exported_by: "RapidSOS PSAP Map",
-                                export_date: new Date().toISOString(),
-                                feature_count: features.length
-                            },
-                            features: features
-                        };
-                        
-                        // Convert to JSON string and download
-                        const json = JSON.stringify(geoJSON, null, 2);
-                        const blob = new Blob([json], {type: "application/json"});
-                        const url = URL.createObjectURL(blob);
-                        
-                        const downloadLink = document.createElement('a');
-                        downloadLink.href = url;
-                        downloadLink.download = `${activeLayer === 'psap' ? 'psap' : 'canada_towns'}_export_${new Date().toISOString().slice(0,10)}.geojson`;
-                        document.body.appendChild(downloadLink);
-                        downloadLink.click();
-                        document.body.removeChild(downloadLink);
-                        URL.revokeObjectURL(url);
-                        
-                        if (activeLayer === 'psap') {
-                            status.textContent = `Downloaded ${selectedFeatures.length} PSAP boundary polygons in WGS84 format`;
-                        } else {
-                            status.textContent = `Downloaded ${selectedFeatures.length} Canada Towns in WGS84 format`;
-                        }
-                    }).catch(error => {
-                        console.error('Error downloading GeoJSON:', error);
-                        alert('Error preparing download. Please try again.');
-                        status.textContent = 'Error during download';
-                    });
-                    
-                } catch (error) {
-                    console.error('Error downloading GeoJSON:', error);
-                    alert('Error downloading GeoJSON. Please try again.');
-                    status.textContent = 'Error during download';
-                }
-            }
-            
-            // Attach event handlers to buttons
-            selectModeBtn.addEventListener('click', toggleMultiSelectMode);
-            clearAllBtn.addEventListener('click', clearAllSelections);
-            downloadBtn.addEventListener('click', downloadSelected);
+            // Event handlers for UI elements
+            selectModeBtn.addEventListener('click', toggleSelectionMode);
+            clearAllBtn.addEventListener('click', clearSelection);
+            downloadBtn.addEventListener('click', downloadSelection);
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
             layerSwitchBtn.addEventListener('click', switchActiveLayer);
@@ -1183,7 +1090,7 @@
             // Function to switch between PSAP and Canada Towns layers
             function switchActiveLayer() {
                 // Clear any existing selection before switching
-                clearAllSelections();
+                clearSelection();
                 
                 if (activeLayer === 'psap') {
                     // Switch to Canada Towns layer
@@ -1714,44 +1621,25 @@
                 });
             });
             
-            // Set initial visibility - PSAP visible, Canada Towns hidden
-            psapLayer.visible = true;
-            canadaTownsLayer.visible = false;
-            
-            // Create layer views for both layers
-            view.whenLayerView(psapLayer).then(function(layerView) {
-                psapLayerView = layerView;
-                initialLoadComplete = true;
-                console.log("PSAP layer view created");
-                
-                // Highlight any selected features
-                highlightSelectedFeatures();
-            });
-            
-            view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                canadaTownsLayerView = layerView;
-                console.log("Canada Towns layer view created");
-            });
-            
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
                 console.log("PSAP layer loaded successfully");
                 status.textContent = "PSAP data loaded! Click to select boundaries or use Draw Polygon tool.";
 
-                // Zoom to continental US for better default view
-                view.goTo({
-                    target: {
-                        xmin: -125.0,
-                        ymin: 24.0,
-                        xmax: -66.0,
-                        ymax: 49.0,
-                        spatialReference: { wkid: 4326 }
-                    },
-                    padding: { left: 20, right: 20, top: 20, bottom: 20 }
-                });
+                // Get layer extent and zoom to it
+                if (psapLayer.fullExtent) {
+                    view.goTo(psapLayer.fullExtent);
+                }
 
                 // Initialize UI
                 updateStatus();
+                
+                // Also initialize Canada Towns layer view for highlighting
+                view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                    canadaTownsLayerView = layerView;
+                    console.log("Canada Towns layer view created");
+                });
+
             }).catch(function(error) {
                 console.error("Error loading layer:", error);
                 status.textContent = 'Error loading PSAP layer';
