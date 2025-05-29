@@ -603,8 +603,11 @@
         </div>
     </div>
 
+    <!-- Map will be loaded here -->
     <script>
-        require([
+        // Wait for the DOM to be fully loaded before initializing the map
+        document.addEventListener('DOMContentLoaded', function() {
+            require([
             "esri/Map",
             "esri/views/MapView",
             "esri/layers/FeatureLayer",
@@ -2206,10 +2209,16 @@
 
                 // Initialize UI
                 updateStatus();
-            }).catch(function(error) {
-                console.error("Error loading layer:", error);
-                status.textContent = 'Error loading PSAP layer';
             });
+
+            // Error handling for the initial view setup
+            view.when().catch(function(error) {
+                console.error("Error initializing view:", error);
+                status.textContent = 'Error initializing map';
+            });
+        }).catch(function(error) {
+            console.error("Error loading layer:", error);
+            status.textContent = 'Error loading PSAP layer';
         });
     </script>
 </body>
