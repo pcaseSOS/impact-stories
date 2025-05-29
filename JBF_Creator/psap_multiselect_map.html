@@ -642,9 +642,23 @@
                 // Update selection list
                 selectionList.innerHTML = '';
                 
-                // Get layer type specific header text
-                const headerText = activeLayer === 'psap' ? 'Selected PSAPs' : 'Selected Towns';
-                document.querySelector('.panel-header').firstChild.textContent = `${headerText} (${selectedFeatures.length})`;
+                // Count how many features of each type
+                const psapCount = selectedFeatures.filter(f => f.layer === psapLayer).length;
+                const townCount = selectedFeatures.filter(f => f.layer !== psapLayer).length;
+                
+                // Create an appropriate header text based on what's selected
+                let headerText = '';
+                if (psapCount > 0 && townCount > 0) {
+                    headerText = `Selected Features (${psapCount} PSAPs, ${townCount} Towns)`;
+                } else if (psapCount > 0) {
+                    headerText = `Selected PSAPs (${psapCount})`;
+                } else if (townCount > 0) {
+                    headerText = `Selected Towns (${townCount})`;
+                } else {
+                    headerText = `Selected Features (0)`;
+                }
+                
+                document.querySelector('.panel-header').firstChild.textContent = headerText;
                 
                 // Add each selected feature to the panel
                 selectedFeatures.forEach((feature, index) => {
@@ -654,13 +668,13 @@
                     const nameSpan = document.createElement('span');
                     nameSpan.className = 'item-name';
                     
-                    // Get appropriate name based on layer type
-                    if (activeLayer === 'psap') {
+                    // Get appropriate name based on which layer the feature belongs to
+                    const isPsapFeature = feature.layer === psapLayer;
+                    
+                    if (isPsapFeature) {
                         nameSpan.textContent = getPsapName(feature.attributes);
                     } else {
-                        nameSpan.textContent = feature.attributes.NAME || 
-                                               feature.attributes.TOWN_NAME || 
-                                               `Town ${feature.attributes.OBJECTID}`;
+                        nameSpan.textContent = getTownName(feature.attributes);
                     }
                     
                     const removeBtn = document.createElement('button');
