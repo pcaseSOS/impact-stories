@@ -300,6 +300,67 @@
             z-index: 1002;
             pointer-events: auto !important;
         }
+        
+        /* Area Selection Modal Styles */
+        .modal {
+            display: block;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+        }
+        
+        .modal-content {
+            position: relative;
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            width: 400px;
+            max-width: 80%;
+            text-align: center;
+        }
+        
+        .modal h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .modal p {
+            margin-bottom: 20px;
+            font-size: 16px;
+            color: #555;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .select-area-btn {
+            padding: 12px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #2b6da8;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .select-area-btn:hover {
+            background-color: #3980bd;
+            transform: translateY(-2px);
+        }
+        
+        .select-area-btn:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 
@@ -342,8 +403,19 @@
 
     <div id="status">Single-click to select PSAPs. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
     
+    <!-- Area Selection Modal -->
+    <div id="areaSelectionModal" class="modal">
+        <div class="modal-content">
+            <h2>Select Area</h2>
+            <p>Which area would you like to work with?</p>
+            <div class="modal-buttons">
+                <button id="selectUSBtn" class="select-area-btn">United States</button>
+                <button id="selectCanadaBtn" class="select-area-btn">Canada</button>
+                <button id="selectDefaultBtn" class="select-area-btn">Other (Default)</button>
+            </div>
+        </div>
+    </div>
 
-    
     <!-- Interactive Walkthrough Elements -->
     <div id="tutorialOverlay" class="tutorial-overlay" style="display: none;"></div>
     <div id="tutorialSpotlight" class="tutorial-spotlight" style="display: none;"></div>
@@ -1267,7 +1339,7 @@
             
             // Attach event handlers to buttons
             selectModeBtn.addEventListener('click', toggleMultiSelectMode);
-            clearAllBtn.addEventListener('click', clearAllSelections);
+            // Note: clearAllBtn event listener is already attached earlier in the code
             downloadBtn.addEventListener('click', downloadSelected);
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
@@ -1716,29 +1788,24 @@
             skipTutorialBtn.addEventListener('click', endTutorial);
             nextTutorialBtn.addEventListener('click', nextTutorialStep);
             
-            // Start tutorial automatically when the page is fully loaded
+            // Show area selection modal and start tutorial when the page is fully loaded
             window.addEventListener('load', function() {
-                // Wait for the map to be fully loaded and zoomed to the contiguous 48 states before starting tutorial
+                // Wait for the map to be fully loaded before showing the area selection modal
                 setTimeout(function() {
-                    // Zoom to a closer view of the US (central-eastern focus where most PSAPs are)
-                    const closerUSExtent = {
-                        xmin: -115.0, // Move eastern boundary in from Pacific coast
-                        ymin: 28.0,   // Move northern boundary up from Mexico
-                        xmax: -75.0,  // Move western boundary in from Atlantic coast
-                        ymax: 46.0,   // Move southern boundary down from Canada
-                        spatialReference: { wkid: 4326 }
+                    // Show the area selection modal first
+                    areaSelectionModal.style.display = 'block';
+                    
+                    // The tutorial will start after the user selects an area
+                    // We'll add a callback to start the tutorial after area selection
+                    const originalSelectArea = selectArea;
+                    selectArea = function(area) {
+                        originalSelectArea(area);
+                        
+                        // Start the tutorial after a short delay to allow the map to zoom
+                        setTimeout(function() {
+                            startTutorial();
+                        }, 1000);
                     };
-                    
-                    // Zoom to this extent with minimal padding for a closer view
-                    view.goTo({
-                        target: closerUSExtent,
-                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
-                    });
-                    
-                    // Then start the tutorial after the zoom animation completes
-                    setTimeout(function() {
-                        startTutorial();
-                    }, 1000);
                 }, 1500);
             });
             
@@ -1855,6 +1922,78 @@
             view.whenLayerView(canadaTownsLayer).then(function(layerView) {
                 canadaTownsLayerView = layerView;
                 console.log("Canada Towns layer view created");
+            });
+            
+            // Area selection modal functionality
+            const areaSelectionModal = document.getElementById('areaSelectionModal');
+            const selectUSBtn = document.getElementById('selectUSBtn');
+            const selectCanadaBtn = document.getElementById('selectCanadaBtn');
+            const selectDefaultBtn = document.getElementById('selectDefaultBtn');
+            
+            // Function to handle area selection
+            function selectArea(area) {
+                console.log(`Selected area: ${area}`);
+                
+                // Close the modal
+                areaSelectionModal.style.display = 'none';
+                
+                // Set the appropriate layer as active based on selection
+                if (area === 'canada') {
+                    activeLayer = 'canada';
+                    psapLayer.opacity = 0.3;
+                    canadaTownsLayer.opacity = 1.0;
+                    layerSwitchBtn.textContent = 'Focus: Canada Towns';
+                    
+                    // Zoom to Canada
+                    view.goTo({
+                        target: {
+                            xmin: -141.0,
+                            ymin: 41.0,
+                            xmax: -52.0,
+                            ymax: 83.0,
+                            spatialReference: { wkid: 4326 }
+                        },
+                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                    });
+                    
+                    // Update placeholder text for search input
+                    searchInput.placeholder = 'Search for a town...';
+                    
+                } else {
+                    // Default to US/other
+                    activeLayer = 'psap';
+                    canadaTownsLayer.opacity = 0.3;
+                    psapLayer.opacity = 1.0;
+                    layerSwitchBtn.textContent = 'Focus: US PSAPs';
+                    
+                    // Zoom to US
+                    view.goTo({
+                        target: {
+                            xmin: -125.0,
+                            ymin: 24.0,
+                            xmax: -66.0,
+                            ymax: 49.0,
+                            spatialReference: { wkid: 4326 }
+                        },
+                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                    });
+                    
+                    // Update placeholder text for search input
+                    searchInput.placeholder = 'Search for a PSAP...';
+                }
+            }
+            
+            // Event listeners for area selection buttons
+            selectUSBtn.addEventListener('click', function() {
+                selectArea('us');
+            });
+            
+            selectCanadaBtn.addEventListener('click', function() {
+                selectArea('canada');
+            });
+            
+            selectDefaultBtn.addEventListener('click', function() {
+                selectArea('other');
             });
             
             // Wait for layer to load and zoom to extent
