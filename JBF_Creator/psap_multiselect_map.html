@@ -1535,7 +1535,7 @@
                     title: 'Layer Focus',
                     content: 'Click this button to switch focus between US PSAPs and Canadian Towns. Both layers remain visible, but the focused layer is highlighted.',
                     target: '#layerSwitchBtn',
-                    position: { top: '80px', right: '320px' },
+                    position: { top: '105px', left: '10px' },
                     spotlightSize: null
                 },
                 {
@@ -1543,7 +1543,7 @@
                     title: 'Multi-Select Mode',
                     content: 'Multi-select mode is ON by default, allowing you to select multiple features from either layer. Toggle this button to switch between single and multi-select modes.',
                     target: '#multiSelectBtn',
-                    position: { top: '80px', right: '220px' },
+                    position: { top: '105px', left: '220px' },
                     spotlightSize: null
                 },
                 {
@@ -1559,7 +1559,7 @@
                     title: 'Drawing Tool',
                     content: 'Click this button to enter drawing mode, which lets you create your own custom polygons over either layer.',
                     target: '#drawPolygonBtn',
-                    position: { top: '110px', right: '220px' },
+                    position: { top: '105px', left: '350px' },
                     spotlightSize: null
                 },
                 {
@@ -1572,13 +1572,13 @@
                 },
                 {
                     // Selected panel
-                    title: 'Selected PSAPs Panel',
-                    content: 'Your selected PSAPs appear here. You can remove individual selections or download them all as GeoJSON.',
+                    title: 'Selected Features Panel',
+                    content: 'Your selected PSAPs and Towns appear here. You can remove individual selections or download them all as GeoJSON.',
                     target: '#selectionPanel',
-                    position: { top: '100px', left: '320px' },
+                    position: { top: '150px', left: '250px' },
                     spotlightSize: null,
                     condition: function() { return selectedFeatures.length > 0; },
-                    retry: 'Please select a PSAP boundary first by clicking on it, then continue.'
+                    retry: 'Please select a boundary first by clicking on it, then continue.'
                 },
                 {
                     // Download selected button
