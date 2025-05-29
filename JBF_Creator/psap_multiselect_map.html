@@ -1874,21 +1874,24 @@
                     // Mark selection as made FIRST
                     localStorage.setItem('psapMapAreaSelected', 'true'); 
                     selectArea('us');
-                    // No tutorial for now to keep it simple
+                    // Start tutorial after a slight delay to allow the map to zoom
+                    setTimeout(startTutorial, 1200);
                 });
                 
                 selectCanadaBtn.addEventListener('click', function() {
                     // Mark selection as made FIRST
                     localStorage.setItem('psapMapAreaSelected', 'true');
                     selectArea('canada');
-                    // No tutorial for now to keep it simple
+                    // Start tutorial after a slight delay to allow the map to zoom
+                    setTimeout(startTutorial, 1200);
                 });
                 
                 selectDefaultBtn.addEventListener('click', function() {
                     // Mark selection as made FIRST
                     localStorage.setItem('psapMapAreaSelected', 'true');
                     selectArea('default');
-                    // No tutorial for now to keep it simple
+                    // Start tutorial after a slight delay to allow the map to zoom
+                    setTimeout(startTutorial, 1200);
                 });
             }
             
