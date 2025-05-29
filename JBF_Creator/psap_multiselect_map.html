@@ -1513,7 +1513,7 @@
             const skipTutorialBtn = document.getElementById('skipTutorialBtn');
             const nextTutorialBtn = document.getElementById('nextTutorialBtn');
             
-            // Tutorial steps
+            // Tutorial steps - completely rebuilt to match current map features
             const tutorialSteps = [
                 {
                     // Welcome step
@@ -1526,15 +1526,15 @@
                 {
                     // Map overview
                     title: 'The Map',
-                    content: 'This map now displays both US PSAP boundaries and Canadian Towns. You can interact with either layer in several ways.',
+                    content: 'This map displays both US PSAP boundaries and Canadian Towns simultaneously. You can interact with either layer and select features from both at the same time.',
                     target: '#viewDiv',
                     position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
                     spotlightSize: { width: '80%', height: '80%' }
                 },
                 {
                     // Layer switching
-                    title: 'Layer Focus',
-                    content: 'Click this button to switch focus between US PSAPs and Canadian Towns. Both layers remain visible, but the focused layer is highlighted.',
+                    title: 'Layer Focus Button',
+                    content: 'Click this button to switch focus between US PSAPs and Canadian Towns. Both layers remain visible, but the focused layer is highlighted with higher opacity.',
                     target: '#layerSwitchBtn',
                     position: { top: '75px', left: '200px' },
                     spotlightSize: { width: '180px', height: '45px' }
@@ -1542,7 +1542,7 @@
                 {
                     // Multi-select button
                     title: 'Multi-Select Mode',
-                    content: 'Multi-select mode is ON by default, allowing you to select multiple features from either layer. Toggle this button to switch between single and multi-select modes.',
+                    content: 'Multi-select mode is ON by default, allowing you to select multiple features without holding Ctrl/Cmd key. Toggle this button to switch between single and multi-select modes.',
                     target: '#multiSelectBtn',
                     position: { top: '75px', left: '360px' },
                     spotlightSize: { width: '180px', height: '45px' }
@@ -1550,88 +1550,73 @@
                 {
                     // Search bar
                     title: 'Search Functionality',
-                    content: 'You can search for specific US PSAPs or Canadian Towns by name using this search bar. The search works for whichever layer currently has focus.',
+                    content: 'You can search for specific US PSAPs or Canadian Towns by name using this search bar. The search prioritizes results from whichever layer currently has focus.',
                     target: '.search-container',
                     position: { top: '75px', left: '50%', transform: 'translateX(-50%)' },
                     spotlightSize: { width: '320px', height: '60px' }
                 },
                 {
-                    // Drawing button
-                    title: 'Drawing Tool',
-                    content: 'Click this button to enter drawing mode, which lets you create your own custom polygons over either layer.',
-                    target: '#drawPolygonBtn',
-                    position: { top: '75px', right: '340px' },
-                    spotlightSize: { width: '150px', height: '45px' }
-                },
-                {
-                    // Method 1: Selecting existing boundaries
-                    title: 'Option 1: Select Existing Boundaries',
-                    content: 'You can click directly on PSAP boundaries to select them. They will highlight in blue when selected. Try clicking on a boundary now!',
+                    // Selecting features
+                    title: 'Selecting Features',
+                    content: 'Click directly on any US PSAP or Canadian Town to select it. With multi-select mode ON, you can select multiple features from either layer without holding any keys.',
                     target: '#viewDiv',
                     position: { top: '30%', left: '50%', transform: 'translateX(-50%)' },
                     spotlightSize: { width: '50%', height: '50%' }
                 },
                 {
+                    // Feature hover
+                    title: 'Feature Information',
+                    content: 'Hover over any feature to see detailed information. US PSAPs show state information, while Canadian Towns show province and population details.',
+                    target: '#viewDiv',
+                    position: { top: '40%', left: '50%', transform: 'translateX(-50%)' },
+                    spotlightSize: { width: '50%', height: '50%' }
+                },
+                {
                     // Selected panel
                     title: 'Selected Features Panel',
-                    content: 'Your selected PSAPs and Towns appear here. You can remove individual selections or download them all as GeoJSON.',
+                    content: 'Your selected features appear here. The panel shows how many PSAPs and Towns you have selected. You can remove individual selections by clicking the × button.',
                     target: '#selectionPanel',
                     position: { top: '150px', left: '250px' },
-                    spotlightSize: null,
+                    spotlightSize: { width: '300px', height: '200px' },
                     condition: function() { return selectedFeatures.length > 0; },
                     retry: 'Please select a boundary first by clicking on it, then continue.'
                 },
                 {
                     // Download selected button
-                    title: 'Download Selected',
-                    content: 'Once you have selected PSAPs, click this button to download them as a GeoJSON file.',
+                    title: 'Download Selected Features',
+                    content: 'After selecting features, click this button to download them as a GeoJSON file. The download includes all selected features from both layers.',
                     target: '#downloadBtn',
-                    position: { top: '140px', right: '220px' },
-                    spotlightSize: null
+                    position: { top: '75px', right: '220px' },
+                    spotlightSize: { width: '230px', height: '45px' }
                 },
                 {
-                    // Method 2: Drawing custom polygons
-                    title: 'Option 2: Draw Custom Polygons',
-                    content: "Now let's learn how to draw your own custom polygons. Click 'Next' to continue.",
-                    target: null,
-                    position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
-                    spotlightSize: null
-                },
-                {
-                    // Activate drawing mode
-                    title: 'Start Drawing Mode',
-                    content: 'Click the "Draw Polygon" button to activate drawing mode.',
+                    // Drawing button
+                    title: 'Drawing Custom Polygons',
+                    content: 'Click this button to enter drawing mode, which lets you create your own custom polygons. This is useful for defining your own areas of interest.',
                     target: '#drawPolygonBtn',
-                    position: { top: '110px', right: '220px' },
-                    spotlightSize: null,
-                    action: function() {
-                        // Actually highlight the button
-                        addHighlightClass('#drawPolygonBtn');
-                    },
-                    cleanup: function() {
-                        removeHighlightClass('#drawPolygonBtn');
-                    }
+                    position: { top: '75px', right: '340px' },
+                    spotlightSize: { width: '150px', height: '45px' }
                 },
                 {
                     // Drawing tools instruction
-                    title: 'Drawing Tools',
-                    content: 'When in drawing mode, use the sketch widget that appears in the bottom-right corner to draw your polygon. Click on the map to create vertices, and double-click to complete your polygon.',
+                    title: 'Using Drawing Tools',
+                    content: 'When in drawing mode, use the sketch widget that appears to draw your polygon. Click on the map to create vertices, and double-click to complete your polygon.',
                     target: '#viewDiv',
-                    position: { bottom: '120px', right: '120px' },
+                    position: { bottom: '150px', right: '150px' },
                     spotlightSize: { width: '300px', height: '200px' }
                 },
                 {
                     // Download drawn polygon
-                    title: 'Download Your Polygon',
+                    title: 'Download Custom Polygons',
                     content: 'After drawing a polygon, the "Download Drawn Polygon" button will appear. Click it to save your custom polygon as a GeoJSON file.',
                     target: '#downloadDrawnBtn',
-                    position: { top: '170px', right: '220px' },
-                    spotlightSize: null
+                    position: { top: '75px', right: '220px' },
+                    spotlightSize: { width: '230px', height: '45px' }
                 },
                 {
                     // Final step
                     title: 'Tutorial Complete!',
-                    content: 'You now know how to select existing PSAP boundaries and draw your own custom polygons. Click "Finish" to start using the map.',
+                    content: 'You now know how to use all features of the enhanced PSAP Map, including multi-selection of US PSAPs and Canadian Towns, searching, and creating custom polygons.',
                     target: null,
                     position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
                     spotlightSize: null,
