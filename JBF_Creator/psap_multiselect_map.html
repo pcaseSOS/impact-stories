@@ -1016,14 +1016,30 @@
                         const feature = hoverResult.graphic;
                         let featureName = '';
                         
-                        // Determine which layer the feature belongs to
+                        // Determine which layer the feature belongs to and create appropriate tooltip content
                         if (feature.layer === psapLayer) {
+                            // For PSAP layer, get the PSAP name and format tooltip
                             featureName = getPsapName(feature.attributes);
+                            tooltip.innerHTML = `<strong>${featureName}</strong>`;
+                            
+                            // Add additional PSAP info if available
+                            if (feature.attributes.state) {
+                                tooltip.innerHTML += `<br>State: ${feature.attributes.state}`;
+                            }
                         } else {
+                            // For Canadian Towns layer, get town name and format tooltip with more details
                             featureName = getTownName(feature.attributes);
+                            tooltip.innerHTML = `<strong>${featureName}</strong>`;
+                            
+                            // Add additional town info if available
+                            const attrs = feature.attributes;
+                            if (attrs.PROVINCE) {
+                                tooltip.innerHTML += `<br>Province: ${attrs.PROVINCE}`;
+                            }
+                            if (attrs.POPULATION) {
+                                tooltip.innerHTML += `<br>Population: ${attrs.POPULATION.toLocaleString()}`;
+                            }
                         }
-                        
-                        tooltip.textContent = featureName;
                         tooltip.style.display = 'block';
                         tooltip.style.left = `${event.x + 10}px`;
                         tooltip.style.top = `${event.y + 10}px`;
