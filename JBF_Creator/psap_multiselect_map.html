@@ -1408,20 +1408,19 @@
             window.addEventListener('load', function() {
                 // Wait for the map to be fully loaded and zoomed to the contiguous 48 states before starting tutorial
                 setTimeout(function() {
-                    // Zoom to contiguous 48 states (excluding Alaska and Hawaii for a closer view)
-                    // These coordinates approximately cover the contiguous 48 states
-                    const continentalUSExtent = {
-                        xmin: -125.0,
-                        ymin: 24.0,
-                        xmax: -66.0,
-                        ymax: 49.0,
+                    // Zoom to a closer view of the US (central-eastern focus where most PSAPs are)
+                    const closerUSExtent = {
+                        xmin: -115.0, // Move eastern boundary in from Pacific coast
+                        ymin: 28.0,   // Move northern boundary up from Mexico
+                        xmax: -75.0,  // Move western boundary in from Atlantic coast
+                        ymax: 46.0,   // Move southern boundary down from Canada
                         spatialReference: { wkid: 4326 }
                     };
                     
-                    // Zoom to this extent with some padding
+                    // Zoom to this extent with minimal padding for a closer view
                     view.goTo({
-                        target: continentalUSExtent,
-                        padding: { left: 40, right: 40, top: 40, bottom: 40 }
+                        target: closerUSExtent,
+                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
                     });
                     
                     // Then start the tutorial after the zoom animation completes
