@@ -580,14 +580,17 @@
                     return;
                 }
                 
-                // Apply highlights to all selected features
+                // Apply highlights to all selected features based on which layer they belong to
                 selectedFeatures.forEach(feature => {
                     try {
-                        if (activeLayer === 'psap' && psapLayerView) {
+                        // Check which layer the feature belongs to
+                        const isPsapFeature = feature.layer === psapLayer;
+                        
+                        if (isPsapFeature && psapLayerView) {
                             const highlight = psapLayerView.highlight(feature);
                             highlightSelections.push(highlight);
                             console.log('Added PSAP highlight');
-                        } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                        } else if (!isPsapFeature && canadaTownsLayerView) {
                             const highlight = canadaTownsLayerView.highlight(feature);
                             highlightSelections.push(highlight);
                             console.log('Added Canadian Towns highlight');
@@ -1909,7 +1912,7 @@
                                 const psapName = getPsapName(feature.attributes);
                                 status.textContent = `Selected PSAP: ${psapName}`;
                             } else {
-                                const townName = feature.attributes.NAME || feature.attributes.TOWN_NAME || `Town ${featureId}`;
+                                const townName = getTownName(feature.attributes);
                                 status.textContent = `Selected town: ${townName}`;
                             }
                         }
@@ -1917,13 +1920,17 @@
                         // Update UI after selection change
                         updateSelectionPanel();
                         
-                        // Add highlight for the selected feature
-                        if (activeLayer === 'psap' && psapLayerView) {
+                        // Add highlight for the selected feature based on which layer it belongs to
+                        const isPsapFeature = feature.layer === psapLayer;
+                        
+                        if (isPsapFeature && psapLayerView) {
                             const highlight = psapLayerView.highlight(feature);
                             highlightSelections.push(highlight);
-                        } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                            console.log('Added PSAP highlight');
+                        } else if (!isPsapFeature && canadaTownsLayerView) {
                             const highlight = canadaTownsLayerView.highlight(feature);
                             highlightSelections.push(highlight);
+                            console.log('Added Canadian Towns highlight');
                         }
                     } else if (!event.native.ctrlKey && !event.native.metaKey) {
                         // Clicked on empty area - ask if user wants to clear selection
