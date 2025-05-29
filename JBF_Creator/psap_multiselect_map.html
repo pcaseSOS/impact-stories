@@ -340,8 +340,8 @@
 
     <div id="status">Single-click to select PSAPs. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
     
-    <!-- Start Tutorial Button -->
-    <button id="startTutorialBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100;">❓ Start Interactive Tutorial</button>
+    <!-- Restart Tutorial Button -->
+    <button id="startTutorialBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100;">❓ Restart Tutorial</button>
     
     <!-- Interactive Walkthrough Elements -->
     <div id="tutorialOverlay" class="tutorial-overlay" style="display: none;"></div>
@@ -1087,7 +1087,7 @@
                 {
                     // Method 1: Selecting existing boundaries
                     title: 'Option 1: Select Existing Boundaries',
-                    content: 'You can click directly on PSAP boundaries to select them. Try clicking on a boundary now!',
+                    content: 'You can click directly on PSAP boundaries to select them. They will highlight in blue when selected. Try clicking on a boundary now!',
                     target: '#viewDiv',
                     position: { top: '30%', left: '50%', transform: 'translateX(-50%)' },
                     spotlightSize: { width: '50%', height: '50%' }
@@ -1302,6 +1302,14 @@
             startTutorialBtn.addEventListener('click', startTutorial);
             skipTutorialBtn.addEventListener('click', endTutorial);
             nextTutorialBtn.addEventListener('click', nextTutorialStep);
+            
+            // Start tutorial automatically when the page is fully loaded
+            window.addEventListener('load', function() {
+                // Start the tutorial with a slight delay to ensure the map is loaded
+                setTimeout(function() {
+                    startTutorial();
+                }, 1000);
+            });
             
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
