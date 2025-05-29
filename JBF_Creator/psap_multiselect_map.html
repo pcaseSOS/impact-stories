@@ -356,32 +356,161 @@
         }
         
         .search-results {
-            width: 100%;
+            position: absolute;
+            top: 60px;
+            right: 20px;
+            width: 350px;
+            max-height: 70vh;
+            overflow-y: auto;
             background: white;
-            border-radius: 0 0 4px 4px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
             display: none;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        .search-result-count {
+            padding: 10px 15px;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9em;
+            color: #495057;
+            font-weight: bold;
         }
         
         .search-result-item {
-            padding: 10px 15px;
+            padding: 12px 15px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .search-result-item:last-child {
+            border-bottom: none;
         }
         
         .search-result-item:hover {
-            background-color: #f0f0f0;
+            background-color: #f8f9fa;
         }
         
         .search-result-header {
-            padding: 8px 12px;
-            font-weight: bold;
-            background-color: #f5f5f5;
-            border-bottom: 1px solid #ddd;
-            color: #555;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #212529;
+        }
+        
+        .layer-badge {
+            font-size: 0.7em;
+            background-color: #e9ecef;
+            color: #495057;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: normal;
+        }
+        
+        .search-result-details {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            max-height: 150px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+        
+        .search-result-details div {
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .search-result-details div:hover {
+            white-space: normal;
+            overflow: visible;
+        }
+        
+        .search-result-details strong {
+            color: #495057;
+            margin-right: 5px;
+        }
+        
+        .search-result-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .search-result-actions button {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 0.8em;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .search-result-actions button i {
             font-size: 0.9em;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        }
+        
+        .search-result-actions .btn-primary {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .search-result-actions .btn-primary:hover {
+            background-color: #0069d9;
+            border-color: #0062cc;
+        }
+        
+        .search-result-actions .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            border-color: #6c757d;
+        }
+        
+        .search-result-actions .btn-secondary:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
+        }
+        
+        .search-result-header {
+            font-size: 1.1em;
+            margin-bottom: 6px;
+        }
+        
+        .search-result-item.highlighted {
+            background-color: #e7f5ff;
+            border-left: 3px solid #339af0;
+        }
+        
+        /* Scrollbar styling */
+        .search-results::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .search-results::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .search-results::-webkit-scrollbar-thumb {
+            background: #adb5bd;
+            border-radius: 4px;
+        }
+        
+        .search-results::-webkit-scrollbar-thumb:hover {
+            background: #868e96;
         }
         
         /* Area Selection Modal Styles */
@@ -1148,40 +1277,60 @@
                     activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
                     console.log('Toggling active layer to:', activeLayer);
                     
-                    // Update the layer opacities
+                    // Update layer visibility and opacity
                     if (psapLayer) {
                         psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.5;
+                        psapLayer.visible = true; // Ensure layer is always visible
                         console.log('PSAP layer visibility:', psapLayer.visible, 'opacity:', psapLayer.opacity);
                     }
                     
                     if (canadaTownsLayer) {
                         canadaTownsLayer.opacity = activeLayer === 'canada' ? 1 : 0.5;
+                        canadaTownsLayer.visible = true; // Ensure layer is always visible
                         console.log('Canadian Towns layer visibility:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
                     }
                     
                     // Update the button text
                     updateLayerSwitchText();
                     
-                    // Clear any existing search results when switching layers
-                    searchResults.innerHTML = '';
-                    searchResults.style.display = 'none';
-                    
-                    // Update the status to show which layer is active
+                    // Update the status message
                     if (status) {
                         status.textContent = `Now searching in ${activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns'} layer`;
                         setTimeout(() => { status.textContent = ''; }, 3000);
                     }
                     
+                    // Clear any existing highlights
+                    if (psapHighlight) {
+                        psapHighlight.remove();
+                        psapHighlight = null;
+                    }
+                    if (canadaTownsHighlight) {
+                        canadaTownsHighlight.remove();
+                        canadaTownsHighlight = null;
+                    }
+                    
+                    // Clear any existing selections
+                    clearSelections();
+                    
                     console.log('Switched to', activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns', 'layer');
                 } catch (error) {
                     console.error('Error in toggleActiveLayer:', error);
+                    if (status) {
+                        status.textContent = 'Error switching layers';
+                        setTimeout(() => { status.textContent = ''; }, 3000);
+                    }
                 }
             }
             
             // Initialize layer switch button
             const layerSwitchBtn = document.getElementById('layerSwitchBtn');
             if (layerSwitchBtn) {
-                layerSwitchBtn.addEventListener('click', toggleActiveLayer);
+                // Remove any existing event listeners to prevent duplicates
+                const newBtn = layerSwitchBtn.cloneNode(true);
+                layerSwitchBtn.parentNode.replaceChild(newBtn, layerSwitchBtn);
+                newBtn.addEventListener('click', toggleActiveLayer);
+                
+                // Set initial button text
                 updateLayerSwitchText();
             } else {
                 console.error('Layer switch button not found');
@@ -1202,122 +1351,177 @@
                     canada: features.filter(f => f.layerType === 'canada')
                 };
                 
-                // Create sections for each layer type if they have results
+                const resultsCount = document.createElement('div');
+                resultsCount.className = 'search-result-count';
+                resultsCount.textContent = `Found ${features.length} result${features.length !== 1 ? 's' : ''}`;
+                searchResults.appendChild(resultsCount);
+                
                 if (resultsByLayer.psap.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'search-result-header';
-                    header.textContent = 'US PSAPs';
+                    header.textContent = `US PSAPs (${resultsByLayer.psap.length})`;
                     searchResults.appendChild(header);
                     
                     resultsByLayer.psap.forEach(feature => {
-                        createSearchResultItem(feature, 'psap');
+                        searchResults.appendChild(createSearchResultItem(feature, 'psap'));
                     });
                 }
                 
                 if (resultsByLayer.canada.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'search-result-header';
-                    header.textContent = 'Canadian Towns';
+                    header.textContent = `Canadian Towns (${resultsByLayer.canada.length})`;
                     searchResults.appendChild(header);
                     
                     resultsByLayer.canada.forEach(feature => {
-                        createSearchResultItem(feature);
+                        searchResults.appendChild(createSearchResultItem(feature));
                     });
                 }
                 
-                // Create search result item helper function
-                function createSearchResultItem(feature) {
-                try {
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    
-                    // Get the feature's attributes with a fallback to empty object
-                    const attrs = feature.attributes || {};
-                    
-                    // Try to get a display name from common field names (case-insensitive)
-                    const getNameFromAttrs = (attrs) => {
-                        const possibleNameFields = [
-                            'psap_name', 'name', 'NAME', 'Name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM',
-                            'TOWN_NAME', 'CITY_NAME', 'MUNICIPAL_NAME', 'NOM_VILLE', 'NOM_MUNICIPALITE', 'ENGLISH_NAME', 'FRENCH_NAME',
-                            'COMMUNITY', 'LOCATION', 'PLACE_NAME', 'NOM_LIEU', 'LIEU', 'CSDNAME', 'CMANAME', 'LABEL', 'TITLE'
-                        ];
+                searchResults.style.display = 'block';
+                
+                function createSearchResultItem(feature, layerType) {
+                    try {
+                        const item = document.createElement('div');
+                        item.className = 'search-result-item';
                         
-                        // Find the first matching field that exists in the attributes
-                        for (const field of possibleNameFields) {
-                            const value = attrs[field];
-                            if (value !== undefined && value !== null && value !== '') {
-                                return value;
-                            }
-                        }
+                        // Get the feature's attributes with a fallback to empty object
+                        const attrs = feature.attributes || {};
                         
-                        // If no name found, try any field that might contain a name
-                        for (const [key, value] of Object.entries(attrs)) {
-                            if (typeof value === 'string' && value.trim() !== '') {
-                                return value;
+                        // Helper function to get a display name from common field names
+                        const getNameFromAttrs = (attrs) => {
+                            const possibleNameFields = [
+                                'name', 'NAME', 'psap_name', 'PSAP_NAME', 'psapname', 'PSAPNAME',
+                                'account_id', 'ACCOUNT_ID', 'accountid', 'ACCOUNTID',
+                                'description', 'DESCRIPTION', 'desc', 'DESC',
+                                'label', 'LABEL', 'title', 'TITLE',
+                                'town', 'TOWN', 'city', 'CITY', 'municipality', 'MUNICIPALITY',
+                                'municipal_name', 'MUNICIPAL_NAME', 'municipalname', 'MUNICIPALNAME',
+                                'nom_ville', 'NOM_VILLE', 'nom_municipalite', 'NOM_MUNICIPALITE',
+                                'community', 'COMMUNITY', 'location', 'LOCATION', 'place_name', 'PLACE_NAME',
+                                'csdname', 'CSDNAME', 'cmaname', 'CMANAME', 'prname', 'PRNAME', 'prename', 'PRENAME',
+                                'english_name', 'ENGLISH_NAME', 'french_name', 'FRENCH_NAME', 'geo_name', 'GEO_NAME'
+                            ];
+                            
+                            for (const field of possibleNameFields) {
+                                if (attrs[field] !== undefined && attrs[field] !== null && attrs[field] !== '') {
+                                    return String(attrs[field]);
+                                }
                             }
-                        }
+                            return 'Unnamed Feature';
+                        };
                         
-                        return 'Unnamed Feature';
-                    };
-                    
-                    // Get a display name
-                    const name = getNameFromAttrs(attrs);
-                    
-                    // Try to get an ID from common ID fields
-                    const getIdFromAttrs = (attrs) => {
-                        const possibleIdFields = ['account_id', 'OBJECTID', 'ID', 'id', 'FID', 'feature_id'];
-                        for (const field of possibleIdFields) {
-                            if (attrs[field] !== undefined) {
-                                return attrs[field];
+                        const name = getNameFromAttrs(attrs);
+                        
+                        // Create a more informative display with available attributes
+                        let details = '';
+                        Object.entries(attrs).forEach(([key, value]) => {
+                            if (value !== null && value !== undefined && value !== '' && 
+                                !key.toLowerCase().includes('shape') && 
+                                !key.toLowerCase().includes('objectid') &&
+                                !key.toLowerCase().includes('globalid')) {
+                                details += `<div><strong>${key}:</strong> ${value}</div>`;
                             }
-                        }
-                        return '';
-                    };
-                    
-                    const id = getIdFromAttrs(attrs);
-                    const layerType = feature.layerType || 'unknown';
-                    const objectId = attrs.OBJECTID || attrs.FID || attrs.id || '';
-                    
-                    item.innerHTML = `
-                        <div class="search-result-header">
-                            <strong>${name}</strong>
-                            ${id ? `<span class="search-result-id">ID: ${id}</span>` : ''}
-                        </div>
-                        <div class="search-result-actions">
-                            <button class="btn btn-sm btn-primary zoom-to-feature" data-layer="${layerType}" data-id="${objectId}">Zoom</button>
-                            <button class="btn btn-sm btn-success add-feature" data-layer="${layerType}" data-id="${objectId}">Add to Selection</button>
-                        </div>
-                    `;
-                    
-                    // Add click handler to zoom to feature
-                    item.addEventListener('click', () => {
-                        if (feature.geometry) {
-                            view.goTo({
-                                target: feature.geometry,
-                                zoom: 10
+                        });
+                        
+                        // Create a unique ID for this feature
+                        const featureId = feature.OBJECTID || feature.objectid || feature.OBJECTID_1 || feature.objectid_1 || 
+                                        feature.FID || feature.fid || Math.random().toString(36).substr(2, 9);
+                        
+                        item.innerHTML = `
+                            <div class="search-result-header">
+                                <strong>${name}</strong>
+                                <span class="layer-badge">${layerType === 'psap' ? 'PSAP' : 'Canada'}</span>
+                            </div>
+                            <div class="search-result-details">
+                                ${details || 'No additional details available'}
+                            </div>
+                            <div class="search-result-actions">
+                                <button class="btn btn-sm btn-primary zoom-to-feature" data-feature-id="${featureId}">
+                                    <i class="fas fa-search-plus"></i> Zoom to
+                                </button>
+                                <button class="btn btn-sm btn-secondary select-feature" data-feature-id="${featureId}">
+                                    <i class="fas fa-check"></i> Select
+                                </button>
+                            </div>
+                        `;
+                        
+                        // Add click handler for the entire item
+                        item.addEventListener('click', (e) => {
+                            // Don't trigger if clicking on buttons (they have their own handlers)
+                            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+                            
+                            // Zoom to the feature
+                            zoomToFeature(feature);
+                            
+                            // Highlight the feature
+                            selectFeature(feature);
+                        });
+                        
+                        // Add click handler for the zoom button
+                        const zoomBtn = item.querySelector('.zoom-to-feature');
+                        if (zoomBtn) {
+                            zoomBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                zoomToFeature(feature);
+                                selectFeature(feature);
                             });
                         }
-                        // Select the feature
-                        selectFeature(feature);
-                        searchResults.style.display = 'none';
-                    });
-                    
-                    return item;
-                } catch (error) {
-                    console.error('Error creating search result item:', error, feature);
-                    const errorItem = document.createElement('div');
-                    errorItem.className = 'search-result-item';
-                    errorItem.innerHTML = `
-                        <div class="search-result-header">
-                            <strong>Error displaying feature</strong>
-                        </div>
-                        <div class="text-muted">
-                            ${error.message || 'Unknown error'}
-                        </div>
-                    `;
-                    return errorItem;
+                        
+                        // Add click handler for the select button
+                        const selectBtn = item.querySelector('.select-feature');
+                        if (selectBtn) {
+                            selectBtn.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                selectFeature(feature);
+                            });
+                        }
+                        
+                        return item;
+                    } catch (error) {
+                        console.error('Error creating search result item:', error, feature);
+                        const errorItem = document.createElement('div');
+                        errorItem.className = 'search-result-item';
+                        errorItem.innerHTML = `
+                            <div class="search-result-header">
+                                <strong>Error displaying feature</strong>
+                            </div>
+                            <div class="text-muted">
+                                ${error.message || 'Unknown error'}
+                            </div>
+                        `;
+                        return errorItem;
+                    }
                 }
-            }
+                
+                // Helper function to zoom to a feature
+                function zoomToFeature(feature) {
+                    if (!feature || !feature.geometry) return;
+                    
+                    // Get the geometry's extent
+                    const geometryExtent = feature.geometry.extent || 
+                                        (feature.geometry.getExtent ? feature.geometry.getExtent() : null);
+                    
+                    if (geometryExtent) {
+                        // Zoom to the feature's extent with some padding
+                        view.goTo({
+                            target: geometryExtent,
+                            padding: 50 // Add some padding around the feature
+                        });
+                    } else if (feature.geometry.type === 'point' || 
+                              feature.geometry.type === 'multipoint') {
+                        // For point features, zoom to a fixed level
+                        view.goTo({
+                            target: feature.geometry,
+                            zoom: 12
+                        });
+                    } else {
+                        // For other geometry types, try to fit to the geometry
+                        view.goTo({
+                            target: feature.geometry
+                        });
+                    }
+                }
             }
             
             // Hide search results when clicking elsewhere
@@ -1789,7 +1993,6 @@
             downloadBtn.addEventListener('click', downloadSelected);
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
-            layerSwitchBtn.addEventListener('click', switchActiveLayer);
             
             // Multi-select button functionality
             multiSelectBtn.addEventListener('click', function() {
@@ -1801,72 +2004,8 @@
             // Function to switch between PSAP and Canadian Towns layers
             // Now just changes visual focus but both layers remain selectable
             function switchActiveLayer() {
-                if (activeLayer === 'psap') {
-                    // Switch to Canadian Towns layer as visual focus
-                    activeLayer = 'canada';
-                    // Keep both layers visible, but adjust opacity to show which is in focus
-                    psapLayer.opacity = 0.3;
-                    canadaTownsLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Focus: Canadian Towns';
-                    
-                    // Get Canada layer view for highlighting
-                    if (!canadaTownsLayerView) {
-                        view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                            console.log('Created Canadian Towns layer view');
-                            canadaTownsLayerView = layerView;
-                        });
-                    }
-                    
-                    // Update status text
-                    status.textContent = 'Switched to Canadian Towns layer. Click to select towns';
-                    
-                    // Zoom to Canada
-                    view.goTo({
-                        target: {
-                            xmin: -140.0,
-                            ymin: 40.0,
-                            xmax: -50.0,
-                            ymax: 70.0,
-                            spatialReference: { wkid: 4326 }
-                        },
-                        padding: { left: 40, right: 40, top: 40, bottom: 40 }
-                    });
-                    
-                    console.log('Switched to Canadian Towns layer');
-                } else {
-                    // Switch to PSAP layer as visual focus
-                    activeLayer = 'psap';
-                    // Keep both layers visible, but adjust opacity to show which is in focus
-                    canadaTownsLayer.opacity = 0.3;
-                    psapLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Focus: US PSAPs';
-                    
-                    // Make sure we have the PSAP layer view for highlighting
-                    if (!psapLayerView) {
-                        view.whenLayerView(psapLayer).then(function(layerView) {
-                            console.log('Created PSAP layer view');
-                            psapLayerView = layerView;
-                            initialLoadComplete = true;
-                        });
-                    }
-                    
-                    // Update status text
-                    status.textContent = 'Switched to US PSAPs layer. Click to select PSAPs.';
-                    
-                    // Zoom back to continental US
-                    view.goTo({
-                        target: {
-                            xmin: -125.0,
-                            ymin: 24.0,
-                            xmax: -66.0,
-                            ymax: 49.0,
-                            spatialReference: { wkid: 4326 }
-                        },
-                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
-                    });
-                    
-                    console.log('Switched to PSAP layer');
-                }
+                // This function is now a wrapper for toggleActiveLayer for backward compatibility
+                toggleActiveLayer();
             }
             
             // Area selection functionality
@@ -2076,7 +2215,7 @@
             // Create layer views for both layers
             view.whenLayerView(psapLayer).then(function(layerView) {
                 psapLayerView = layerView;
-                console.log("PSAP layer view created");
+                console.log("Layer view created for highlighting");
                 
                 // Highlight any selected features
                 highlightSelectedFeatures();
