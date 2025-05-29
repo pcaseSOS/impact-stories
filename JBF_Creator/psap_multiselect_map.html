@@ -849,10 +849,30 @@
 
             // Helper function to get consistent feature ID
             function getFeatureId(feature) {
-                return feature.attributes.ogc_fid ||
-                       feature.attributes.OBJECTID || 
-                       feature.attributes.FID ||
-                       JSON.stringify(feature.attributes);
+                if (!feature || !feature.attributes) {
+                    console.warn('Invalid feature object in getFeatureId:', feature);
+                    return Math.random().toString(36).substr(2, 9); // Return random ID as fallback
+                }
+                
+                // Try common ID fields
+                const id = feature.attributes.ogc_fid ||
+                          feature.attributes.OBJECTID || 
+                          feature.attributes.FID ||
+                          feature.attributes.objectid ||
+                          feature.attributes.OBJECTID_1 ||
+                          feature.attributes.fid;
+                
+                // If no ID field found, create a hash of the attributes
+                if (id === undefined || id === null) {
+                    try {
+                        return JSON.stringify(feature.attributes);
+                    } catch (e) {
+                        console.warn('Failed to stringify feature attributes:', e);
+                        return Math.random().toString(36).substr(2, 9);
+                    }
+                }
+                
+                return id;
             }
 
             // Helper function to get PSAP name from attributes
@@ -1117,13 +1137,15 @@
                                             No results found for "${searchTerm}" in PSAP layer
                                         </div>`;
                                     searchResults.style.display = 'block';
-                                    return;
+                                    console.log('PSAP search results:', psapResults);
+                                } else {
+                                    displaySearchResults(psapResults.features.map(f => ({
+                                        ...f,
+                                        layerType: 'psap',
+                                        layerName: 'PSAP'
+                                    })));
+                                    searchResults.style.display = 'block';
                                 }
-                                displaySearchResults(psapResults.features.map(f => ({
-                                    ...f,
-                                    layerType: 'psap',
-                                    layerName: 'PSAP'
-                                })));
                             });
                     } catch (error) {
                         console.error('Error in PSAP search:', error);
@@ -1241,13 +1263,19 @@
                             .then(canadaResults => {
                                 console.log('Canadian Towns search results:', canadaResults.features.length, 'features found');
                                 if (canadaResults.features.length === 0) {
-                                    throw new Error(`No results found for "${searchTerm}" in Canadian Towns layer`);
+                                    searchResults.innerHTML = `
+                                        <div class="search-result-item">
+                                            No results found for "${searchTerm}" in Canadian Towns layer
+                                        </div>`;
+                                    searchResults.style.display = 'block';
+                                    return;
                                 }
                                 displaySearchResults(canadaResults.features.map(f => ({
                                     ...f,
                                     layerType: 'canada',
                                     layerName: 'Canadian Towns'
                                 })));
+                                searchResults.style.display = 'block';
                             });
                     } catch (error) {
                         console.error('Error in Canadian Towns search:', error);
