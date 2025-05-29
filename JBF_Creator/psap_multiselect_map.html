@@ -726,29 +726,8 @@
                     clearAllBtn.disabled = true;
                 }
 
-                // Clear and rebuild selection list
-                selectionList.innerHTML = '';
-
-                selectedFeatures.forEach((feature, index) => {
-                    const psapName = getPsapName(feature.attributes);
-
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'selected-item';
-
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'item-name';
-                    nameSpan.textContent = psapName;
-
-                    const removeBtn = document.createElement('button');
-                    removeBtn.className = 'remove-btn';
-                    removeBtn.textContent = '×';
-                    removeBtn.title = 'Remove from selection';
-                    removeBtn.onclick = () => removeFromSelection(index);
-
-                    itemDiv.appendChild(nameSpan);
-                    itemDiv.appendChild(removeBtn);
-                    selectionList.appendChild(itemDiv);
-                });
+                // The selection list is already populated above with the correct features
+                // No need to rebuild it again here
             }
 
             // Helper function to remove item from selection
