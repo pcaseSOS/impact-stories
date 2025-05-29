@@ -390,7 +390,7 @@
     <!-- Selection Panel -->
     <div id="selectionPanel">
         <div class="panel-header">
-            Selected Features (<span id="selectionCount">0</span>)
+            <span id="selectionHeaderText">Selected Features</span> (<span id="selectionCount">0</span>)
             <span id="panelToggle" style="cursor: pointer;">−</span>
         </div>
         <div class="panel-content" id="selectionList">
@@ -655,18 +655,16 @@
                 const townCount = selectedFeatures.filter(f => f.layer !== psapLayer).length;
                 
                 // Create an appropriate header text based on what's selected
-                let headerText = '';
+                const headerTextElement = document.getElementById('selectionHeaderText');
                 if (psapCount > 0 && townCount > 0) {
-                    headerText = `Selected Features (${psapCount} PSAPs, ${townCount} Towns)`;
+                    headerTextElement.textContent = `Selected Features (${psapCount} PSAPs, ${townCount} Towns)`;
                 } else if (psapCount > 0) {
-                    headerText = `Selected PSAPs (${psapCount})`;
+                    headerTextElement.textContent = `Selected PSAPs`;
                 } else if (townCount > 0) {
-                    headerText = `Selected Towns (${townCount})`;
+                    headerTextElement.textContent = `Selected Towns`;
                 } else {
-                    headerText = `Selected Features (0)`;
+                    headerTextElement.textContent = `Selected Features`;
                 }
-                
-                document.querySelector('.panel-header').firstChild.textContent = headerText;
                 
                 // Show/hide panel and update button states
                 if (selectedFeatures.length > 0) {
