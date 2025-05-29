@@ -378,7 +378,6 @@
     
     <!-- Toolbar for multiselect and downloads -->
     <div class="toolbar" id="toolbar">
-        <button id="selectModeBtn">Single Select Mode</button>
         <button id="layerSwitchBtn">Focus: US PSAPs</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
@@ -397,7 +396,7 @@
             <!-- Selected items will be populated here -->
         </div>
         <div class="panel-footer">
-            Multiple selection: Hold Ctrl/Cmd + click or Multi-Select Mode
+            Multiple selection is enabled by default. Hold Ctrl/Cmd + click to add more.
         </div>
     </div>
 
@@ -446,12 +445,11 @@
         ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
             // Track which layer is currently active for selections
-            let activeLayer = 'psap';
             
             // Variables for features, highlighting, and user interactions
             let selectedFeatures = [];
             let highlightSelections = []; // Used in clearAllSelections and highlight functions
-            let multiSelectMode = false; // Used in toggleMultiSelectMode
+            let activeLayer = 'psap'; // Default active layer
             let initialLoadComplete = false;
             let drawnPolygons = [];
             let drawingMode = false; // Used in toggleDrawingMode
@@ -750,19 +748,17 @@
             // Helper function to update status message
             function updateStatus() {
                 if (selectedFeatures.length === 0) {
-                    if (multiSelectMode) {
-                        status.textContent = '🔄 Multi-select mode active: Click PSAPs to add/remove from selection';
+                    if (activeLayer === 'psap') {
+                        status.textContent = 'Click to select PSAPs. Hold Ctrl/Cmd for multiple selection.';
                     } else {
-                        // Detect if user is on Mac for better instructions
-                        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-                        const modifierKey = isMac ? 'Cmd' : 'Ctrl';
-                        status.textContent = `Single-click to select PSAPs. Hold ${modifierKey} or use Multi-Select Mode for multiple selections.`;
+                        status.textContent = 'Click to select Canadian towns. Hold Ctrl/Cmd for multiple selection.';
                     }
                 } else {
-                    let modeText = '';
-                    if (multiSelectMode) modeText = ' (Multi-select mode)';
-
-                    status.textContent = `${selectedFeatures.length} PSAP${selectedFeatures.length > 1 ? 's' : ''} selected${modeText}`;
+                    if (activeLayer === 'psap') {
+                        status.textContent = `${selectedFeatures.length} PSAP${selectedFeatures.length > 1 ? 's' : ''} selected. Use Ctrl/Cmd+click to add more.`;
+                    } else {
+                        status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected. Use Ctrl/Cmd+click to add more.`;
+                    }
                 }
             }
 
@@ -1244,20 +1240,7 @@
                 }
             }
             
-            // Define the multi-select mode toggle function
-            function toggleMultiSelectMode() {
-                multiSelectMode = !multiSelectMode;
-                
-                if (multiSelectMode) {
-                    selectModeBtn.textContent = '🔄 Multi-Select: ON';
-                    selectModeBtn.classList.add('active');
-                } else {
-                    selectModeBtn.textContent = '🖱️ Single Select Mode';
-                    selectModeBtn.classList.remove('active');
-                }
-                
-                updateStatus();
-            }
+            // Multi-select is now the default behavior, so no toggle function needed
             
             function downloadSelected() {
                 if (selectedFeatures.length === 0) return;
@@ -1338,8 +1321,8 @@
             }
             
             // Attach event handlers to buttons
-            selectModeBtn.addEventListener('click', toggleMultiSelectMode);
-            // Note: clearAllBtn event listener is already attached earlier in the code
+            // Make sure clearAllBtn event listener is properly attached
+            clearAllBtn.addEventListener('click', clearAllSelections);
             downloadBtn.addEventListener('click', downloadSelected);
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
@@ -1864,10 +1847,13 @@
                                 status.textContent = `Removed town from selection`;
                             }
                         } else {
-                            // If single select mode and we already have selections, clear them first
-                            if (!multiSelectMode && selectedFeatures.length > 0) {
-                                console.log('Clearing selection before adding new feature');
-                                clearAllSelections();
+                            // Check if user is holding down Ctrl/Cmd key or wants to clear selection first
+                            if (!event.native.ctrlKey && !event.native.metaKey && selectedFeatures.length > 0) {
+                                // Only clear if not holding a modifier key
+                                if (confirm('Clear existing selection and select this feature instead?')) {
+                                    console.log('Clearing selection before adding new feature');
+                                    clearAllSelections();
+                                }
                             }
                             
                             // Add to selection
@@ -1898,9 +1884,11 @@
                             const highlight = canadaTownsLayerView.highlight(feature);
                             highlightSelections.push(highlight);
                         }
-                    } else if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
-                        // Clicked on empty area - clear selection if not in multi-select mode
-                        clearAllSelections();
+                    } else if (!event.native.ctrlKey && !event.native.metaKey) {
+                        // Clicked on empty area - ask if user wants to clear selection
+                        if (selectedFeatures.length > 0 && confirm('Clear all selected features?')) {
+                            clearAllSelections();
+                        }
                     }
                 });
             });
