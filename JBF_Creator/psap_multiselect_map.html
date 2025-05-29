@@ -652,16 +652,13 @@
                 return `Town ID: ${attributes.OBJECTID || attributes.FID || 'Unknown'}`;
             }
 
-            // Helper function to update selection panel
+            // Helper function to update selection panel - implementation from Canada app
             function updateSelectionPanel() {
                 console.log('Updating selection panel with', selectedFeatures.length, 'features');
                 
                 // Update count display and button text
                 selectionCount.textContent = selectedFeatures.length;
                 downloadBtn.textContent = `📥 Download Selected (${selectedFeatures.length})`;
-                
-                // Update selection list
-                selectionList.innerHTML = '';
                 
                 // Count how many features of each type
                 const psapCount = selectedFeatures.filter(f => f.layer === psapLayer).length;
@@ -680,6 +677,20 @@
                 }
                 
                 document.querySelector('.panel-header').firstChild.textContent = headerText;
+                
+                // Show/hide panel and update button states
+                if (selectedFeatures.length > 0) {
+                    selectionPanel.style.display = 'block';
+                    downloadBtn.disabled = false;
+                    clearAllBtn.disabled = false;
+                } else {
+                    selectionPanel.style.display = 'none';
+                    downloadBtn.disabled = true;
+                    clearAllBtn.disabled = true;
+                }
+                
+                // Clear and rebuild selection list - IMPORTANT: Do this in one place only
+                selectionList.innerHTML = '';
                 
                 // Add each selected feature to the panel
                 selectedFeatures.forEach((feature, index) => {
@@ -700,51 +711,57 @@
                     
                     const removeBtn = document.createElement('button');
                     removeBtn.className = 'remove-btn';
-                    removeBtn.innerHTML = '&times;';
-                    removeBtn.onclick = function() {
-                        // Remove from selection
-                        selectedFeatures.splice(index, 1);
-                        
-                        // Update panel and highlights
-                        updateSelectionPanel();
-                        highlightSelectedFeatures();
-                    };
+                    removeBtn.textContent = '×';
+                    removeBtn.title = 'Remove from selection';
+                    removeBtn.onclick = () => removeFromSelection(index);
                     
                     itemDiv.appendChild(nameSpan);
                     itemDiv.appendChild(removeBtn);
                     selectionList.appendChild(itemDiv);
                 });
-
-                // Show/hide panel and update button states
-                if (selectedFeatures.length > 0) {
-                    selectionPanel.style.display = 'block';
-                    downloadBtn.disabled = false;
-                    clearAllBtn.disabled = false;
-                } else {
-                    selectionPanel.style.display = 'none';
-                    downloadBtn.disabled = true;
-                    clearAllBtn.disabled = true;
-                }
-
-                // The selection list is already populated above with the correct features
-                // No need to rebuild it again here
             }
-
-            // Helper function to remove item from selection
+            
+            // Helper function to remove item from selection - from Canada app
             function removeFromSelection(index) {
                 if (index >= 0 && index < selectedFeatures.length) {
+                    // Get the feature to show in status message
+                    const feature = selectedFeatures[index];
+                    const isPsapFeature = feature.layer === psapLayer;
+                    const featureName = isPsapFeature ? 
+                        getPsapName(feature.attributes) : 
+                        getTownName(feature.attributes);
+                    
                     // Remove highlight
                     if (highlightSelections[index]) {
                         highlightSelections[index].remove();
                     }
-
+                    
                     // Remove from arrays
                     selectedFeatures.splice(index, 1);
                     highlightSelections.splice(index, 1);
-
+                    
+                    // Update UI
                     updateSelectionPanel();
-                    updateStatus();
+                    status.textContent = `Removed ${featureName} from selection`;
                 }
+            }
+
+            // Helper function to clear all selections
+            function clearAllSelections() {
+                console.log('Clearing all selections');
+                
+                // Remove all highlights
+                highlightSelections.forEach(highlight => {
+                    if (highlight && highlight.remove) highlight.remove();
+                });
+                
+                // Clear arrays
+                highlightSelections = [];
+                selectedFeatures = [];
+                
+                // Update UI
+                updateSelectionPanel();
+                status.textContent = 'All selections cleared';
             }
 
             // Helper function to clear all selections
@@ -1916,69 +1933,82 @@
                         const feature = clickedFeature.graphic;
                         console.log('Clicked feature:', feature);
                         
-                        // Check if already selected
-                        const featureId = feature.attributes.OBJECTID;
-                        const index = selectedFeatures.findIndex(f => f.attributes.OBJECTID === featureId);
-                        console.log('Feature in selection:', index >= 0);
+                        // Check for multi-select: either explicit multi-select mode OR modifier keys
+                        const isModifierPressed = event.native.ctrlKey || 
+                                              event.native.metaKey || 
+                                              event.native.shiftKey;
                         
-                        if (index > -1) {
-                            // If already selected, remove it
-                            selectedFeatures.splice(index, 1);
-                            console.log('Removed feature from selection');
-                            
-                            // Determine which layer the feature belongs to
+                        const shouldMultiSelect = multiSelectMode || isModifierPressed;
+                        console.log('Selection debug:', {
+                            multiSelectMode, 
+                            isModifierPressed, 
+                            shouldMultiSelect, 
+                            currentSelectionCount: selectedFeatures.length
+                        });
+                        
+                        // Get feature ID for consistent comparison
+                        const featureId = feature.attributes.OBJECTID || feature.attributes.FID;
+                        
+                        // Check if this feature is already selected
+                        const existingIndex = selectedFeatures.findIndex(f => 
+                            (f.attributes.OBJECTID === featureId) || (f.attributes.FID === featureId)
+                        );
+                        
+                        if (existingIndex >= 0) {
+                            // Feature already selected - remove it (toggle behavior)
+                            // Get feature properties for status message
                             const isPsapFeature = feature.layer === psapLayer;
+                            const featureName = isPsapFeature ? 
+                                getPsapName(feature.attributes) : 
+                                getTownName(feature.attributes);
                             
-                            if (isPsapFeature) {
-                                status.textContent = `Removed PSAP from selection`;
-                            } else {
-                                status.textContent = `Removed town from selection`;
+                            // Remove the highlight
+                            if (highlightSelections[existingIndex] && highlightSelections[existingIndex].remove) {
+                                highlightSelections[existingIndex].remove();
                             }
+                            
+                            // Remove from arrays
+                            selectedFeatures.splice(existingIndex, 1);
+                            highlightSelections.splice(existingIndex, 1);
+                            
+                            // Update UI
+                            updateSelectionPanel();
+                            status.textContent = `Removed ${featureName} from selection`;
                         } else {
-                            // If multi-select mode is OFF and no modifier key is pressed, clear existing selection first
-                            if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey && selectedFeatures.length > 0) {
-                                console.log('Multi-select mode is OFF, clearing previous selection first');
+                            // New selection
+                            if (!shouldMultiSelect && selectedFeatures.length > 0) {
+                                // Single select mode and we have existing selections - clear them first
+                                console.log('Clearing previous selections for single select');
                                 clearAllSelections();
                             }
                             
-                            // Now the user can add the new feature without confirmation dialog
-                            // This is a more streamlined experience that respects the multi-select toggle button
-                            
-                            // Add to selection
+                            // Add new selection
                             selectedFeatures.push(feature);
-                            console.log('Added feature to selection, new count:', selectedFeatures.length);
+                            console.log('Added feature, total selections:', selectedFeatures.length);
                             
-                            // Determine which layer the feature belongs to
+                            // Highlight selected feature based on which layer it belongs to
                             const isPsapFeature = feature.layer === psapLayer;
                             
-                            // Get feature name based on which layer it belongs to
-                            if (isPsapFeature) {
+                            if (isPsapFeature && psapLayerView) {
+                                const highlight = psapLayerView.highlight(feature);
+                                highlightSelections.push(highlight);
                                 const psapName = getPsapName(feature.attributes);
-                                status.textContent = `Selected PSAP: ${psapName}`;
-                            } else {
+                                status.textContent = `Added ${psapName} to selection (${selectedFeatures.length} total)`;
+                            } else if (!isPsapFeature && canadaTownsLayerView) {
+                                const highlight = canadaTownsLayerView.highlight(feature);
+                                highlightSelections.push(highlight);
                                 const townName = getTownName(feature.attributes);
-                                status.textContent = `Selected town: ${townName}`;
+                                status.textContent = `Added ${townName} to selection (${selectedFeatures.length} total)`;
                             }
+                            
+                            // Update selection panel
+                            updateSelectionPanel();
                         }
-                        
-                        // Update UI after selection change
-                        updateSelectionPanel();
-                        
-                        // Add highlight for the selected feature based on which layer it belongs to
-                        const isPsapFeature = feature.layer === psapLayer;
-                        
-                        if (isPsapFeature && psapLayerView) {
-                            const highlight = psapLayerView.highlight(feature);
-                            highlightSelections.push(highlight);
-                            console.log('Added PSAP highlight');
-                        } else if (!isPsapFeature && canadaTownsLayerView) {
-                            const highlight = canadaTownsLayerView.highlight(feature);
-                            highlightSelections.push(highlight);
-                            console.log('Added Canadian Towns highlight');
-                        }
-                    } else if (!event.native.ctrlKey && !event.native.metaKey) {
-                        // Clicked on empty area - ask if user wants to clear selection
-                        if (selectedFeatures.length > 0 && confirm('Clear all selected features?')) {
+                    } else {
+                        // Clicked on empty area
+                        if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey && selectedFeatures.length > 0) {
+                            // In single-select mode, clear selections when clicking on empty space
+                            // (this matches the behavior in the Canada app)
                             clearAllSelections();
                         }
                     }
