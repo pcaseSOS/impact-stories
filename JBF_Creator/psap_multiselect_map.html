@@ -486,12 +486,23 @@
             function highlightSelectedFeatures() {
                 if (!initialLoadComplete) return;
                 
-                const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
+                // Clear previous highlights
+                highlightSelections.forEach(highlight => {
+                    if (highlight) highlight.remove();
+                });
+                highlightSelections = [];
                 
+                if (selectedFeatures.length === 0) return;
+                
+                // Add new highlights based on active layer
                 if (activeLayer === 'psap' && psapLayerView) {
-                    psapLayerView.highlight(objectIds);
+                    const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
+                    const highlight = psapLayerView.highlight(objectIds);
+                    highlightSelections.push(highlight);
                 } else if (activeLayer === 'canada' && canadaTownsLayerView) {
-                    canadaTownsLayerView.highlight(objectIds);
+                    const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
+                    const highlight = canadaTownsLayerView.highlight(objectIds);
+                    highlightSelections.push(highlight);
                 }
             }
 
@@ -1669,8 +1680,8 @@
                         const feature = clickedFeature.graphic;
                         const featureId = feature.attributes.OBJECTID;
                         
-                        // Check if already selected
-                        const index = selectedFeatures.findIndex(f => f.attributes.OBJECTID === featureId);
+                        // Check if already selected using the getFeatureId helper function
+                        const index = selectedFeatures.findIndex(f => getFeatureId(f) === getFeatureId(feature));
                         
                         if (index > -1) {
                             // If already selected, remove it
@@ -1703,14 +1714,8 @@
                         // Update UI after selection change
                         updateSelectionPanel();
                         
-                        // Highlight selected features
-                        if (activeLayer === 'psap' && psapLayerView) {
-                            const objectIds = selectedFeatures.map(f => f.attributes.OBJECTID);
-                            psapLayerView.highlight(objectIds);
-                        } else if (activeLayer === 'canada' && canadaTownsLayerView) {
-                            const objectIds = selectedFeatures.map(f => f.attributes.OBJECTID);
-                            canadaTownsLayerView.highlight(objectIds);
-                        }
+                        // Highlight selected features using the centralized function
+                        highlightSelectedFeatures();
                     } else if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
                         // Clicked on empty area - clear selection if not in multi-select mode
                         clearAllSelections();
