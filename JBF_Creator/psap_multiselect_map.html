@@ -236,18 +236,25 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.75);
             z-index: 1000;
-            pointer-events: none;
+            pointer-events: auto;
         }
         
         .tutorial-spotlight {
             position: absolute;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
-            border-radius: 4px;
-            pointer-events: none;
+            border-radius: 8px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.8);
             z-index: 1001;
-            transition: all 0.3s ease;
+            pointer-events: none;
+            outline: 3px solid var(--royal-blue);
+            transition: all 0.5s ease-in-out;
+            animation: spotlight-glow 2s infinite alternate;
+        }
+        
+        @keyframes spotlight-glow {
+            from { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.8), 0 0 10px 5px rgba(0, 116, 217, 0.7); }
+            to { box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.8), 0 0 20px 10px rgba(0, 116, 217, 0.9); }
         }
         
         .tutorial-tooltip {
@@ -299,6 +306,16 @@
             position: relative;
             z-index: 1002;
             pointer-events: auto !important;
+            animation: pulse-highlight 1.5s infinite;
+            box-shadow: 0 0 0 5px rgba(0, 116, 217, 0.7);
+            outline: 3px solid var(--royal-blue);
+            border-radius: 4px;
+        }
+        
+        @keyframes pulse-highlight {
+            0% { box-shadow: 0 0 0 0 rgba(0, 116, 217, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(0, 116, 217, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 116, 217, 0); }
         }
         
         /* Area Selection Modal Styles */
@@ -1661,8 +1678,11 @@
                 if (step.target) {
                     const targetElement = document.querySelector(step.target);
                     if (targetElement) {
-                        // Add highlight class to make element interactive
+                        // Add highlight class to make element interactive and bring to front
                         targetElement.classList.add('highlight-element');
+                        
+                        // Make sure the element is visible by scrolling to it if needed
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
                         
                         // Calculate position for spotlight
                         const rect = targetElement.getBoundingClientRect();
@@ -1670,8 +1690,8 @@
                         // Position spotlight
                         tutorialSpotlight.style.display = 'block';
                         
-                        // Add some padding to the spotlight for better visibility
-                        const spotlightPadding = 5; // pixels of padding
+                        // Add more padding to the spotlight for better visibility
+                        const spotlightPadding = 15; // increased padding for better visibility
                         
                         if (step.spotlightSize) {
                             // Custom spotlight size
