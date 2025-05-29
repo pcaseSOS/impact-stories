@@ -318,12 +318,12 @@
     <!-- Toolbar for multiselect and downloads -->
     <div class="toolbar" id="toolbar">
         <button id="selectModeBtn">Single Select Mode</button>
-        <button id="layerSwitchBtn">Active: US PSAPs</button>
+        <button id="layerSwitchBtn">Focus: US PSAPs</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
         <button id="clearAllBtn" disabled class="danger">❌ Clear Selection</button>
-        <button id="startTutorialBtn" class="esri-button--small">❓</button>
+        <button id="startTutorialBtn" class="esri-button--small">❓ Tutorial</button>
     </div>
     
     <!-- Selection Panel -->
@@ -858,22 +858,29 @@
                         result.graphic && result.graphic.layer === canadaTownsLayer
                     );
                     
-                    // First check for PSAP result if that layer is visible
-                    if (activeLayer === 'psap' && psapResult) {
-                        const feature = psapResult.graphic;
-                        const psapName = getPsapName(feature.attributes);
+                    // First try the focused layer, then the other
+                    let hoverResult = null;
+                    if (activeLayer === 'psap') {
+                        hoverResult = psapResult || canadaResult;
+                    } else {
+                        hoverResult = canadaResult || psapResult;
+                    }
+                    
+                    // Show tooltip if we found a feature
+                    if (hoverResult) {
+                        const feature = hoverResult.graphic;
+                        let featureName = '';
                         
-                        tooltip.textContent = psapName;
-                        tooltip.style.display = 'block';
-                        tooltip.style.left = `${event.x + 10}px`;
-                        tooltip.style.top = `${event.y + 10}px`;
-                    } 
-                    // Then check for Canada Towns result if that layer is visible
-                    else if (activeLayer === 'canada' && canadaResult) {
-                        const feature = canadaResult.graphic;
-                        const townName = feature.attributes.NAME || feature.attributes.TOWN_NAME || `Town ${feature.attributes.OBJECTID}`;
+                        // Determine which layer the feature belongs to
+                        if (feature.layer === psapLayer) {
+                            featureName = getPsapName(feature.attributes);
+                        } else {
+                            featureName = feature.attributes.NAME || 
+                                         feature.attributes.TOWN_NAME || 
+                                         `Town ${feature.attributes.OBJECTID}`;
+                        }
                         
-                        tooltip.textContent = townName;
+                        tooltip.textContent = featureName;
                         tooltip.style.display = 'block';
                         tooltip.style.left = `${event.x + 10}px`;
                         tooltip.style.top = `${event.y + 10}px`;
@@ -1267,19 +1274,15 @@
             layerSwitchBtn.addEventListener('click', switchActiveLayer);
             
             // Function to switch between PSAP and Canada Towns layers
+            // Now just changes visual focus but both layers remain selectable
             function switchActiveLayer() {
-                console.log('Switching active layer from', activeLayer);
-                
-                // Clear any existing selection before switching
-                clearAllSelections();
-                
                 if (activeLayer === 'psap') {
-                    // Switch to Canada Towns layer
+                    // Switch to Canada Towns layer as visual focus
                     activeLayer = 'canada';
-                    // Keep both layers visible, but adjust opacity to show which is active
+                    // Keep both layers visible, but adjust opacity to show which is in focus
                     psapLayer.opacity = 0.3;
                     canadaTownsLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Active: Canada Towns';
+                    layerSwitchBtn.textContent = 'Focus: Canada Towns';
                     
                     // Get Canada layer view for highlighting
                     if (!canadaTownsLayerView) {
@@ -1306,12 +1309,12 @@
                     
                     console.log('Switched to Canada Towns layer');
                 } else {
-                    // Switch to PSAP layer
+                    // Switch to PSAP layer as visual focus
                     activeLayer = 'psap';
-                    // Keep both layers visible, but adjust opacity to show which is active
+                    // Keep both layers visible, but adjust opacity to show which is in focus
                     canadaTownsLayer.opacity = 0.3;
                     psapLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Active: US PSAPs';
+                    layerSwitchBtn.textContent = 'Focus: US PSAPs';
                     
                     // Make sure we have the PSAP layer view for highlighting
                     if (!psapLayerView) {
@@ -1752,19 +1755,23 @@
                 
                 // Perform hit test to see if user clicked on a feature
                 view.hitTest(screenPoint).then(function(response) {
-                    // Determine which layer is active and find matching features
-                    let clickedFeature;
+                    // Check both layers for features, not just the active one
+                    // First check for PSAP features
+                    const psapFeature = response.results.find(result => 
+                        result.graphic && result.graphic.layer === psapLayer
+                    );
                     
+                    // Then check for Canada Towns features
+                    const canadaFeature = response.results.find(result => 
+                        result.graphic && result.graphic.layer === canadaTownsLayer
+                    );
+                    
+                    // First try the active layer, then fall back to the other layer
+                    let clickedFeature = null;
                     if (activeLayer === 'psap') {
-                        // Look for PSAP features
-                        clickedFeature = response.results.find(result => 
-                            result.graphic && result.graphic.layer === psapLayer
-                        );
+                        clickedFeature = psapFeature || canadaFeature;
                     } else {
-                        // Look for Canada Towns features
-                        clickedFeature = response.results.find(result => 
-                            result.graphic && result.graphic.layer === canadaTownsLayer
-                        );
+                        clickedFeature = canadaFeature || psapFeature;
                     }
                     
                     if (clickedFeature) {
@@ -1781,7 +1788,10 @@
                             selectedFeatures.splice(index, 1);
                             console.log('Removed feature from selection');
                             
-                            if (activeLayer === 'psap') {
+                            // Determine which layer the feature belongs to
+                            const isPsapFeature = feature.layer === psapLayer;
+                            
+                            if (isPsapFeature) {
                                 status.textContent = `Removed PSAP from selection`;
                             } else {
                                 status.textContent = `Removed town from selection`;
@@ -1797,8 +1807,11 @@
                             selectedFeatures.push(feature);
                             console.log('Added feature to selection, new count:', selectedFeatures.length);
                             
-                            // Get feature name based on layer type
-                            if (activeLayer === 'psap') {
+                            // Determine which layer the feature belongs to
+                            const isPsapFeature = feature.layer === psapLayer;
+                            
+                            // Get feature name based on which layer it belongs to
+                            if (isPsapFeature) {
                                 const psapName = getPsapName(feature.attributes);
                                 status.textContent = `Selected PSAP: ${psapName}`;
                             } else {
