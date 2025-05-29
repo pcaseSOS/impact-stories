@@ -267,6 +267,64 @@
     </div>
 
     <div id="status">Single-click to select PSAPs. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
+    
+    <!-- Help Button -->
+    <button id="helpBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100;">❓ Tutorial</button>
+    
+    <!-- Tutorial Modal -->
+    <div id="tutorialModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); z-index: 1000;">
+        <div style="position: relative; background-color: white; width: 80%; max-width: 800px; margin: 50px auto; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <span id="closeModal" style="position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer;">&times;</span>
+            <h2 style="color: #001559; margin-top: 0;">PSAP Map Tutorial</h2>
+            
+            <div style="display: flex; margin-bottom: 20px;">
+                <div style="flex: 1; cursor: pointer; font-weight: bold; text-align: center; padding: 10px; border-bottom: 3px solid #001559;" id="tab1">Option 1: Select Existing Boundaries</div>
+                <div style="flex: 1; cursor: pointer; text-align: center; padding: 10px; border-bottom: 3px solid #ccc;" id="tab2">Option 2: Draw Custom Polygon</div>
+            </div>
+            
+            <div id="tutorial1" style="display: block;">
+                <h3>How to Select and Download Existing PSAP Boundaries</h3>
+                <ol>
+                    <li><strong>Select PSAPs:</strong> Click directly on a PSAP boundary to select it. It will highlight in yellow.</li>
+                    <li><strong>Multi-Select:</strong> To select multiple PSAPs, either:
+                        <ul>
+                            <li>Hold Ctrl (Windows) or Cmd (Mac) while clicking additional PSAPs</li>
+                            <li>Click the "Single Select Mode" button to toggle to "Multi-Select: ON" mode</li>
+                        </ul>
+                    </li>
+                    <li><strong>Review Selection:</strong> Selected PSAPs appear in the panel on the left side</li>
+                    <li><strong>Download:</strong> Click "Download Selected" button to get a GeoJSON file containing all selected boundaries</li>
+                    <li><strong>Clear Selection:</strong> Use the "Clear Selection" button to start over</li>
+                </ol>
+                <p><strong>Tip:</strong> You can search for specific PSAPs using the search bar at the top.</p>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button id="nextBtn" class="esri-button esri-button--primary">Next: Drawing Custom Polygons →</button>
+                </div>
+            </div>
+            
+            <div id="tutorial2" style="display: none;">
+                <h3>How to Draw and Download Custom Polygons</h3>
+                <ol>
+                    <li><strong>Start Drawing Mode:</strong> Click the "Draw Polygon" button in the toolbar</li>
+                    <li><strong>Create Polygon:</strong> The drawing tools will appear in the bottom-right corner
+                        <ul>
+                            <li>Click the polygon tool in the sketch panel</li>
+                            <li>Click on the map to place each vertex of your polygon</li>
+                            <li>You can use existing PSAP boundaries as reference</li>
+                            <li>Double-click to complete your polygon</li>
+                        </ul>
+                    </li>
+                    <li><strong>Edit (if needed):</strong> Use the edit tools to modify your polygon</li>
+                    <li><strong>Download:</strong> Click "Download Drawn Polygon" button to get a GeoJSON file of your custom polygon</li>
+                    <li><strong>Exit Drawing Mode:</strong> Click "Exit Drawing Mode" when finished</li>
+                </ol>
+                <p><strong>Tip:</strong> You can draw multiple polygons before downloading, or clear and start over.</p>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button id="prevBtn" class="esri-button esri-button--primary">← Back to Selecting Boundaries</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         require([
@@ -944,6 +1002,64 @@
             // Add event listeners for draw button functionality
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
+            
+            // Tutorial functionality
+            const helpBtn = document.getElementById('helpBtn');
+            const tutorialModal = document.getElementById('tutorialModal');
+            const closeModal = document.getElementById('closeModal');
+            const tab1 = document.getElementById('tab1');
+            const tab2 = document.getElementById('tab2');
+            const tutorial1 = document.getElementById('tutorial1');
+            const tutorial2 = document.getElementById('tutorial2');
+            const nextBtn = document.getElementById('nextBtn');
+            const prevBtn = document.getElementById('prevBtn');
+            
+            // Show tutorial modal
+            helpBtn.addEventListener('click', function() {
+                tutorialModal.style.display = 'block';
+            });
+            
+            // Close tutorial modal
+            closeModal.addEventListener('click', function() {
+                tutorialModal.style.display = 'none';
+            });
+            
+            // Switch to tab 1
+            tab1.addEventListener('click', function() {
+                tab1.style.fontWeight = 'bold';
+                tab1.style.borderBottom = '3px solid #001559';
+                tab2.style.fontWeight = 'normal';
+                tab2.style.borderBottom = '3px solid #ccc';
+                tutorial1.style.display = 'block';
+                tutorial2.style.display = 'none';
+            });
+            
+            // Switch to tab 2
+            tab2.addEventListener('click', function() {
+                tab2.style.fontWeight = 'bold';
+                tab2.style.borderBottom = '3px solid #001559';
+                tab1.style.fontWeight = 'normal';
+                tab1.style.borderBottom = '3px solid #ccc';
+                tutorial2.style.display = 'block';
+                tutorial1.style.display = 'none';
+            });
+            
+            // Next button
+            nextBtn.addEventListener('click', function() {
+                tab2.click();
+            });
+            
+            // Previous button
+            prevBtn.addEventListener('click', function() {
+                tab1.click();
+            });
+            
+            // Close modal if clicked outside
+            window.addEventListener('click', function(event) {
+                if (event.target === tutorialModal) {
+                    tutorialModal.style.display = 'none';
+                }
+            });
             
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
