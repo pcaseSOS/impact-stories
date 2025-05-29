@@ -379,7 +379,7 @@
     <!-- Toolbar for multiselect and downloads -->
     <div class="toolbar" id="toolbar">
         <button id="layerSwitchBtn">Focus: US PSAPs</button>
-        <button id="multiSelectBtn">🔘 Multi-Select: OFF</button>
+        <button id="multiSelectBtn">🔘 Multi-Select: ON</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
@@ -454,7 +454,7 @@
             let canadaTownsLayerView;
             let initialLoadComplete = false;
             let activeLayer = 'psap'; // Default to PSAP layer
-            let multiSelectMode = false; // Default multi-select to OFF
+            let multiSelectMode = true; // Default multi-select to ON
             let drawnPolygons = [];
             let drawingMode = false; // Used in toggleDrawingMode
             let sketch = null; // For sketch widget
