@@ -532,19 +532,9 @@
                     })
                 }),
                 outFields: ["*"],  // Get all fields for proper attribute handling
-                popupEnabled: true,
-                popupTemplate: {
-                    title: "{NAME}",
-                    content: [
-                        {
-                            type: "fields",
-                            fieldInfos: [
-                                { fieldName: "NAME", label: "Town Name" },
-                                { fieldName: "OBJECTID", label: "ID" }
-                            ]
-                        }
-                    ]
-                },
+                popupEnabled: false,  // Disable click popups for Canadian Towns
+                // No popupTemplate needed since popups are disabled
+                // We'll still show information via custom hover tooltips instead
                 // Set highlight options
                 highlightOptions: {
                     color: [0, 102, 255, 0.8], // Blue highlight
@@ -1511,8 +1501,8 @@
             const tutorialSteps = [
                 {
                     // Welcome step
-                    title: 'Welcome to the PSAP Map!',
-                    content: 'This interactive tutorial will guide you through using this map to work with PSAP boundaries. Ready to begin?',
+                    title: 'Welcome to the Enhanced PSAP Map!',
+                    content: 'This interactive tutorial will guide you through using this map to work with both US PSAP boundaries and Canadian Towns. Ready to begin?',
                     target: null,
                     position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
                     spotlightSize: null
@@ -1520,31 +1510,39 @@
                 {
                     // Map overview
                     title: 'The Map',
-                    content: 'This map displays all Public Safety Answering Point (PSAP) boundaries across the US. You can interact with it in several ways.',
+                    content: 'This map now displays both US PSAP boundaries and Canadian Towns. You can interact with either layer in several ways.',
                     target: '#viewDiv',
                     position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
                     spotlightSize: { width: '80%', height: '80%' }
                 },
                 {
+                    // Layer switching
+                    title: 'Layer Focus',
+                    content: 'Click this button to switch focus between US PSAPs and Canadian Towns. Both layers remain visible, but the focused layer is highlighted.',
+                    target: '#layerSwitchBtn',
+                    position: { top: '80px', right: '320px' },
+                    spotlightSize: null
+                },
+                {
+                    // Multi-select button
+                    title: 'Multi-Select Mode',
+                    content: 'Multi-select mode is ON by default, allowing you to select multiple features from either layer. Toggle this button to switch between single and multi-select modes.',
+                    target: '#multiSelectBtn',
+                    position: { top: '80px', right: '220px' },
+                    spotlightSize: null
+                },
+                {
                     // Search bar
-                    title: 'Search for PSAPs',
-                    content: 'You can search for specific PSAPs by name or ID using this search bar.',
+                    title: 'Search Functionality',
+                    content: 'You can search for specific US PSAPs or Canadian Towns by name using this search bar. The search works for whichever layer currently has focus.',
                     target: '.search-container',
                     position: { top: '130px', left: '50%', transform: 'translateX(-50%)' },
                     spotlightSize: null
                 },
                 {
-                    // Selection button
-                    title: 'Selection Mode',
-                    content: 'Click this button to toggle between single and multi-select modes. In multi-select mode, each click adds to your selection.',
-                    target: '#selectModeBtn',
-                    position: { top: '80px', right: '220px' },
-                    spotlightSize: null
-                },
-                {
                     // Drawing button
                     title: 'Drawing Tool',
-                    content: 'Click this button to enter drawing mode, which lets you create your own custom polygons.',
+                    content: 'Click this button to enter drawing mode, which lets you create your own custom polygons over either layer.',
                     target: '#drawPolygonBtn',
                     position: { top: '110px', right: '220px' },
                     spotlightSize: null
