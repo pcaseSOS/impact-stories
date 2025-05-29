@@ -1181,6 +1181,9 @@
                 // Display overlay
                 tutorialOverlay.style.display = 'block';
                 
+                // Reset any existing positions
+                resetTooltipAndSpotlightPositions();
+                
                 // Set tooltip content
                 tooltipTitle.textContent = step.title;
                 tooltipContent.textContent = step.content;
@@ -1205,25 +1208,45 @@
                         
                         // Position spotlight
                         tutorialSpotlight.style.display = 'block';
-                        tutorialSpotlight.style.top = rect.top + 'px';
-                        tutorialSpotlight.style.left = rect.left + 'px';
-                        tutorialSpotlight.style.width = step.spotlightSize ? step.spotlightSize.width : rect.width + 'px';
-                        tutorialSpotlight.style.height = step.spotlightSize ? step.spotlightSize.height : rect.height + 'px';
                         
-                        // Position tooltip
-                        tutorialTooltip.style.display = 'block';
+                        // Add some padding to the spotlight for better visibility
+                        const spotlightPadding = 5; // pixels of padding
                         
-                        if (step.position) {
-                            if (step.position.top) tutorialTooltip.style.top = step.position.top;
-                            if (step.position.left) tutorialTooltip.style.left = step.position.left;
-                            if (step.position.right) tutorialTooltip.style.right = step.position.right;
-                            if (step.position.bottom) tutorialTooltip.style.bottom = step.position.bottom;
-                            if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
+                        if (step.spotlightSize) {
+                            // Custom spotlight size
+                            let width, height;
+                            
+                            // Handle percentage or pixel values
+                            if (typeof step.spotlightSize.width === 'string' && step.spotlightSize.width.includes('%')) {
+                                const percentage = parseInt(step.spotlightSize.width) / 100;
+                                width = window.innerWidth * percentage;
+                            } else {
+                                width = step.spotlightSize.width.replace('px', '');
+                            }
+                            
+                            if (typeof step.spotlightSize.height === 'string' && step.spotlightSize.height.includes('%')) {
+                                const percentage = parseInt(step.spotlightSize.height) / 100;
+                                height = window.innerHeight * percentage;
+                            } else {
+                                height = step.spotlightSize.height.replace('px', '');
+                            }
+                            
+                            tutorialSpotlight.style.width = `${width}px`;
+                            tutorialSpotlight.style.height = `${height}px`;
+                            
+                            // Center spotlight on element
+                            tutorialSpotlight.style.top = `${rect.top - ((height - rect.height) / 2)}px`;
+                            tutorialSpotlight.style.left = `${rect.left - ((width - rect.width) / 2)}px`;
                         } else {
-                            // Default positioning below the element
-                            tutorialTooltip.style.top = (rect.bottom + 10) + 'px';
-                            tutorialTooltip.style.left = rect.left + 'px';
+                            // Default spotlight size based on element
+                            tutorialSpotlight.style.top = `${rect.top - spotlightPadding}px`;
+                            tutorialSpotlight.style.left = `${rect.left - spotlightPadding}px`;
+                            tutorialSpotlight.style.width = `${rect.width + (spotlightPadding * 2)}px`;
+                            tutorialSpotlight.style.height = `${rect.height + (spotlightPadding * 2)}px`;
                         }
+                        
+                        // Position tooltip - display it after positioning to avoid flicker
+                        positionTooltip(step, rect);
                     }
                 } else {
                     // No target, center the tooltip
@@ -1233,6 +1256,8 @@
                     if (step.position) {
                         if (step.position.top) tutorialTooltip.style.top = step.position.top;
                         if (step.position.left) tutorialTooltip.style.left = step.position.left;
+                        if (step.position.right) tutorialTooltip.style.right = step.position.right;
+                        if (step.position.bottom) tutorialTooltip.style.bottom = step.position.bottom;
                         if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
                     } else {
                         tutorialTooltip.style.top = '50%';
@@ -1240,6 +1265,82 @@
                         tutorialTooltip.style.transform = 'translate(-50%, -50%)';
                     }
                 }
+            }
+            
+            // Helper function to position the tooltip
+            function positionTooltip(step, targetRect) {
+                // Reset tooltip position
+                tutorialTooltip.style.display = 'block';
+                
+                // Apply custom positioning if provided
+                if (step.position) {
+                    if (step.position.top) tutorialTooltip.style.top = step.position.top;
+                    if (step.position.left) tutorialTooltip.style.left = step.position.left;
+                    if (step.position.right) tutorialTooltip.style.right = step.position.right;
+                    if (step.position.bottom) tutorialTooltip.style.bottom = step.position.bottom;
+                    if (step.position.transform) tutorialTooltip.style.transform = step.position.transform;
+                } else {
+                    // Default smarter positioning based on available space
+                    const tooltipRect = tutorialTooltip.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    const viewportWidth = window.innerWidth;
+                    
+                    // Clear any existing positions
+                    tutorialTooltip.style.top = '';
+                    tutorialTooltip.style.left = '';
+                    tutorialTooltip.style.right = '';
+                    tutorialTooltip.style.bottom = '';
+                    tutorialTooltip.style.transform = '';
+                    
+                    // Determine best position (above, below, left, or right of target)
+                    const spaceAbove = targetRect.top;
+                    const spaceBelow = viewportHeight - targetRect.bottom;
+                    const spaceLeft = targetRect.left;
+                    const spaceRight = viewportWidth - targetRect.right;
+                    
+                    // Find the direction with most space
+                    const maxSpace = Math.max(spaceAbove, spaceBelow, spaceLeft, spaceRight);
+                    
+                    // Position based on available space
+                    if (maxSpace === spaceBelow && spaceBelow >= tooltipRect.height) {
+                        // Position below
+                        tutorialTooltip.style.top = (targetRect.bottom + 10) + 'px';
+                        tutorialTooltip.style.left = (targetRect.left + (targetRect.width/2) - (tooltipRect.width/2)) + 'px';
+                    } else if (maxSpace === spaceAbove && spaceAbove >= tooltipRect.height) {
+                        // Position above
+                        tutorialTooltip.style.bottom = (viewportHeight - targetRect.top + 10) + 'px';
+                        tutorialTooltip.style.left = (targetRect.left + (targetRect.width/2) - (tooltipRect.width/2)) + 'px';
+                    } else if (maxSpace === spaceRight && spaceRight >= tooltipRect.width) {
+                        // Position to the right
+                        tutorialTooltip.style.left = (targetRect.right + 10) + 'px';
+                        tutorialTooltip.style.top = (targetRect.top + (targetRect.height/2) - (tooltipRect.height/2)) + 'px';
+                    } else if (maxSpace === spaceLeft && spaceLeft >= tooltipRect.width) {
+                        // Position to the left
+                        tutorialTooltip.style.right = (viewportWidth - targetRect.left + 10) + 'px';
+                        tutorialTooltip.style.top = (targetRect.top + (targetRect.height/2) - (tooltipRect.height/2)) + 'px';
+                    } else {
+                        // Fallback: center on screen if no good position
+                        tutorialTooltip.style.top = '50%';
+                        tutorialTooltip.style.left = '50%';
+                        tutorialTooltip.style.transform = 'translate(-50%, -50%)';
+                    }
+                }
+            }
+            
+            // Helper function to reset tooltip and spotlight positions
+            function resetTooltipAndSpotlightPositions() {
+                // Reset tooltip
+                tutorialTooltip.style.top = '';
+                tutorialTooltip.style.left = '';
+                tutorialTooltip.style.right = '';
+                tutorialTooltip.style.bottom = '';
+                tutorialTooltip.style.transform = '';
+                
+                // Reset spotlight
+                tutorialSpotlight.style.top = '';
+                tutorialSpotlight.style.left = '';
+                tutorialSpotlight.style.width = '';
+                tutorialSpotlight.style.height = '';
             }
             
             // Function to advance to the next tutorial step
@@ -1305,10 +1406,18 @@
             
             // Start tutorial automatically when the page is fully loaded
             window.addEventListener('load', function() {
-                // Start the tutorial with a slight delay to ensure the map is loaded
+                // Wait for the map to be fully loaded and zoomed to the PSAP layer before starting tutorial
                 setTimeout(function() {
-                    startTutorial();
-                }, 1000);
+                    // Make sure we're zoomed to the PSAP layer first
+                    if (psapLayer && psapLayer.fullExtent) {
+                        view.goTo(psapLayer.fullExtent);
+                    }
+                    
+                    // Then start the tutorial after the zoom animation completes
+                    setTimeout(function() {
+                        startTutorial();
+                    }, 1000);
+                }, 1500);
             });
             
             // Wait for layer to load and zoom to extent
