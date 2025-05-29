@@ -955,72 +955,110 @@
                 // Clear previous search results
                 searchResults.innerHTML = '';
                 
-                // Search PSAP layer
-                const psapQuery = psapLayer.createQuery();
-                psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
-                psapQuery.outFields = ["*"];
-                psapQuery.returnGeometry = true;
-                
-                // Log the Canadian Towns layer's fields for debugging
-                console.log('Canadian Towns layer fields:', Object.keys(canadaTownsLayer.fields || {}));
-                
-                // Search Canadian Towns layer with more comprehensive field matching
-                const canadaQuery = canadaTownsLayer.createQuery();
-                const possibleNameFields = [
-                    'NAME', 'name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM',
-                    'TOWN_NAME', 'CITY_NAME', 'MUNICIPAL_NAME', 'NOM_VILLE', 'NOM_MUNICIPALITE',
-                    'COMMUNITY', 'LOCATION', 'PLACE_NAME', 'NOM_LIEU', 'LIEU'
-                ];
-                
-                // Get the actual field names from the layer
-                const layerFields = canadaTownsLayer.fields ? canadaTownsLayer.fields.map(f => f.name) : [];
-                console.log('Available fields in Canadian Towns layer:', layerFields);
-                
-                // Only include fields that actually exist in the layer
-                const validFields = possibleNameFields.filter(field => 
-                    layerFields.some(layerField => layerField.toUpperCase() === field.toUpperCase())
-                );
-                
-                console.log('Matching fields for search:', validFields);
-                
-                let whereClause = '';
-                validFields.forEach((field, index) => {
-                    if (index > 0) whereClause += ' OR ';
-                    whereClause += `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`;
-                });
-                
-                canadaQuery.where = whereClause || "1=0";
-                canadaQuery.outFields = ["*"];
-                canadaQuery.returnGeometry = true;
-                canadaQuery.returnDistinctValues = true; // Avoid duplicate results
-                
-                // Execute both queries in parallel
-                Promise.all([
-                    psapLayer.queryFeatures(psapQuery).catch(error => {
-                        console.error("PSAP search error:", error);
-                        return { features: [] }; // Return empty result on error
-                    }),
-                    canadaTownsLayer.queryFeatures(canadaQuery).catch(error => {
-                        console.error("Canadian Towns search error:", error);
-                        return { features: [] }; // Return empty result on error
-                    })
-                ]).then(([psapResults, canadaResults]) => {
-                    // Combine and display results
-                    const allResults = [
-                        ...psapResults.features.map(f => ({ ...f, layerType: 'psap' })),
-                        ...canadaResults.features.map(f => ({ ...f, layerType: 'canada' }))
+                // Search only the currently focused layer
+                if (activeLayer === 'psap') {
+                    // Search PSAP layer only
+                    const psapQuery = psapLayer.createQuery();
+                    psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
+                    psapQuery.outFields = ["*"];
+                    psapQuery.returnGeometry = true;
+                    
+                    psapLayer.queryFeatures(psapQuery)
+                        .then(psapResults => {
+                            displaySearchResults(psapResults.features.map(f => ({ ...f, layerType: 'psap' })));
+                        })
+                        .catch(error => {
+                            console.error("PSAP search error:", error);
+                            searchResults.innerHTML = '<div class="search-result-item">Error searching PSAPs</div>';
+                            searchResults.style.display = 'block';
+                        });
+                } else {
+                    // Search Canadian Towns layer only
+                    console.log('Searching Canadian Towns layer with term:', searchTerm);
+                    
+                    const canadaQuery = canadaTownsLayer.createQuery();
+                    const possibleNameFields = [
+                        'NAME', 'name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM',
+                        'TOWN_NAME', 'CITY_NAME', 'MUNICIPAL_NAME', 'NOM_VILLE', 'NOM_MUNICIPALITE',
+                        'COMMUNITY', 'LOCATION', 'PLACE_NAME', 'NOM_LIEU', 'LIEU', 'CSDNAME', 'CMANAME',
+                        'CSDTYPE', 'CMATYPE', 'PRNAME', 'PRENAME', 'PRENAME_FR', 'PCNAME', 'PCNAME_FR'
                     ];
                     
-                    // Sort results by name for better UX
-                    allResults.sort((a, b) => {
-                        const nameA = (a.attributes.psap_name || a.attributes.NAME || '').toLowerCase();
-                        const nameB = (b.attributes.psap_name || b.attributes.NAME || '').toLowerCase();
-                        return nameA.localeCompare(nameB);
+                    // Log available fields for debugging
+                    console.log('Available fields in Canadian Towns layer:', 
+                        canadaTownsLayer.fields ? canadaTownsLayer.fields.map(f => f.name) : 'No fields found');
+                    
+                    // Get the actual field names from the layer
+                    const layerFields = canadaTownsLayer.fields ? canadaTownsLayer.fields.map(f => f.name) : [];
+                    
+                    // Only include fields that actually exist in the layer (case-insensitive match)
+                    const validFields = possibleNameFields.filter(field => 
+                        layerFields.some(layerField => layerField.toUpperCase() === field.toUpperCase())
+                    );
+                    
+                    console.log('Matching fields for search:', validFields);
+                    
+                    let whereClause = '';
+                    validFields.forEach((field, index) => {
+                        if (index > 0) whereClause += ' OR ';
+                        whereClause += `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`;
                     });
                     
-                    displaySearchResults(allResults);
-                });
+                    // If no valid fields found, try a generic search
+                    if (!whereClause) {
+                        whereClause = "1=1"; // Return all features if we can't determine fields
+                    }
+                    
+                    canadaQuery.where = whereClause;
+                    canadaQuery.outFields = ["*"];
+                    canadaQuery.returnGeometry = true;
+                    canadaQuery.returnDistinctValues = true;
+                    
+                    console.log('Executing Canadian Towns query with where clause:', whereClause);
+                    
+                    canadaTownsLayer.queryFeatures(canadaQuery)
+                        .then(canadaResults => {
+                            console.log('Canadian Towns search results:', canadaResults.features.length);
+                            displaySearchResults(canadaResults.features.map(f => ({ ...f, layerType: 'canada' })));
+                        })
+                        .catch(error => {
+                            console.error("Canadian Towns search error:", error);
+                            searchResults.innerHTML = '<div class="search-result-item">Error searching Canadian Towns</div>';
+                            searchResults.style.display = 'block';
+                        });
+                }
             }
+            
+            // Update the layer switch button text
+            function updateLayerSwitchText() {
+                const buttonText = activeLayer === 'psap' ? 'Focus: PSAP' : 'Focus: Canadian Towns';
+                document.getElementById('layerSwitchBtn').textContent = buttonText;
+            }
+            
+            // Toggle between PSAP and Canadian Towns layers
+            function toggleActiveLayer() {
+                activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
+                updateLayerSwitchText();
+                
+                // Update layer visibility
+                if (psapLayer && canadaTownsLayer) {
+                    if (activeLayer === 'psap') {
+                        psapLayer.visible = true;
+                        canadaTownsLayer.opacity = 0.5;
+                    } else {
+                        psapLayer.opacity = 0.5;
+                        canadaTownsLayer.visible = true;
+                    }
+                }
+                
+                // Clear any current search results
+                searchResults.innerHTML = '';
+                searchInput.value = '';
+            }
+            
+            // Initialize layer switch button
+            document.getElementById('layerSwitchBtn').addEventListener('click', toggleActiveLayer);
+            updateLayerSwitchText();
             
             function displaySearchResults(features) {
                 searchResults.innerHTML = '';
