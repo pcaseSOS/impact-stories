@@ -342,7 +342,7 @@
     <div id="status">Single-click to select PSAPs. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
     
     <!-- Restart Tutorial Button -->
-    <button id="startTutorialBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100;">❓ Restart Tutorial</button>
+    <button id="startTutorialBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; font-size: 12px; padding: 6px 10px;">❓ Tutorial</button>
     
     <!-- Interactive Walkthrough Elements -->
     <div id="tutorialOverlay" class="tutorial-overlay" style="display: none;"></div>
@@ -484,25 +484,36 @@
 
             // Helper function to highlight selected features
             function highlightSelectedFeatures() {
-                if (!initialLoadComplete) return;
+                console.log('Highlighting selected features:', selectedFeatures.length);
                 
                 // Clear previous highlights
                 highlightSelections.forEach(highlight => {
-                    if (highlight) highlight.remove();
+                    if (highlight && highlight.remove) highlight.remove();
                 });
                 highlightSelections = [];
                 
-                if (selectedFeatures.length === 0) return;
+                if (selectedFeatures.length === 0) {
+                    console.log('No features to highlight');
+                    return;
+                }
                 
-                // Add new highlights based on active layer
-                if (activeLayer === 'psap' && psapLayerView) {
-                    const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
-                    const highlight = psapLayerView.highlight(objectIds);
-                    highlightSelections.push(highlight);
-                } else if (activeLayer === 'canada' && canadaTownsLayerView) {
-                    const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
-                    const highlight = canadaTownsLayerView.highlight(objectIds);
-                    highlightSelections.push(highlight);
+                try {
+                    // Add new highlights based on active layer
+                    if (activeLayer === 'psap' && psapLayerView) {
+                        console.log('Highlighting PSAP features');
+                        const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
+                        const highlight = psapLayerView.highlight(objectIds);
+                        highlightSelections.push(highlight);
+                        console.log('PSAP highlights added');
+                    } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                        console.log('Highlighting Canada Towns features');
+                        const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
+                        const highlight = canadaTownsLayerView.highlight(objectIds);
+                        highlightSelections.push(highlight);
+                        console.log('Canada Towns highlights added');
+                    }
+                } catch (error) {
+                    console.error('Error highlighting features:', error);
                 }
             }
 
@@ -521,9 +532,54 @@
 
             // Helper function to update selection panel
             function updateSelectionPanel() {
+                console.log('Updating selection panel with', selectedFeatures.length, 'features');
+                
+                // Update count display and button text
                 selectionCount.textContent = selectedFeatures.length;
                 downloadBtn.textContent = `📥 Download Selected (${selectedFeatures.length})`;
+                
+                // Update selection list
+                selectionList.innerHTML = '';
+                
+                // Get layer type specific header text
+                const headerText = activeLayer === 'psap' ? 'Selected PSAPs' : 'Selected Towns';
+                document.querySelector('.panel-header').firstChild.textContent = `${headerText} (${selectedFeatures.length})`;
+                
+                // Add each selected feature to the panel
+                selectedFeatures.forEach((feature, index) => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'selected-item';
+                    
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'item-name';
+                    
+                    // Get appropriate name based on layer type
+                    if (activeLayer === 'psap') {
+                        nameSpan.textContent = getPsapName(feature.attributes);
+                    } else {
+                        nameSpan.textContent = feature.attributes.NAME || 
+                                               feature.attributes.TOWN_NAME || 
+                                               `Town ${feature.attributes.OBJECTID}`;
+                    }
+                    
+                    const removeBtn = document.createElement('button');
+                    removeBtn.className = 'remove-btn';
+                    removeBtn.innerHTML = '&times;';
+                    removeBtn.onclick = function() {
+                        // Remove from selection
+                        selectedFeatures.splice(index, 1);
+                        
+                        // Update panel and highlights
+                        updateSelectionPanel();
+                        highlightSelectedFeatures();
+                    };
+                    
+                    itemDiv.appendChild(nameSpan);
+                    itemDiv.appendChild(removeBtn);
+                    selectionList.appendChild(itemDiv);
+                });
 
+                // Show/hide panel and update button states
                 if (selectedFeatures.length > 0) {
                     selectionPanel.style.display = 'block';
                     downloadBtn.disabled = false;
@@ -578,15 +634,47 @@
 
             // Helper function to clear all selections
             function clearAllSelections() {
+                console.log('Clearing all selections');
+                
                 // Remove all highlights
                 highlightSelections.forEach(highlight => {
-                    if (highlight) highlight.remove();
+                    if (highlight && highlight.remove) {
+                        try {
+                            highlight.remove();
+                        } catch (e) {
+                            console.error('Error removing highlight:', e);
+                        }
+                    }
                 });
 
                 selectedFeatures = [];
                 highlightSelections = [];
+                
+                // Clear PSAP layer highlights if available
+                if (psapLayerView && psapLayerView.highlight) {
+                    try {
+                        psapLayerView.highlight();
+                    } catch (e) {
+                        console.error('Error clearing PSAP highlights:', e);
+                    }
+                }
+                
+                // Clear Canada Towns layer highlights if available
+                if (canadaTownsLayerView && canadaTownsLayerView.highlight) {
+                    try {
+                        canadaTownsLayerView.highlight();
+                    } catch (e) {
+                        console.error('Error clearing Canada Towns highlights:', e);
+                    }
+                }
+                
                 updateSelectionPanel();
                 updateStatus();
+                
+                // Update button state
+                clearAllBtn.disabled = true;
+                downloadBtn.disabled = true;
+                downloadBtn.textContent = '📥 Download Selected (0)';
             }
 
             // Helper function to update status message
@@ -1197,6 +1285,8 @@
             
             // Function to switch between PSAP and Canada Towns layers
             function switchActiveLayer() {
+                console.log('Switching active layer from', activeLayer);
+                
                 // Clear any existing selection before switching
                 clearAllSelections();
                 
@@ -1208,9 +1298,12 @@
                     layerSwitchBtn.textContent = 'Layer: Canada Towns';
                     
                     // Get Canada layer view for highlighting
-                    view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                        canadaTownsLayerView = layerView;
-                    });
+                    if (!canadaTownsLayerView) {
+                        view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                            console.log('Created Canada Towns layer view');
+                            canadaTownsLayerView = layerView;
+                        });
+                    }
                     
                     // Update status text
                     status.textContent = 'Switched to Canada Towns layer. Click to select towns.';
@@ -1226,6 +1319,8 @@
                         },
                         padding: { left: 40, right: 40, top: 40, bottom: 40 }
                     });
+                    
+                    console.log('Switched to Canada Towns layer');
                 } else {
                     // Switch to PSAP layer
                     activeLayer = 'psap';
@@ -1233,20 +1328,31 @@
                     psapLayer.visible = true;
                     layerSwitchBtn.textContent = 'Layer: US PSAPs';
                     
+                    // Make sure we have the PSAP layer view for highlighting
+                    if (!psapLayerView) {
+                        view.whenLayerView(psapLayer).then(function(layerView) {
+                            console.log('Created PSAP layer view');
+                            psapLayerView = layerView;
+                            initialLoadComplete = true;
+                        });
+                    }
+                    
                     // Update status text
                     status.textContent = 'Switched to US PSAPs layer. Click to select PSAPs.';
                     
                     // Zoom back to continental US
                     view.goTo({
                         target: {
-                            xmin: -115.0,
-                            ymin: 28.0,
-                            xmax: -75.0,
-                            ymax: 46.0,
+                            xmin: -125.0,
+                            ymin: 24.0,
+                            xmax: -66.0,
+                            ymax: 49.0,
                             spatialReference: { wkid: 4326 }
                         },
                         padding: { left: 20, right: 20, top: 20, bottom: 20 }
                     });
+                    
+                    console.log('Switched to PSAP layer');
                 }
             }
             
@@ -1678,14 +1784,17 @@
                     
                     if (clickedFeature) {
                         const feature = clickedFeature.graphic;
-                        const featureId = feature.attributes.OBJECTID;
+                        console.log('Clicked feature:', feature);
                         
-                        // Check if already selected using the getFeatureId helper function
-                        const index = selectedFeatures.findIndex(f => getFeatureId(f) === getFeatureId(feature));
+                        // Check if already selected
+                        const featureId = feature.attributes.OBJECTID;
+                        const index = selectedFeatures.findIndex(f => f.attributes.OBJECTID === featureId);
+                        console.log('Feature in selection:', index >= 0);
                         
                         if (index > -1) {
                             // If already selected, remove it
                             selectedFeatures.splice(index, 1);
+                            console.log('Removed feature from selection');
                             
                             if (activeLayer === 'psap') {
                                 status.textContent = `Removed PSAP from selection`;
@@ -1695,11 +1804,13 @@
                         } else {
                             // If single select mode and we already have selections, clear them first
                             if (!multiSelectMode && selectedFeatures.length > 0) {
+                                console.log('Clearing selection before adding new feature');
                                 clearAllSelections();
                             }
                             
                             // Add to selection
                             selectedFeatures.push(feature);
+                            console.log('Added feature to selection, new count:', selectedFeatures.length);
                             
                             // Get feature name based on layer type
                             if (activeLayer === 'psap') {
