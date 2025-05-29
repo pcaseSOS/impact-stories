@@ -965,16 +965,11 @@
                         // Ensure the layer is loaded
                         if (!psapLayer.loaded) {
                             console.log('PSAP layer not loaded yet, waiting...');
-                            psapLayer.load()
+                            return psapLayer.load()
                                 .then(() => {
                                     console.log('PSAP layer loaded, retrying search...');
-                                    performSearch(); // Retry the search now that the layer is loaded
-                                })
-                                .catch(loadError => {
-                                    console.error('Error loading PSAP layer:', loadError);
-                                    throw new Error('Failed to load PSAP layer');
+                                    return performSearch(); // Retry the search now that the layer is loaded
                                 });
-                            return;
                         }
                         
                         const psapQuery = psapLayer.createQuery();
@@ -988,7 +983,12 @@
                             .then(psapResults => {
                                 console.log('PSAP search results:', psapResults.features.length, 'features found');
                                 if (psapResults.features.length === 0) {
-                                    throw new Error(`No results found for "${searchTerm}" in PSAP layer`);
+                                    searchResults.innerHTML = `
+                                        <div class="search-result-item">
+                                            No results found for "${searchTerm}" in PSAP layer
+                                        </div>`;
+                                    searchResults.style.display = 'block';
+                                    return;
                                 }
                                 displaySearchResults(psapResults.features.map(f => ({
                                     ...f,
@@ -1006,28 +1006,22 @@
                         searchResults.style.display = 'block';
                     }
                 } else {
+                    // Canadian Towns search
                     try {
-                        console.log('Searching Canadian Towns layer with term:', searchTerm);
-                        
                         if (!canadaTownsLayer) {
                             throw new Error('Canadian Towns layer not initialized');
                         }
-                        
-                        // First, let's check if the layer is loaded
+
+                        // Ensure the layer is loaded
                         if (!canadaTownsLayer.loaded) {
                             console.log('Canadian Towns layer not loaded yet, waiting...');
-                            canadaTownsLayer.load()
+                            return canadaTownsLayer.load()
                                 .then(() => {
                                     console.log('Canadian Towns layer loaded, retrying search...');
-                                    performSearch(); // Retry the search now that the layer is loaded
-                                })
-                                .catch(loadError => {
-                                    console.error('Error loading Canadian Towns layer:', loadError);
-                                    throw new Error('Failed to load Canadian Towns layer');
+                                    return performSearch();
                                 });
-                            return;
                         }
-                        
+
                         const canadaQuery = canadaTownsLayer.createQuery();
                         const possibleNameFields = [
                             'NAME', 'name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM',
@@ -1150,12 +1144,13 @@
             // Toggle between PSAP and Canadian Towns layers
             function toggleActiveLayer() {
                 try {
+                    // Toggle the active layer
                     activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
                     updateLayerSwitchText();
                     
                     console.log('Toggling active layer to:', activeLayer);
                     
-                    // Update layer visibility and opacity
+                    // Update layer visibility and opacity based on active layer
                     if (psapLayer) {
                         psapLayer.visible = true; // Always keep both layers visible
                         psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.5;
@@ -1168,18 +1163,26 @@
                         console.log('Canadian Towns layer visibility:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
                     }
                     
-                    // Refresh the view to show the changes
+                    // Force a refresh of the view
                     if (view) {
-                        view.extent = view.extent;
+                        // Save current extent
+                        const currentExtent = view.extent;
+                        // Slightly modify the extent to force a refresh
+                        view.extent = null;
+                        // Restore the extent
+                        view.extent = currentExtent;
                     }
                     
                     // Clear any current search results
                     if (searchResults) {
                         searchResults.innerHTML = '';
+                        searchResults.style.display = 'none';
                     }
                     if (searchInput) {
                         searchInput.value = '';
                     }
+                    
+                    console.log('Switched to', activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns', 'layer');
                 } catch (error) {
                     console.error('Error in toggleActiveLayer:', error);
                 }
@@ -1228,36 +1231,103 @@
                     searchResults.appendChild(header);
                     
                     resultsByLayer.canada.forEach(feature => {
-                        createSearchResultItem(feature, 'canada');
+                        createSearchResultItem(feature);
                     });
                 }
                 
                 // Create search result item helper function
-                function createSearchResultItem(feature, layerType) {
+                function createSearchResultItem(feature) {
+                try {
                     const item = document.createElement('div');
                     item.className = 'search-result-item';
                     
-                    // Get the appropriate name based on layer type
-                    let name = '';
-                    if (layerType === 'psap') {
-                        name = feature.attributes.psap_name || feature.attributes.NAME || 'Unnamed PSAP';
-                    } else {
-                        name = feature.attributes.NAME || feature.attributes.name || 'Unnamed Location';
-                    }
+                    // Get the feature's attributes with a fallback to empty object
+                    const attrs = feature.attributes || {};
                     
-                    item.textContent = name;
+                    // Try to get a display name from common field names (case-insensitive)
+                    const getNameFromAttrs = (attrs) => {
+                        const possibleNameFields = [
+                            'psap_name', 'name', 'NAME', 'Name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM',
+                            'TOWN_NAME', 'CITY_NAME', 'MUNICIPAL_NAME', 'NOM_VILLE', 'NOM_MUNICIPALITE', 'ENGLISH_NAME', 'FRENCH_NAME',
+                            'COMMUNITY', 'LOCATION', 'PLACE_NAME', 'NOM_LIEU', 'LIEU', 'CSDNAME', 'CMANAME', 'LABEL', 'TITLE'
+                        ];
+                        
+                        // Find the first matching field that exists in the attributes
+                        for (const field of possibleNameFields) {
+                            const value = attrs[field];
+                            if (value !== undefined && value !== null && value !== '') {
+                                return value;
+                            }
+                        }
+                        
+                        // If no name found, try any field that might contain a name
+                        for (const [key, value] of Object.entries(attrs)) {
+                            if (typeof value === 'string' && value.trim() !== '') {
+                                return value;
+                            }
+                        }
+                        
+                        return 'Unnamed Feature';
+                    };
+                    
+                    // Get a display name
+                    const name = getNameFromAttrs(attrs);
+                    
+                    // Try to get an ID from common ID fields
+                    const getIdFromAttrs = (attrs) => {
+                        const possibleIdFields = ['account_id', 'OBJECTID', 'ID', 'id', 'FID', 'feature_id'];
+                        for (const field of possibleIdFields) {
+                            if (attrs[field] !== undefined) {
+                                return attrs[field];
+                            }
+                        }
+                        return '';
+                    };
+                    
+                    const id = getIdFromAttrs(attrs);
+                    const layerType = feature.layerType || 'unknown';
+                    const objectId = attrs.OBJECTID || attrs.FID || attrs.id || '';
+                    
+                    item.innerHTML = `
+                        <div class="search-result-header">
+                            <strong>${name}</strong>
+                            ${id ? `<span class="search-result-id">ID: ${id}</span>` : ''}
+                        </div>
+                        <div class="search-result-actions">
+                            <button class="btn btn-sm btn-primary zoom-to-feature" data-layer="${layerType}" data-id="${objectId}">Zoom</button>
+                            <button class="btn btn-sm btn-success add-feature" data-layer="${layerType}" data-id="${objectId}">Add to Selection</button>
+                        </div>
+                    `;
+                    
+                    // Add click handler to zoom to feature
                     item.addEventListener('click', () => {
+                        if (feature.geometry) {
+                            view.goTo({
+                                target: feature.geometry,
+                                zoom: 10
+                            });
+                        }
+                        // Select the feature
                         selectFeature(feature);
                         searchResults.style.display = 'none';
-                        // Zoom to the feature
-                        view.goTo({
-                            target: feature.geometry,
-                            zoom: 10
-                        });
                     });
                     
-                    searchResults.appendChild(item);
+                    return item;
+                } catch (error) {
+                    console.error('Error creating search result item:', error, feature);
+                    const errorItem = document.createElement('div');
+                    errorItem.className = 'search-result-item';
+                    errorItem.innerHTML = `
+                        <div class="search-result-header">
+                            <strong>Error displaying feature</strong>
+                        </div>
+                        <div class="text-muted">
+                            ${error.message || 'Unknown error'}
+                        </div>
+                    `;
+                    return errorItem;
                 }
+            }
             }
             
             // Hide search results when clicking elsewhere
