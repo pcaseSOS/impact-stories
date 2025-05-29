@@ -2212,13 +2212,18 @@
             });
 
             // Error handling for the initial view setup
-            view.when().catch(function(error) {
-                console.error("Error initializing view:", error);
-                status.textContent = 'Error initializing map';
+                // Error handling for the initial view setup
+                view.when().catch(function(error) {
+                    console.error("Error initializing view:", error);
+                    status.textContent = 'Error initializing map';
+                });
+
+                // Error handling for the layer loading
+                psapLayer.when().catch(function(error) {
+                    console.error("Error loading PSAP layer:", error);
+                    status.textContent = 'Error loading PSAP layer';
+                });
             });
-        }).catch(function(error) {
-            console.error("Error loading layer:", error);
-            status.textContent = 'Error loading PSAP layer';
         });
     </script>
 </body>
