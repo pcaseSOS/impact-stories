@@ -961,19 +961,38 @@
                 psapQuery.outFields = ["*"];
                 psapQuery.returnGeometry = true;
                 
-                // Search Canadian Towns layer
-                const canadaQuery = canadaTownsLayer.createQuery();
-                const possibleNameFields = ['NAME', 'name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM'];
-                let whereClause = '';
+                // Log the Canadian Towns layer's fields for debugging
+                console.log('Canadian Towns layer fields:', Object.keys(canadaTownsLayer.fields || {}));
                 
-                possibleNameFields.forEach(field => {
-                    if (whereClause) whereClause += ' OR ';
+                // Search Canadian Towns layer with more comprehensive field matching
+                const canadaQuery = canadaTownsLayer.createQuery();
+                const possibleNameFields = [
+                    'NAME', 'name', 'TOWN', 'CITY', 'MUNICIPALITY', 'MUNI', 'MUNICIPALITE', 'NOM',
+                    'TOWN_NAME', 'CITY_NAME', 'MUNICIPAL_NAME', 'NOM_VILLE', 'NOM_MUNICIPALITE',
+                    'COMMUNITY', 'LOCATION', 'PLACE_NAME', 'NOM_LIEU', 'LIEU'
+                ];
+                
+                // Get the actual field names from the layer
+                const layerFields = canadaTownsLayer.fields ? canadaTownsLayer.fields.map(f => f.name) : [];
+                console.log('Available fields in Canadian Towns layer:', layerFields);
+                
+                // Only include fields that actually exist in the layer
+                const validFields = possibleNameFields.filter(field => 
+                    layerFields.some(layerField => layerField.toUpperCase() === field.toUpperCase())
+                );
+                
+                console.log('Matching fields for search:', validFields);
+                
+                let whereClause = '';
+                validFields.forEach((field, index) => {
+                    if (index > 0) whereClause += ' OR ';
                     whereClause += `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`;
                 });
                 
                 canadaQuery.where = whereClause || "1=0";
                 canadaQuery.outFields = ["*"];
                 canadaQuery.returnGeometry = true;
+                canadaQuery.returnDistinctValues = true; // Avoid duplicate results
                 
                 // Execute both queries in parallel
                 Promise.all([
