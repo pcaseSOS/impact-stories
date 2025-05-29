@@ -514,9 +514,10 @@
                 title: "User-Drawn Polygons"
             });
             
-            // Create the Canada Towns layer with its own renderer
+            // Create the Canadian Towns layer with its own renderer
             const canadaTownsLayer = new FeatureLayer({
                 url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
+                title: "Canadian Towns",
                 renderer: new SimpleRenderer({
                     symbol: new SimpleFillSymbol({
                         color: [51, 51, 204, 0.3], // Blue with transparency
@@ -526,8 +527,20 @@
                         })
                     })
                 }),
-                outFields: ["*"],
-                visible: false, // Initially hidden
+                outFields: ["*"],  // Get all fields for proper attribute handling
+                popupEnabled: true,
+                popupTemplate: {
+                    title: "{NAME}",
+                    content: [
+                        {
+                            type: "fields",
+                            fieldInfos: [
+                                { fieldName: "NAME", label: "Town Name" },
+                                { fieldName: "OBJECTID", label: "ID" }
+                            ]
+                        }
+                    ]
+                },
                 // Set highlight options
                 highlightOptions: {
                     color: [0, 102, 255, 0.8], // Blue highlight
@@ -577,7 +590,7 @@
                         } else if (activeLayer === 'canada' && canadaTownsLayerView) {
                             const highlight = canadaTownsLayerView.highlight(feature);
                             highlightSelections.push(highlight);
-                            console.log('Added Canada Towns highlight');
+                            console.log('Added Canadian Towns highlight');
                         }
                     } catch (error) {
                         console.error('Error highlighting feature:', error);
@@ -596,6 +609,23 @@
             // Helper function to get PSAP name from attributes
             function getPsapName(attributes) {
                 return attributes.psap_name || attributes.name || 'Unknown PSAP';
+            }
+            
+            // Helper function to get town name from attributes
+            function getTownName(attributes) {
+                let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
+
+                // Try to find a name field if the standard ones aren't populated
+                Object.keys(attributes).forEach(key => {
+                    if ((key.toLowerCase().includes('name') ||
+                         key.toLowerCase().includes('town') ||
+                         key.toLowerCase().includes('city')) &&
+                         attributes[key] && townName === 'Unknown Town') {
+                        townName = attributes[key];
+                    }
+                });
+
+                return townName;
             }
 
             // Helper function to update selection panel
@@ -727,12 +757,12 @@
                     }
                 }
                 
-                // Clear Canada Towns layer highlights if available
+                // Clear Canadian Towns layer highlights if available
                 if (canadaTownsLayerView && canadaTownsLayerView.highlight) {
                     try {
                         canadaTownsLayerView.highlight();
                     } catch (e) {
-                        console.error('Error clearing Canada Towns highlights:', e);
+                        console.error('Error clearing Canadian Towns highlights:', e);
                     }
                 }
                 
@@ -808,16 +838,30 @@
                         console.error("PSAP search error:", error);
                     });
                 } else {
-                    // Query Canada Towns layer
+                    // Query Canadian Towns layer
                     const query = canadaTownsLayer.createQuery();
-                    query.where = `NAME LIKE '%${searchTerm}%'`;
+                    
+                    // Create a more comprehensive search query for town names
+                    let whereClause = '';
+                    
+                    // Look for fields that might contain the town name
+                    const nameFields = ['NAME', 'TOWN_NAME', 'CITY_NAME', 'MUNICIPALITY'];
+                    nameFields.forEach(fieldName => {
+                        if (whereClause) {
+                            whereClause += ` OR ${fieldName} LIKE '%${searchTerm}%'`;
+                        } else {
+                            whereClause = `${fieldName} LIKE '%${searchTerm}%'`;
+                        }
+                    });
+                    
+                    query.where = whereClause || "1=0"; // Use 1=0 if no valid fields (will return no results)
                     query.outFields = ["*"];
                     query.returnGeometry = true;
                     
                     canadaTownsLayer.queryFeatures(query).then(result => {
                         displaySearchResults(result.features, 'canada');
                     }).catch(error => {
-                        console.error("Canada Towns search error:", error);
+                        console.error("Canadian Towns search error:", error);
                     });
                 }
             }
@@ -843,8 +887,7 @@
                         name = feature.attributes.NAME || feature.attributes.PSAP_NAME || feature.attributes.psap_name || 
                               `PSAP ${feature.attributes.OBJECTID || ''}`;
                     } else {
-                        name = feature.attributes.NAME || feature.attributes.TOWN_NAME || 
-                              `Town ${feature.attributes.OBJECTID || ''}`;
+                        name = getTownName(feature.attributes);
                     }
                     resultItem.textContent = name;
                     
@@ -943,9 +986,7 @@
                         if (feature.layer === psapLayer) {
                             featureName = getPsapName(feature.attributes);
                         } else {
-                            featureName = feature.attributes.NAME || 
-                                         feature.attributes.TOWN_NAME || 
-                                         `Town ${feature.attributes.OBJECTID}`;
+                            featureName = getTownName(feature.attributes);
                         }
                         
                         tooltip.textContent = featureName;
@@ -1305,7 +1346,7 @@
                         if (activeLayer === 'psap') {
                             status.textContent = `Downloaded ${selectedFeatures.length} PSAP boundary polygons in WGS84 format`;
                         } else {
-                            status.textContent = `Downloaded ${selectedFeatures.length} Canada Towns in WGS84 format`;
+                            status.textContent = `Downloaded ${selectedFeatures.length} Canadian Towns in WGS84 format`;
                         }
                     }).catch(error => {
                         console.error('Error downloading GeoJSON:', error);
@@ -1328,27 +1369,27 @@
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
             layerSwitchBtn.addEventListener('click', switchActiveLayer);
             
-            // Function to switch between PSAP and Canada Towns layers
+            // Function to switch between PSAP and Canadian Towns layers
             // Now just changes visual focus but both layers remain selectable
             function switchActiveLayer() {
                 if (activeLayer === 'psap') {
-                    // Switch to Canada Towns layer as visual focus
+                    // Switch to Canadian Towns layer as visual focus
                     activeLayer = 'canada';
                     // Keep both layers visible, but adjust opacity to show which is in focus
                     psapLayer.opacity = 0.3;
                     canadaTownsLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Focus: Canada Towns';
+                    layerSwitchBtn.textContent = 'Focus: Canadian Towns';
                     
                     // Get Canada layer view for highlighting
                     if (!canadaTownsLayerView) {
                         view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                            console.log('Created Canada Towns layer view');
+                            console.log('Created Canadian Towns layer view');
                             canadaTownsLayerView = layerView;
                         });
                     }
                     
                     // Update status text
-                    status.textContent = 'Switched to Canada Towns layer. Click to select towns.';
+                    status.textContent = 'Switched to Canadian Towns layer. Click to select towns';
                     
                     // Zoom to Canada
                     view.goTo({
@@ -1362,7 +1403,7 @@
                         padding: { left: 40, right: 40, top: 40, bottom: 40 }
                     });
                     
-                    console.log('Switched to Canada Towns layer');
+                    console.log('Switched to Canadian Towns layer');
                 } else {
                     // Switch to PSAP layer as visual focus
                     activeLayer = 'psap';
@@ -1811,7 +1852,7 @@
                         result.graphic && result.graphic.layer === psapLayer
                     );
                     
-                    // Then check for Canada Towns features
+                    // Then check for Canadian Towns features
                     const canadaFeature = response.results.find(result => 
                         result.graphic && result.graphic.layer === canadaTownsLayer
                     );
@@ -1909,7 +1950,7 @@
             
             view.whenLayerView(canadaTownsLayer).then(function(layerView) {
                 canadaTownsLayerView = layerView;
-                console.log("Canada Towns layer view created");
+                console.log("Canadian Towns layer view created");
             });
             
             // Area selection modal functionality
@@ -1930,7 +1971,7 @@
                     activeLayer = 'canada';
                     psapLayer.opacity = 0.3;
                     canadaTownsLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Focus: Canada Towns';
+                    layerSwitchBtn.textContent = 'Focus: Canadian Towns';
                     
                     // Zoom to Canada
                     view.goTo({
