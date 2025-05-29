@@ -206,20 +206,54 @@
         .search-results {
             background: white;
             border-radius: 0 0 4px 4px;
-            max-height: 200px;
+            max-height: 400px;
             overflow-y: auto;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             display: none;
+            position: absolute;
+            width: 100%;
+            z-index: 1000;
+        }
+        
+        .search-layer-header {
+            padding: 8px 12px;
+            background-color: #f5f5f5;
+            font-weight: bold;
+            font-size: 12px;
+            color: #555;
+            border-bottom: 1px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        
+        .search-item-name {
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .search-item-layer {
+            font-size: 11px;
+            color: #666;
+            opacity: 0.8;
         }
         
         .search-result-item {
             padding: 10px 15px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
         
         .search-result-item:hover {
-            background: #f0f0f0;
+            background-color: #f0f7ff;
+        }
+        
+        .search-result-item:active {
+            background-color: #e0f0ff;
         }
         
         .search-result-item:last-child {
@@ -578,106 +612,179 @@
             const searchButton = document.getElementById('searchButton');
             const searchResults = document.getElementById('searchResults');
             
-            // Function to search for towns
-            function searchTowns(searchText) {
+            // Function to search for features in a layer
+            async function searchLayer(layer, searchText, layerName) {
+                const query = layer.createQuery();
+                const searchPattern = searchText.replace(/\s+/g, '%');
+                let whereClause = '';
+                
+                // Define search fields based on layer type
+                if (layer === canadaTownsLayer) {
+                    // Search in Canada Towns layer
+                    const nameFields = [];
+                    
+                    // Find all potential name fields
+                    layer.fields.forEach(field => {
+                        const fieldName = field.name;
+                        if (fieldName.toLowerCase().includes('name') || 
+                            fieldName.toLowerCase().includes('town') || 
+                            fieldName.toLowerCase().includes('city') ||
+                            fieldName.toLowerCase().includes('municip')) {
+                            nameFields.push(fieldName);
+                        }
+                    });
+                    
+                    // If no specific name fields found, search all string fields
+                    if (nameFields.length === 0) {
+                        layer.fields.forEach(field => {
+                            if (field.type === 'string') {
+                                nameFields.push(field.name);
+                            }
+                        });
+                    }
+                    
+                    // Build the where clause
+                    nameFields.forEach((field, index) => {
+                        if (index > 0) whereClause += ' OR ';
+                        whereClause += `UPPER(${field}) LIKE UPPER('%${searchPattern}%')`;
+                    });
+                } else {
+                    // For other layers (like PSAP), search in common name fields
+                    const nameFields = [];
+                    layer.fields.forEach(field => {
+                        const fieldName = field.name.toLowerCase();
+                        if (fieldName.includes('name') || 
+                            fieldName.includes('label') ||
+                            fieldName.includes('title') ||
+                            fieldName.includes('psap') ||
+                            field.type === 'string') {
+                            nameFields.push(field.name);
+                        }
+                    });
+                    
+                    nameFields.forEach((field, index) => {
+                        if (index > 0) whereClause += ' OR ';
+                        whereClause += `UPPER(${field}) LIKE UPPER('%${searchPattern}%')`;
+                    });
+                }
+                
+                query.where = whereClause || '1=0';
+                query.outFields = ['*'];
+                query.returnGeometry = true;
+                query.num = 10; // Limit results
+                
+                try {
+                    const result = await layer.queryFeatures(query);
+                    return {
+                        layer: layer,
+                        layerName: layerName,
+                        features: result.features.map(feature => ({
+                            ...feature,
+                            layerType: layerName
+                        }))
+                    };
+                } catch (error) {
+                    console.error(`Error searching ${layerName}:`, error);
+                    return { layer: layer, layerName: layerName, features: [] };
+                }
+            }
+            
+            // Function to search across all layers
+            async function searchAllLayers(searchText) {
                 if (!searchText.trim()) {
                     searchResults.style.display = 'none';
                     return;
                 }
                 
-                const query = canadaTownsLayer.createQuery();
-                // Use wildcards to find partial matches
-                const searchPattern = searchText.replace(/\s+/g, '%');
-                let whereClause = '';
+                // Show loading state
+                searchResults.innerHTML = '<div class="search-result-item">Searching...</div>';
+                searchResults.style.display = 'block';
                 
-                // Find attributes that might contain town names
-                canadaTownsLayer.fields.forEach(field => {
-                    const fieldName = field.name;
-                    if (fieldName.toLowerCase().includes('name') || 
-                        fieldName.toLowerCase().includes('town') || 
-                        fieldName.toLowerCase().includes('city')) {
-                        if (whereClause) {
-                            whereClause += ` OR UPPER(${fieldName}) LIKE UPPER('%${searchPattern}%')`;
-                        } else {
-                            whereClause = `UPPER(${fieldName}) LIKE UPPER('%${searchPattern}%')`;
-                        }
-                    }
-                });
-                
-                // If no name fields found, search all string fields
-                if (!whereClause) {
-                    canadaTownsLayer.fields.forEach(field => {
-                        if (field.type === 'string') {
-                            if (whereClause) {
-                                whereClause += ` OR UPPER(${field.name}) LIKE UPPER('%${searchPattern}%')`;
-                            } else {
-                                whereClause = `UPPER(${field.name}) LIKE UPPER('%${searchPattern}%')`;
-                            }
-                        }
-                    });
-                }
-                
-                query.where = whereClause || '1=0'; // Use 1=0 if no valid fields (will return no results)
-                query.outFields = ['*'];
-                query.returnGeometry = true;
-                query.num = 10; // Limit to 10 results
-                
-                canadaTownsLayer.queryFeatures(query).then(function(result) {
-                    // Clear previous results
-                    searchResults.innerHTML = '';
+                try {
+                    // Search both layers in parallel
+                    const results = await Promise.all([
+                        searchLayer(canadaTownsLayer, searchText, 'Canada Towns')
+                        // Add other layers here if needed
+                    ]);
                     
-                    if (result.features.length > 0) {
-                        searchResults.style.display = 'block';
+                    // Process and display results
+                    displaySearchResults(results, searchText);
+                } catch (error) {
+                    console.error('Search error:', error);
+                    searchResults.innerHTML = '<div class="search-result-item">Error performing search</div>';
+                }
+            }
+            
+            // Function to display search results
+            function displaySearchResults(layerResults, searchText) {
+                searchResults.innerHTML = '';
+                let hasResults = false;
+                
+                layerResults.forEach(layerResult => {
+                    if (layerResult.features.length > 0) {
+                        hasResults = true;
                         
-                        // Create result items
-                        result.features.forEach(feature => {
-                            const townName = getTownName(feature.attributes);
+                        // Add layer header
+                        const header = document.createElement('div');
+                        header.className = 'search-layer-header';
+                        header.textContent = layerResult.layerName;
+                        searchResults.appendChild(header);
+                        
+                        // Add features
+                        layerResult.features.forEach(feature => {
+                            const featureName = getTownName(feature.attributes);
                             const resultItem = document.createElement('div');
                             resultItem.className = 'search-result-item';
-                            resultItem.textContent = townName;
+                            resultItem.innerHTML = `
+                                <div class="search-item-name">${featureName}</div>
+                                <div class="search-item-layer">${layerResult.layerName}</div>
+                            `;
                             
-                            // Add click event to zoom to the town
-                            resultItem.addEventListener('click', function() {
-                                // Zoom to the feature
-                                view.goTo({
-                                    target: feature.geometry,
-                                    zoom: 12
-                                }, {
-                                    duration: 1000,
-                                    easing: 'ease-out'
-                                }).then(function() {
-                                    // Highlight the feature
-                                    view.whenLayerView(canadaTownsLayer).then(function(layerView) {
-                                        // Clear previous search highlights
-                                        if (window.searchHighlight) {
-                                            window.searchHighlight.remove();
-                                        }
-                                        
-                                        // Highlight the feature
-                                        window.searchHighlight = layerView.highlight(feature);
-                                        
-                                        // Show status message
-                                        status.textContent = `Zoomed to: ${townName}`;
-                                    });
-                                });
-                                
-                                // Hide search results
+                            resultItem.addEventListener('click', () => {
+                                zoomToFeature(feature, featureName, layerResult.layer);
                                 searchResults.style.display = 'none';
                             });
                             
                             searchResults.appendChild(resultItem);
                         });
-                    } else {
-                        searchResults.style.display = 'block';
-                        const noResults = document.createElement('div');
-                        noResults.className = 'search-result-item';
-                        noResults.textContent = 'No matching towns found';
-                        searchResults.appendChild(noResults);
                     }
-                }).catch(function(error) {
-                    console.error('Search error:', error);
-                    status.textContent = 'Error searching for towns';
                 });
+                
+                if (!hasResults) {
+                    const noResults = document.createElement('div');
+                    noResults.className = 'search-result-item';
+                    noResults.textContent = `No results found for "${searchText}"`;
+                    searchResults.appendChild(noResults);
+                }
+                
+                searchResults.style.display = 'block';
+            }
+            
+            // Function to zoom to a feature
+            function zoomToFeature(feature, name, layer) {
+                view.goTo({
+                    target: feature.geometry,
+                    zoom: 12
+                }, {
+                    duration: 1000,
+                    easing: 'ease-out'
+                }).then(() => {
+                    view.whenLayerView(layer).then(layerView => {
+                        // Clear previous highlight
+                        if (window.searchHighlight) {
+                            window.searchHighlight.remove();
+                        }
+                        
+                        // Highlight the feature
+                        window.searchHighlight = layerView.highlight(feature);
+                        status.textContent = `Zoomed to: ${name}`;
+                    });
+                });
+            }
+            
+            // Wrapper function for backward compatibility
+            function searchTowns(searchText) {
+                searchAllLayers(searchText);
             }
             
             // Search button click event
