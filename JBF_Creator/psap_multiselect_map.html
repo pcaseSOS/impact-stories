@@ -189,34 +189,18 @@
             background: #c82333;
         }
         
-        /* Help Button */
-        .help-button {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            z-index: 100;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--royal-blue);
-            color: white;
-            border: none;
-            cursor: pointer;
+        /* Help Button in Toolbar */
+        #helpButton {
             display: flex;
             align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            transition: all 0.2s;
+            gap: 6px;
+            padding: 6px 12px;
         }
         
-        .help-button:hover {
-            background: var(--safety-blue);
-            transform: scale(1.1);
-        }
-        
-        .help-button svg {
-            width: 20px;
-            height: 20px;
+        #helpButton svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
         }
 
         #selectionPanel {
@@ -365,13 +349,55 @@
         }
         
         .search-result-item {
-            padding: 10px 15px;
-            border-bottom: 1px solid #eee;
+            padding: 10px 15px 10px 30px;
             cursor: pointer;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            line-height: 1.4;
+            background: white;
         }
         
         .search-result-item:hover {
-            background: #f0f0f0;
+            background-color: #e9f5ff;
+            transform: translateX(2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .search-result-category {
+            padding: 8px 12px;
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .search-result-item::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4e73df;
+        }
+        
+        .search-result-item[data-type='canada']::before {
+            background-color: #1cc88a;
+        }
+        
+        .search-result-item .subtext {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-top: 2px;
         }
         
         .search-result-item:last-child {
@@ -442,14 +468,7 @@
 </head>
 
 <body>
-    <!-- Help Button -->
-    <button id="helpButton" class="help-button" title="Show Help">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="12" y1="16" x2="12" y2="16"></line>
-            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-        </svg>
-    </button>
+
     
     <div id="viewDiv"></div>
     
@@ -522,6 +541,14 @@
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
         <button id="clearAllBtn" disabled class="danger">❌ Clear Selection</button>
+        <button id="helpButton" title="Map Instructions">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="16"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Map Instructions</span>
+        </button>
     </div>
     
     <!-- Selection Panel -->
@@ -571,12 +598,10 @@
         ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
             // Initialize variables
-            let sketchGraphicsLayer;
+            let psapLayerView, canadaTownsLayerView;
             let drawnPolygon = null;
             let selectedFeatures = [];
             let highlightSelections = [];
-            let psapLayerView;
-            let canadaTownsLayerView;
             let activeLayer = 'psap'; // Default to PSAP layer
             let multiSelectMode = true; // Default multi-select to ON
             let drawnPolygons = [];
@@ -952,94 +977,175 @@
                 const searchTerm = searchInput.value.trim();
                 if (searchTerm.length < 2) return;
                 
-                // Different query based on active layer
-                if (activeLayer === 'psap') {
-                    // Query PSAP layer
+                // Show loading state
+                searchResults.innerHTML = '<div class="search-result-item">Searching...</div>';
+                searchResults.style.display = 'block';
+                
+                // Search PSAP layer
+                const psapPromise = new Promise((resolve) => {
                     const query = psapLayer.createQuery();
-                    query.where = `psap_name LIKE '%${searchTerm}%' OR account_id LIKE '%${searchTerm}%' OR NAME LIKE '%${searchTerm}%'`;
+                    query.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR 
+                                 UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR 
+                                 UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
                     query.outFields = ["*"];
                     query.returnGeometry = true;
                     
-                    psapLayer.queryFeatures(query).then(result => {
-                        displaySearchResults(result.features, 'psap');
-                    }).catch(error => {
-                        console.error("PSAP search error:", error);
-                    });
-                } else {
-                    // Query Canadian Towns layer
+                    psapLayer.queryFeatures(query)
+                        .then(result => ({
+                            features: result.features.map(f => ({
+                                ...f,
+                                layerType: 'psap'
+                            })),
+                            type: 'psap'
+                        }))
+                        .catch(error => {
+                            console.error("PSAP search error:", error);
+                            return { features: [], type: 'psap' };
+                        })
+                        .then(resolve);
+                });
+                
+                // Search Canadian Towns layer
+                const canadaPromise = new Promise((resolve) => {
                     const query = canadaTownsLayer.createQuery();
                     
                     // Create a more comprehensive search query for town names
-                    let whereClause = '';
+                    const nameFields = ['NAME', 'TOWN_NAME', 'CITY_NAME', 'MUNICIPALITY', 'COMMUNITY', 'SETTLEMENT'];
+                    const whereClause = nameFields
+                        .map(field => `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`)
+                        .join(' OR ');
                     
-                    // Look for fields that might contain the town name
-                    const nameFields = ['NAME', 'TOWN_NAME', 'CITY_NAME', 'MUNICIPALITY'];
-                    nameFields.forEach(fieldName => {
-                        if (whereClause) {
-                            whereClause += ` OR ${fieldName} LIKE '%${searchTerm}%'`;
-                        } else {
-                            whereClause = `${fieldName} LIKE '%${searchTerm}%'`;
-                        }
-                    });
-                    
-                    query.where = whereClause || "1=0"; // Use 1=0 if no valid fields (will return no results)
+                    query.where = whereClause || "1=0";
                     query.outFields = ["*"];
                     query.returnGeometry = true;
                     
-                    canadaTownsLayer.queryFeatures(query).then(result => {
-                        displaySearchResults(result.features, 'canada');
-                    }).catch(error => {
-                        console.error("Canadian Towns search error:", error);
-                    });
-                }
+                    canadaTownsLayer.queryFeatures(query)
+                        .then(result => ({
+                            features: result.features.map(f => ({
+                                ...f,
+                                layerType: 'canada'
+                            })),
+                            type: 'canada'
+                        }))
+                        .catch(error => {
+                            console.error("Canadian Towns search error:", error);
+                            return { features: [], type: 'canada' };
+                        })
+                        .then(resolve);
+                });
+                
+                // Combine results from both layers
+                Promise.all([psapPromise, canadaPromise]).then(([psapResults, canadaResults]) => {
+                    const allResults = [
+                        ...psapResults.features,
+                        ...canadaResults.features
+                    ];
+                    
+                    displaySearchResults(allResults);
+                });
             }
             
-            function displaySearchResults(features, layerType) {
+            function displaySearchResults(features) {
                 searchResults.innerHTML = '';
                 
-                if (features.length === 0) {
+                if (!features || features.length === 0) {
                     const noResults = document.createElement('div');
                     noResults.className = 'search-result-item';
-                    noResults.textContent = layerType === 'psap' ? 'No matching PSAPs found' : 'No matching towns found';
+                    noResults.textContent = 'No results found';
                     searchResults.appendChild(noResults);
+                    searchResults.style.display = 'block';
                     return;
                 }
                 
+                // Group features by type
+                const grouped = {
+                    psap: [],
+                    canada: []
+                };
+                
                 features.forEach(feature => {
-                    const resultItem = document.createElement('div');
-                    resultItem.className = 'search-result-item';
-                    
-                    // Get name from attributes based on layer type
-                    let name;
-                    if (layerType === 'psap') {
-                        name = feature.attributes.NAME || feature.attributes.PSAP_NAME || feature.attributes.psap_name || 
-                              `PSAP ${feature.attributes.OBJECTID || ''}`;
-                    } else {
-                        name = getTownName(feature.attributes);
+                    const type = feature.layerType || 'psap';
+                    if (grouped[type]) {
+                        grouped[type].push(feature);
                     }
-                    resultItem.textContent = name;
-                    
-                    // Click to select
-                    resultItem.addEventListener('click', function() {
-                        // Close search results
-                        searchResults.innerHTML = '';
-                        searchInput.value = '';
-                        
-                        // Select the feature
-                        selectFeature(feature);
-                        
-                        // Zoom to the feature
-                        view.goTo({
-                            target: feature.geometry,
-                            zoom: 10
-                        });
-                    });
-                    
-                    searchResults.appendChild(resultItem);
                 });
+                
+                // Display PSAP results first
+                if (grouped.psap.length > 0) {
+                    const psapHeader = document.createElement('div');
+                    psapHeader.className = 'search-result-category';
+                    psapHeader.textContent = 'PSAPs';
+                    searchResults.appendChild(psapHeader);
+                    
+                    grouped.psap.forEach(feature => {
+                        addSearchResultItem(feature, 'psap');
+                    });
+                }
+                
+                // Then display Canadian Towns
+                if (grouped.canada.length > 0) {
+                    const canadaHeader = document.createElement('div');
+                    canadaHeader.className = 'search-result-category';
+                    canadaHeader.textContent = 'Canadian Towns';
+                    searchResults.appendChild(canadaHeader);
+                    
+                    grouped.canada.forEach(feature => {
+                        addSearchResultItem(feature, 'canada');
+                    });
+                }
                 
                 // Make search results visible
                 searchResults.style.display = 'block';
+            }
+            
+            function addSearchResultItem(feature, layerType) {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'search-result-item';
+                resultItem.setAttribute('data-type', layerType);
+                
+                // Get name from attributes based on layer type
+                let name, subtext = '';
+                if (layerType === 'psap') {
+                    name = feature.attributes.NAME || feature.attributes.PSAP_NAME || feature.attributes.psap_name || 
+                          `PSAP ${feature.attributes.OBJECTID || ''}`;
+                    subtext = feature.attributes.account_id || '';
+                } else {
+                    name = getTownName(feature.attributes);
+                    subtext = feature.attributes.PROVINCE || feature.attributes.PROVINCE_1 || '';
+                }
+                
+                // Create name element
+                const nameEl = document.createElement('div');
+                nameEl.textContent = name;
+                
+                // Create subtext element if available
+                if (subtext) {
+                    const subtextEl = document.createElement('div');
+                    subtextEl.className = 'subtext';
+                    subtextEl.textContent = subtext;
+                    resultItem.appendChild(subtextEl);
+                }
+                
+                resultItem.prepend(nameEl);
+                
+                // Click to select
+                resultItem.addEventListener('click', function() {
+                    // Close search results
+                    searchResults.innerHTML = '';
+                    searchInput.value = '';
+                    searchResults.style.display = 'none';
+                    
+                    // Select the feature
+                    selectFeature(feature);
+                    
+                    // Zoom to the feature
+                    view.goTo({
+                        target: feature.geometry,
+                        zoom: 10
+                    });
+                });
+                
+                searchResults.appendChild(resultItem);
             }
             
             // Hide search results when clicking elsewhere
@@ -1069,8 +1175,9 @@
                 selectedFeatures.push(feature);
                 
                 // Highlight the feature
-                if (psapLayerView) {
-                    const highlight = psapLayerView.highlight(feature);
+                const layerView = feature.layerType === 'psap' ? psapLayerView : canadaTownsLayerView;
+                if (layerView) {
+                    const highlight = layerView.highlight(feature);
                     highlightSelections.push(highlight);
                 }
                 
