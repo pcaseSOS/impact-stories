@@ -585,6 +585,8 @@
             "esri/Map",
             "esri/views/MapView",
             "esri/layers/FeatureLayer",
+            "esri/rest/support/AddressToLocationsParams",
+            "esri/rest/locator",
             "esri/symbols/SimpleFillSymbol",
             "esri/symbols/SimpleLineSymbol",
             "esri/renderers/SimpleRenderer",
@@ -964,15 +966,105 @@
             // Clear all selections
             clearAllBtn.addEventListener('click', clearAllSelections);
 
+            // Initialize the Locator (geocoding service)
+            const locatorUrl = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
+            const locator = new Locator({
+                url: locatorUrl,
+                categories: ["Address", "Populated Place"],
+                maxLocations: 5,
+                forStorage: false,
+                outFields: ["*"],
+                location: view.extent.center
+            });
+
             // Search functionality
             searchInput.addEventListener('keyup', function(e) {
                 if (e.key === 'Enter') {
-                    performSearch();
+                    performGeocodeSearch();
                 }
             });
             
-            searchButton.addEventListener('click', performSearch);
+            searchButton.addEventListener('click', performGeocodeSearch);
             
+            function performGeocodeSearch() {
+                const searchTerm = searchInput.value.trim();
+                if (searchTerm.length < 2) {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                console.log('Searching for:', searchTerm);
+                
+                // Show loading state
+                searchResults.innerHTML = '<div class="search-result-item">Searching for location...</div>';
+                searchResults.style.display = 'block';
+                
+                // Use the locator to find the address or place
+                locator.addressToLocations({
+                    address: {
+                        SingleLine: searchTerm
+                    },
+                    maxLocations: 5,  // Maximum number of results to return
+                    outFields: ["*"],   // Return all fields
+                    forStorage: false,  // Don't use for storage to avoid consuming credits
+                    location: view.extent.center // Bias the search to the current map view
+                })
+                .then(function(results) {
+                    console.log('Geocoding results:', results);
+                    displayGeocodeResults(results);
+                })
+                .catch(function(error) {
+                    console.error('Geocoding error:', error);
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            Error performing search. Please try a different location.
+                        </div>`;
+                });
+            }
+            
+            function displayGeocodeResults(results) {
+                searchResults.innerHTML = '';
+                
+                if (!results || results.length === 0) {
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            No results found. Try a different search term or address.
+                        </div>`;
+                    return;
+                }
+                
+                results.forEach(function(result) {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'search-result-item';
+                    
+                    // Create a more readable address
+                    const address = result.attributes.LongLabel || result.attributes.Match_addr || 'Location';
+                    const type = result.attributes.Type || 'Location';
+                    
+                    resultItem.innerHTML = `
+                        <div class="search-result-title">${address}</div>
+                        <div class="search-result-type">${type}</div>
+                    `;
+                    
+                    resultItem.addEventListener('click', function() {
+                        // Zoom to the result
+                        view.goTo({
+                            target: result.location,
+                            zoom: 12
+                        });
+                        
+                        // Clear search results
+                        searchResults.style.display = 'none';
+                        searchInput.value = address; // Update input with selected address
+                    });
+                    
+                    searchResults.appendChild(resultItem);
+                });
+                
+                searchResults.style.display = 'block';
+            }
+            
+            // Keep the old search function but rename it for potential future use
             function performSearch() {
                 const searchTerm = searchInput.value.trim();
                 if (searchTerm.length < 2) {
@@ -1086,14 +1178,37 @@
                     });
             }
             
+            // Add these styles for better search results display
+            const style = document.createElement('style');
+            style.textContent = `
+                .search-result-title {
+                    font-weight: 600;
+                    margin-bottom: 2px;
+                }
+                .search-result-type {
+                    font-size: 0.85em;
+                    color: #666;
+                    font-style: italic;
+                }
+                .search-result-item {
+                    padding: 10px 15px;
+                    border-bottom: 1px solid #eee;
+                    cursor: pointer;
+                }
+                .search-result-item:hover {
+                    background-color: #f5f5f5;
+                }
+            `;
+            document.head.appendChild(style);
+            
             function displaySearchResults(features) {
                 searchResults.innerHTML = '';
                 
                 if (!features || features.length === 0) {
-                    const noResults = document.createElement('div');
-                    noResults.className = 'search-result-item';
-                    noResults.textContent = 'No results found';
-                    searchResults.appendChild(noResults);
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            No results found. Try a different search term.
+                        </div>`;
                     searchResults.style.display = 'block';
                     return;
                 }
