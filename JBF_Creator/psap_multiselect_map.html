@@ -318,11 +318,12 @@
     <!-- Toolbar for multiselect and downloads -->
     <div class="toolbar" id="toolbar">
         <button id="selectModeBtn">Single Select Mode</button>
-        <button id="layerSwitchBtn">Layer: US PSAPs</button>
+        <button id="layerSwitchBtn">Active: US PSAPs</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
         <button id="clearAllBtn" disabled class="danger">❌ Clear Selection</button>
+        <button id="startTutorialBtn" class="esri-button--small">❓</button>
     </div>
     
     <!-- Selection Panel -->
@@ -341,8 +342,7 @@
 
     <div id="status">Single-click to select PSAPs. For multiple: Hold Cmd/Ctrl or Multi-Select Mode.</div>
     
-    <!-- Restart Tutorial Button -->
-    <button id="startTutorialBtn" class="esri-button esri-button--primary" style="position: absolute; bottom: 20px; right: 20px; z-index: 100; font-size: 12px; padding: 6px 10px;">❓ Tutorial</button>
+
     
     <!-- Interactive Walkthrough Elements -->
     <div id="tutorialOverlay" class="tutorial-overlay" style="display: none;"></div>
@@ -482,11 +482,11 @@
             let psapLayerView;
             let canadaTownsLayerView;
 
-            // Helper function to highlight selected features
+            // Centralized function to highlight all selected features
             function highlightSelectedFeatures() {
                 console.log('Highlighting selected features:', selectedFeatures.length);
                 
-                // Clear previous highlights
+                // Clear existing highlights first
                 highlightSelections.forEach(highlight => {
                     if (highlight && highlight.remove) highlight.remove();
                 });
@@ -497,24 +497,22 @@
                     return;
                 }
                 
-                try {
-                    // Add new highlights based on active layer
-                    if (activeLayer === 'psap' && psapLayerView) {
-                        console.log('Highlighting PSAP features');
-                        const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
-                        const highlight = psapLayerView.highlight(objectIds);
-                        highlightSelections.push(highlight);
-                        console.log('PSAP highlights added');
-                    } else if (activeLayer === 'canada' && canadaTownsLayerView) {
-                        console.log('Highlighting Canada Towns features');
-                        const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
-                        const highlight = canadaTownsLayerView.highlight(objectIds);
-                        highlightSelections.push(highlight);
-                        console.log('Canada Towns highlights added');
+                // Apply highlights to all selected features
+                selectedFeatures.forEach(feature => {
+                    try {
+                        if (activeLayer === 'psap' && psapLayerView) {
+                            const highlight = psapLayerView.highlight(feature);
+                            highlightSelections.push(highlight);
+                            console.log('Added PSAP highlight');
+                        } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                            const highlight = canadaTownsLayerView.highlight(feature);
+                            highlightSelections.push(highlight);
+                            console.log('Added Canada Towns highlight');
+                        }
+                    } catch (error) {
+                        console.error('Error highlighting feature:', error);
                     }
-                } catch (error) {
-                    console.error('Error highlighting features:', error);
-                }
+                });
             }
 
             // Helper function to get consistent feature ID
@@ -710,21 +708,6 @@
                     footer.style.display = 'none';
                     panelToggle.textContent = '+';
                 }
-            });
-
-            // Toggle multi-select mode
-            selectModeBtn.addEventListener('click', function() {
-                multiSelectMode = !multiSelectMode;
-                
-                if (multiSelectMode) {
-                    selectModeBtn.textContent = '🔄 Multi-Select: ON';
-                    selectModeBtn.classList.add('active');
-                } else {
-                    selectModeBtn.textContent = '🖱️ Single Select Mode';
-                    selectModeBtn.classList.remove('active');
-                }
-                
-                updateStatus();
             });
 
             // Clear all selections
@@ -1293,9 +1276,10 @@
                 if (activeLayer === 'psap') {
                     // Switch to Canada Towns layer
                     activeLayer = 'canada';
-                    psapLayer.visible = false;
-                    canadaTownsLayer.visible = true;
-                    layerSwitchBtn.textContent = 'Layer: Canada Towns';
+                    // Keep both layers visible, but adjust opacity to show which is active
+                    psapLayer.opacity = 0.3;
+                    canadaTownsLayer.opacity = 1.0;
+                    layerSwitchBtn.textContent = 'Active: Canada Towns';
                     
                     // Get Canada layer view for highlighting
                     if (!canadaTownsLayerView) {
@@ -1324,9 +1308,10 @@
                 } else {
                     // Switch to PSAP layer
                     activeLayer = 'psap';
-                    canadaTownsLayer.visible = false;
-                    psapLayer.visible = true;
-                    layerSwitchBtn.textContent = 'Layer: US PSAPs';
+                    // Keep both layers visible, but adjust opacity to show which is active
+                    canadaTownsLayer.opacity = 0.3;
+                    psapLayer.opacity = 1.0;
+                    layerSwitchBtn.textContent = 'Active: US PSAPs';
                     
                     // Make sure we have the PSAP layer view for highlighting
                     if (!psapLayerView) {
@@ -1825,8 +1810,14 @@
                         // Update UI after selection change
                         updateSelectionPanel();
                         
-                        // Highlight selected features using the centralized function
-                        highlightSelectedFeatures();
+                        // Add highlight for the selected feature
+                        if (activeLayer === 'psap' && psapLayerView) {
+                            const highlight = psapLayerView.highlight(feature);
+                            highlightSelections.push(highlight);
+                        } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                            const highlight = canadaTownsLayerView.highlight(feature);
+                            highlightSelections.push(highlight);
+                        }
                     } else if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
                         // Clicked on empty area - clear selection if not in multi-select mode
                         clearAllSelections();
@@ -1834,9 +1825,9 @@
                 });
             });
             
-            // Set initial visibility - PSAP visible, Canada Towns hidden
+            // Set initial visibility - both layers visible
             psapLayer.visible = true;
-            canadaTownsLayer.visible = false;
+            canadaTownsLayer.visible = true;
             
             // Create layer views for both layers
             view.whenLayerView(psapLayer).then(function(layerView) {
