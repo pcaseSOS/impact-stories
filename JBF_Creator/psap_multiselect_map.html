@@ -246,7 +246,9 @@
     <!-- Toolbar for multiselect and downloads -->
     <div class="toolbar">
         <button id="selectModeBtn">🖱️ Single Select Mode</button>
+        <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
+        <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
         <button id="clearAllBtn" disabled class="danger">❌ Clear Selection</button>
     </div>
     
@@ -279,17 +281,22 @@
             "esri/widgets/Sketch",
             "esri/layers/GraphicsLayer",
             "esri/geometry/projection",
-            "esri/geometry/SpatialReference"
-        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference) {
+            "esri/geometry/SpatialReference",
+            "esri/widgets/Expand"
+        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
             let selectedFeatures = []; // Array to store multiple selected features
             let highlightSelections = []; // Array to store highlight handles
             let multiSelectMode = false;
+            let drawingMode = false; // Track if drawing mode is active
+            let sketch = null; // Reference to sketch widget
 
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
+            const downloadDrawnBtn = document.getElementById('downloadDrawnBtn');
             const clearAllBtn = document.getElementById('clearAllBtn');
             const selectModeBtn = document.getElementById('selectModeBtn');
+            const drawPolygonBtn = document.getElementById('drawPolygonBtn');
             const selectionPanel = document.getElementById('selectionPanel');
             const selectionList = document.getElementById('selectionList');
             const selectionCount = document.getElementById('selectionCount');
@@ -338,8 +345,14 @@
                 }
             });
 
-            // Add the layer to the map
+            // Create graphics layer for drawings
+            const drawLayer = new GraphicsLayer({
+                title: "User-Drawn Polygons"
+            });
+            
+            // Add the layers to the map
             map.add(psapLayer);
+            map.add(drawLayer);
 
             // Create tooltip element
             const tooltip = document.createElement('div');
@@ -774,16 +787,168 @@
                 }
             }
 
+            // Set up the sketch widget for polygon drawing
+            function setupDrawTools() {
+                // Create the sketch widget for drawing polygons
+                sketch = new Sketch({
+                    layer: drawLayer,
+                    view: view,
+                    creationMode: "update",
+                    availableCreateTools: ["polygon"], // Only allow polygon creation
+                    defaultCreateOptions: {
+                        mode: "click" // Default to click-by-click polygon creation
+                    },
+                    visibleElements: {
+                        createTools: {
+                            point: false,
+                            polyline: false,
+                            polygon: true,
+                            rectangle: false,
+                            circle: false
+                        },
+                        selectionTools: {
+                            "lasso-selection": false,
+                            "rectangle-selection": false
+                        },
+                        undoRedoMenu: true,
+                        settingsMenu: false
+                    }
+                });
+                
+                // Track drawing state
+                sketch.on(["create", "update", "delete"], function(event) {
+                    if (event.state === "complete") {
+                        // Show download button when drawing is complete
+                        if (drawLayer.graphics.length > 0) {
+                            downloadDrawnBtn.style.display = "block";
+                            status.textContent = "Polygon drawn! You can now download it or continue editing.";
+                        } else {
+                            downloadDrawnBtn.style.display = "none";
+                        }
+                    }
+                });
+                
+                return sketch;
+            }
+            
+            // Toggle drawing mode
+            function toggleDrawingMode() {
+                drawingMode = !drawingMode;
+                
+                if (drawingMode) {
+                    // Activate drawing mode
+                    if (!sketch) {
+                        sketch = setupDrawTools();
+                    }
+                    view.ui.add(sketch, "top-right");
+                    drawPolygonBtn.textContent = "✏️ Exit Drawing Mode";
+                    drawPolygonBtn.classList.add("active");
+                    status.textContent = "Drawing mode active. Click to create polygon vertices, double-click to complete.";
+                } else {
+                    // Deactivate drawing mode
+                    view.ui.remove(sketch);
+                    drawPolygonBtn.textContent = "✏️ Draw Polygon";
+                    drawPolygonBtn.classList.remove("active");
+                    status.textContent = "Drawing mode exited.";
+                }
+            }
+            
             // Get a reference to the layer view for highlighting
             view.whenLayerView(psapLayer).then(function(layerView) {
                 psapLayerView = layerView;
                 console.log("Layer view created for highlighting");
             });
 
+            // Function to download drawn polygons as GeoJSON
+            async function downloadDrawnPolygons() {
+                // Get all graphics from the draw layer
+                const graphics = drawLayer.graphics.toArray();
+                
+                if (graphics.length === 0) {
+                    alert("No polygons drawn! Draw a polygon first.");
+                    return;
+                }
+                
+                try {
+                    status.textContent = 'Preparing download of drawn polygon...';
+                    
+                    // Process each drawn graphic
+                    const features = await Promise.all(graphics.map(async function(graphic, index) {
+                        // Convert coordinates with proper projection
+                        const coordinates = await convertEsriGeometryToGeoJSON(graphic.geometry);
+                        
+                        return {
+                            type: "Feature",
+                            geometry: {
+                                type: "Polygon",
+                                coordinates: coordinates
+                            },
+                            properties: {
+                                id: index + 1,
+                                name: `User Drawn Polygon ${index + 1}`,
+                                drawn_date: new Date().toISOString(),
+                                export_metadata: {
+                                    exported_date: new Date().toISOString(),
+                                    source: "User Drawing",
+                                    target_crs: "EPSG:4326",
+                                    target_crs_name: "WGS 84"
+                                }
+                            }
+                        };
+                    }));
+                    
+                    // Create GeoJSON object
+                    const geoJSON = {
+                        type: "FeatureCollection",
+                        crs: {
+                            type: "name",
+                            properties: {
+                                name: "urn:ogc:def:crs:EPSG::4326"
+                            }
+                        },
+                        metadata: {
+                            exported_by: "RapidSOS PSAP Map - Drawing Tool",
+                            export_date: new Date().toISOString(),
+                            feature_count: features.length
+                        },
+                        features: features
+                    };
+                    
+                    // Create and download the file
+                    const dataStr = JSON.stringify(geoJSON, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    const url = URL.createObjectURL(dataBlob);
+                    
+                    // Create download link
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = url;
+                    
+                    // Create filename with timestamp
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                    const filename = `user_drawn_polygons_${timestamp}.geojson`;
+                    
+                    downloadLink.download = filename;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                    URL.revokeObjectURL(url);
+                    
+                    status.textContent = `Downloaded ${features.length} drawn polygon(s) as GeoJSON`;
+                } catch (error) {
+                    console.error('Error downloading drawn polygons:', error);
+                    alert('Error downloading drawn polygons. Please try again.');
+                    status.textContent = 'Error during download';
+                }
+            }
+
+            // Add event listeners for draw button functionality
+            drawPolygonBtn.addEventListener('click', toggleDrawingMode);
+            downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
+            
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
                 console.log("PSAP layer loaded successfully");
-                status.textContent = "PSAP data loaded! Click to select boundaries.";
+                status.textContent = "PSAP data loaded! Click to select boundaries or use Draw Polygon tool.";
 
                 // Get layer extent and zoom to it
                 if (psapLayer.fullExtent) {
