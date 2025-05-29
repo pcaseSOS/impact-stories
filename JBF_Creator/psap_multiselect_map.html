@@ -316,8 +316,9 @@
     </div>
     
     <!-- Toolbar for multiselect and downloads -->
-    <div class="toolbar">
-        <button id="selectModeBtn">🖱️ Single Select Mode</button>
+    <div class="toolbar" id="toolbar">
+        <button id="selectModeBtn">Single Select Mode</button>
+        <button id="layerSwitchBtn">Layer: US PSAPs</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
@@ -372,11 +373,15 @@
             "esri/widgets/Expand"
         ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
-            let selectedFeatures = []; // Array to store multiple selected features
-            let highlightSelections = []; // Array to store highlight handles
-            let multiSelectMode = false;
-            let drawingMode = false; // Track if drawing mode is active
-            let sketch = null; // Reference to sketch widget
+            // Track which layer is currently active for selections
+            let activeLayer = 'psap';
+            
+            // Variables for features, highlighting, and user interactions
+            let selectedFeatures = [];
+            let highlightHandles = [];
+            let selectMode = false;
+            let initialLoadComplete = false;
+            let drawnPolygons = [];
 
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
@@ -437,8 +442,32 @@
                 title: "User-Drawn Polygons"
             });
             
-            // Add the layers to the map
+            // Create the Canada Towns layer with its own renderer
+            const canadaTownsLayer = new FeatureLayer({
+                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
+                renderer: new SimpleRenderer({
+                    symbol: new SimpleFillSymbol({
+                        color: [51, 51, 204, 0.3], // Blue with transparency
+                        outline: new SimpleLineSymbol({
+                            color: [51, 51, 204, 0.8], // Dark blue outline
+                            width: 1
+                        })
+                    })
+                }),
+                outFields: ["*"],
+                visible: false, // Initially hidden
+                // Set highlight options
+                highlightOptions: {
+                    color: [0, 102, 255, 0.8], // Blue highlight
+                    fillOpacity: 0.7,
+                    haloColor: [0, 102, 255],
+                    haloOpacity: 0.7
+                }
+            });
+            
+            // Add all layers to the map
             map.add(psapLayer);
+            map.add(canadaTownsLayer);
             map.add(drawLayer);
 
             // Create tooltip element
@@ -449,6 +478,20 @@
 
             // Reference to layer view for highlighting
             let psapLayerView;
+            let canadaTownsLayerView;
+
+            // Helper function to highlight selected features
+            function highlightSelectedFeatures() {
+                if (!initialLoadComplete) return;
+                
+                const objectIds = selectedFeatures.map(feature => feature.attributes.OBJECTID);
+                
+                if (activeLayer === 'psap' && psapLayerView) {
+                    psapLayerView.highlight(objectIds);
+                } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                    canadaTownsLayerView.highlight(objectIds);
+                }
+            }
 
             // Helper function to get consistent feature ID
             function getFeatureId(feature) {
@@ -599,51 +642,80 @@
                 const searchTerm = searchInput.value.trim();
                 if (searchTerm.length < 2) return;
                 
-                // Query the layer for matching PSAPs
-                const query = psapLayer.createQuery();
-                query.where = `psap_name LIKE '%${searchTerm}%' OR account_id LIKE '%${searchTerm}%'`;
-                query.outFields = ["*"];
-                query.returnGeometry = true;
-                
-                psapLayer.queryFeatures(query).then(result => {
-                    displaySearchResults(result.features);
-                }).catch(error => {
-                    console.error("Search error:", error);
-                });
+                // Different query based on active layer
+                if (activeLayer === 'psap') {
+                    // Query PSAP layer
+                    const query = psapLayer.createQuery();
+                    query.where = `psap_name LIKE '%${searchTerm}%' OR account_id LIKE '%${searchTerm}%' OR NAME LIKE '%${searchTerm}%'`;
+                    query.outFields = ["*"];
+                    query.returnGeometry = true;
+                    
+                    psapLayer.queryFeatures(query).then(result => {
+                        displaySearchResults(result.features, 'psap');
+                    }).catch(error => {
+                        console.error("PSAP search error:", error);
+                    });
+                } else {
+                    // Query Canada Towns layer
+                    const query = canadaTownsLayer.createQuery();
+                    query.where = `NAME LIKE '%${searchTerm}%'`;
+                    query.outFields = ["*"];
+                    query.returnGeometry = true;
+                    
+                    canadaTownsLayer.queryFeatures(query).then(result => {
+                        displaySearchResults(result.features, 'canada');
+                    }).catch(error => {
+                        console.error("Canada Towns search error:", error);
+                    });
+                }
             }
             
-            function displaySearchResults(features) {
+            function displaySearchResults(features, layerType) {
                 searchResults.innerHTML = '';
                 
                 if (features.length === 0) {
                     const noResults = document.createElement('div');
                     noResults.className = 'search-result-item';
-                    noResults.textContent = 'No matching PSAPs found';
+                    noResults.textContent = layerType === 'psap' ? 'No matching PSAPs found' : 'No matching towns found';
                     searchResults.appendChild(noResults);
-                } else {
-                    features.forEach(feature => {
-                        const resultItem = document.createElement('div');
-                        resultItem.className = 'search-result-item';
-                        resultItem.textContent = getPsapName(feature.attributes);
-                        
-                        resultItem.addEventListener('click', () => {
-                            // Zoom to the feature
-                            view.goTo({
-                                target: feature.geometry,
-                                zoom: 10
-                            });
-                            
-                            // Select the feature
-                            selectFeature(feature);
-                            
-                            // Hide search results
-                            searchResults.style.display = 'none';
-                        });
-                        
-                        searchResults.appendChild(resultItem);
-                    });
+                    return;
                 }
                 
+                features.forEach(feature => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'search-result-item';
+                    
+                    // Get name from attributes based on layer type
+                    let name;
+                    if (layerType === 'psap') {
+                        name = feature.attributes.NAME || feature.attributes.PSAP_NAME || feature.attributes.psap_name || 
+                              `PSAP ${feature.attributes.OBJECTID || ''}`;
+                    } else {
+                        name = feature.attributes.NAME || feature.attributes.TOWN_NAME || 
+                              `Town ${feature.attributes.OBJECTID || ''}`;
+                    }
+                    resultItem.textContent = name;
+                    
+                    // Click to select
+                    resultItem.addEventListener('click', function() {
+                        // Close search results
+                        searchResults.innerHTML = '';
+                        searchInput.value = '';
+                        
+                        // Select the feature
+                        selectFeature(feature);
+                        
+                        // Zoom to the feature
+                        view.goTo({
+                            target: feature.geometry,
+                            zoom: 10
+                        });
+                    });
+                    
+                    searchResults.appendChild(resultItem);
+                });
+                
+                // Make search results visible
                 searchResults.style.display = 'block';
             }
             
@@ -679,59 +751,16 @@
                     highlightSelections.push(highlight);
                 }
                 
+                // Update selection panel with newly selected feature
                 updateSelectionPanel();
                 updateStatus();
             }
-
-            // Click event for feature selection
-            view.on("click", function(event) {
-                view.hitTest(event).then(function(response) {
-                    // Find PSAP features from the hitTest results
-                    const psapResult = response.results.find(result => 
-                        result.graphic && result.graphic.layer === psapLayer
-                    );
-                    
-                    if (psapResult) {
-                        const clickedFeature = psapResult.graphic;
-                        
-                        // Check for multi-select: either explicit multi-select mode OR modifier keys
-                        const isModifierPressed = event.native.ctrlKey || event.native.metaKey;
-                        const shouldMultiSelect = multiSelectMode || isModifierPressed;
-                        
-                        // Check if already selected
-                        const existingIndex = selectedFeatures.findIndex(f => 
-                            getFeatureId(f) === getFeatureId(clickedFeature)
-                        );
-                        
-                        if (existingIndex >= 0) {
-                            // Already selected, so remove it
-                            removeFromSelection(existingIndex);
-                        } else {
-                            // New selection
-                            if (!shouldMultiSelect && selectedFeatures.length > 0) {
-                                // Clear existing selections in single-select mode
-                                clearAllSelections();
-                            }
-                            
-                            // Add to selection
-                            selectedFeatures.push(clickedFeature);
-                            
-                            // Highlight the feature
-                            if (psapLayerView) {
-                                const highlight = psapLayerView.highlight(clickedFeature);
-                                highlightSelections.push(highlight);
-                            }
-                            
-                            updateSelectionPanel();
-                            updateStatus();
-                        }
-                    } else if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
-                        // Clicked on empty area - clear selection if not in multi-select mode
-                        clearAllSelections();
-                    }
-                });
+            
+            // Hide tooltip when leaving map area
+            view.on("pointer-leave", function() {
+                tooltip.style.display = 'none';
             });
-
+            
             // Show tooltip with PSAP name on hover
             view.on("pointer-move", function(event) {
                 view.hitTest(event).then(function(response) {
@@ -825,7 +854,11 @@
                     document.body.removeChild(downloadLink);
                     URL.revokeObjectURL(url);
                     
-                    status.textContent = `Downloaded ${selectedFeatures.length} PSAP boundary polygons in WGS84 format`;
+                    if (activeLayer === 'psap') {
+                        status.textContent = `Downloaded ${selectedFeatures.length} PSAP boundary polygons in WGS84 format`;
+                    } else {
+                        status.textContent = `Downloaded ${selectedFeatures.length} Canada town polygons in WGS84 format`;
+                    }
                 } catch (error) {
                     console.error('Error downloading GeoJSON:', error);
                     status.textContent = 'Error preparing download';
@@ -1019,18 +1052,76 @@
                     downloadLink.click();
                     document.body.removeChild(downloadLink);
                     URL.revokeObjectURL(url);
-                    
-                    status.textContent = `Downloaded ${features.length} drawn polygon(s) as GeoJSON`;
+                    status.textContent = `Downloaded ${drawnPolygons.length} drawn polygon(s) as GeoJSON`;
                 } catch (error) {
                     console.error('Error downloading drawn polygons:', error);
                     alert('Error downloading drawn polygons. Please try again.');
                     status.textContent = 'Error during download';
                 }
             }
-
-            // Add event listeners for draw button functionality
+            
+            // Event handlers for UI elements
+            selectModeBtn.addEventListener('click', toggleSelectionMode);
+            clearAllBtn.addEventListener('click', clearSelection);
+            downloadBtn.addEventListener('click', downloadSelection);
             drawPolygonBtn.addEventListener('click', toggleDrawingMode);
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
+            layerSwitchBtn.addEventListener('click', switchActiveLayer);
+            
+            // Function to switch between PSAP and Canada Towns layers
+            function switchActiveLayer() {
+                // Clear any existing selection before switching
+                clearSelection();
+                
+                if (activeLayer === 'psap') {
+                    // Switch to Canada Towns layer
+                    activeLayer = 'canada';
+                    psapLayer.visible = false;
+                    canadaTownsLayer.visible = true;
+                    layerSwitchBtn.textContent = 'Layer: Canada Towns';
+                    
+                    // Get Canada layer view for highlighting
+                    view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                        canadaTownsLayerView = layerView;
+                    });
+                    
+                    // Update status text
+                    status.textContent = 'Switched to Canada Towns layer. Click to select towns.';
+                    
+                    // Zoom to Canada
+                    view.goTo({
+                        target: {
+                            xmin: -140.0,
+                            ymin: 40.0,
+                            xmax: -50.0,
+                            ymax: 70.0,
+                            spatialReference: { wkid: 4326 }
+                        },
+                        padding: { left: 40, right: 40, top: 40, bottom: 40 }
+                    });
+                } else {
+                    // Switch to PSAP layer
+                    activeLayer = 'psap';
+                    canadaTownsLayer.visible = false;
+                    psapLayer.visible = true;
+                    layerSwitchBtn.textContent = 'Layer: US PSAPs';
+                    
+                    // Update status text
+                    status.textContent = 'Switched to US PSAPs layer. Click to select PSAPs.';
+                    
+                    // Zoom back to continental US
+                    view.goTo({
+                        target: {
+                            xmin: -115.0,
+                            ymin: 28.0,
+                            xmax: -75.0,
+                            ymax: 46.0,
+                            spatialReference: { wkid: 4326 }
+                        },
+                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                    });
+                }
+            }
             
             // Interactive Walkthrough Tutorial Functionality
             const startTutorialBtn = document.getElementById('startTutorialBtn');
