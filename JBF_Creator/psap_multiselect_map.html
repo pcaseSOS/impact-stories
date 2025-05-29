@@ -379,6 +379,7 @@
     <!-- Toolbar for multiselect and downloads -->
     <div class="toolbar" id="toolbar">
         <button id="layerSwitchBtn">Focus: US PSAPs</button>
+        <button id="multiSelectBtn">🔘 Multi-Select: OFF</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
@@ -389,7 +390,7 @@
     <!-- Selection Panel -->
     <div id="selectionPanel">
         <div class="panel-header">
-            Selected PSAPs (<span id="selectionCount">0</span>)
+            Selected Features (<span id="selectionCount">0</span>)
             <span id="panelToggle" style="cursor: pointer;">−</span>
         </div>
         <div class="panel-content" id="selectionList">
@@ -444,13 +445,16 @@
             "esri/widgets/Expand"
         ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
-            // Track which layer is currently active for selections
-            
-            // Variables for features, highlighting, and user interactions
+            // Initialize variables
+            let sketchGraphicsLayer;
+            let drawnPolygon = null;
             let selectedFeatures = [];
-            let highlightSelections = []; // Used in clearAllSelections and highlight functions
-            let activeLayer = 'psap'; // Default active layer
+            let highlightSelections = [];
+            let psapLayerView;
+            let canadaTownsLayerView;
             let initialLoadComplete = false;
+            let activeLayer = 'psap'; // Default to PSAP layer
+            let multiSelectMode = false; // Default multi-select to OFF
             let drawnPolygons = [];
             let drawingMode = false; // Used in toggleDrawingMode
             let sketch = null; // For sketch widget
@@ -459,7 +463,7 @@
             const downloadBtn = document.getElementById('downloadBtn');
             const downloadDrawnBtn = document.getElementById('downloadDrawnBtn');
             const clearAllBtn = document.getElementById('clearAllBtn');
-            const selectModeBtn = document.getElementById('selectModeBtn');
+            const multiSelectBtn = document.getElementById('multiSelectBtn');
             const drawPolygonBtn = document.getElementById('drawPolygonBtn');
             const selectionPanel = document.getElementById('selectionPanel');
             const selectionList = document.getElementById('selectionList');
@@ -561,9 +565,8 @@
             tooltip.style.display = 'none';
             document.body.appendChild(tooltip);
 
-            // Reference to layer view for highlighting
-            let psapLayerView;
-            let canadaTownsLayerView;
+            // Reference to layer view for highlighting already declared at the top
+            // Using the existing psapLayerView and canadaTownsLayerView variables
 
             // Centralized function to highlight all selected features
             function highlightSelectedFeatures() {
@@ -616,19 +619,37 @@
             
             // Helper function to get town name from attributes
             function getTownName(attributes) {
-                let townName = attributes.NAME || attributes.name || attributes.TOWN_NAME || 'Unknown Town';
-
-                // Try to find a name field if the standard ones aren't populated
-                Object.keys(attributes).forEach(key => {
-                    if ((key.toLowerCase().includes('name') ||
-                         key.toLowerCase().includes('town') ||
-                         key.toLowerCase().includes('city')) &&
-                         attributes[key] && townName === 'Unknown Town') {
-                        townName = attributes[key];
+                // For debugging - log all attributes to see what's available
+                console.log('Canadian Town attributes:', attributes);
+                
+                // Try specific field names that should exist in the Canadian Towns layer
+                if (attributes.NAME) {
+                    return attributes.NAME;
+                }
+                
+                if (attributes.name) {
+                    return attributes.name;
+                }
+                
+                if (attributes.TOWN_NAME) {
+                    return attributes.TOWN_NAME;
+                }
+                
+                // Prioritize fields with 'name', 'town', or 'city' in them
+                const nameFields = Object.keys(attributes).filter(key => 
+                    key.toLowerCase().includes('name') || 
+                    key.toLowerCase().includes('town') || 
+                    key.toLowerCase().includes('city')
+                );
+                
+                for (const field of nameFields) {
+                    if (attributes[field] && typeof attributes[field] === 'string' && attributes[field].trim() !== '') {
+                        return attributes[field];
                     }
-                });
-
-                return townName;
+                }
+                
+                // If no name found, combine the ID and any other useful information
+                return `Town ID: ${attributes.OBJECTID || attributes.FID || 'Unknown'}`;
             }
 
             // Helper function to update selection panel
@@ -1386,6 +1407,13 @@
             downloadDrawnBtn.addEventListener('click', downloadDrawnPolygons);
             layerSwitchBtn.addEventListener('click', switchActiveLayer);
             
+            // Multi-select button functionality
+            multiSelectBtn.addEventListener('click', function() {
+                multiSelectMode = !multiSelectMode;
+                multiSelectBtn.textContent = multiSelectMode ? '🔘 Multi-Select: ON' : '🔘 Multi-Select: OFF';
+                status.textContent = multiSelectMode ? 'Multi-select mode activated. Click on multiple features to select them.' : 'Multi-select mode deactivated. Click on a feature to select it.';
+            });
+            
             // Function to switch between PSAP and Canadian Towns layers
             // Now just changes visual focus but both layers remain selectable
             function switchActiveLayer() {
@@ -1829,24 +1857,30 @@
             skipTutorialBtn.addEventListener('click', endTutorial);
             nextTutorialBtn.addEventListener('click', nextTutorialStep);
             
+            // Flag to track if area selection has been made
+            let areaSelectionMade = false;
+            
             // Show area selection modal and start tutorial when the page is fully loaded
             window.addEventListener('load', function() {
                 // Wait for the map to be fully loaded before showing the area selection modal
                 setTimeout(function() {
-                    // Show the area selection modal first
-                    areaSelectionModal.style.display = 'block';
-                    
-                    // The tutorial will start after the user selects an area
-                    // We'll add a callback to start the tutorial after area selection
-                    const originalSelectArea = selectArea;
-                    selectArea = function(area) {
-                        originalSelectArea(area);
+                    // Only show the modal if an area hasn't been selected yet
+                    if (!areaSelectionMade) {
+                        areaSelectionModal.style.display = 'block';
                         
-                        // Start the tutorial after a short delay to allow the map to zoom
-                        setTimeout(function() {
-                            startTutorial();
-                        }, 1000);
-                    };
+                        // The tutorial will start after the user selects an area
+                        // We'll add a callback to start the tutorial after area selection
+                        const originalSelectArea = selectArea;
+                        selectArea = function(area) {
+                            areaSelectionMade = true; // Set the flag when area is selected
+                            originalSelectArea(area);
+                            
+                            // Start the tutorial after a short delay to allow the map to zoom
+                            setTimeout(function() {
+                                startTutorial();
+                            }, 1000);
+                        };
+                    }
                 }, 1500);
             });
             
@@ -1905,12 +1939,16 @@
                                 status.textContent = `Removed town from selection`;
                             }
                         } else {
-                            // Check if user is holding down Ctrl/Cmd key or wants to clear selection first
-                            if (!event.native.ctrlKey && !event.native.metaKey && selectedFeatures.length > 0) {
-                                // Only clear if not holding a modifier key
+                            // Check if multi-select mode is ON or if user is holding down Ctrl/Cmd key
+                            // If neither, clear existing selection before adding new feature
+                            if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey && selectedFeatures.length > 0) {
+                                // Only clear if not in multi-select mode and not holding a modifier key
                                 if (confirm('Clear existing selection and select this feature instead?')) {
                                     console.log('Clearing selection before adding new feature');
                                     clearAllSelections();
+                                } else {
+                                    // If user cancels the confirmation, don't add the new feature
+                                    return;
                                 }
                             }
                             
