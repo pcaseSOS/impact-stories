@@ -1406,12 +1406,23 @@
             
             // Start tutorial automatically when the page is fully loaded
             window.addEventListener('load', function() {
-                // Wait for the map to be fully loaded and zoomed to the PSAP layer before starting tutorial
+                // Wait for the map to be fully loaded and zoomed to the contiguous 48 states before starting tutorial
                 setTimeout(function() {
-                    // Make sure we're zoomed to the PSAP layer first
-                    if (psapLayer && psapLayer.fullExtent) {
-                        view.goTo(psapLayer.fullExtent);
-                    }
+                    // Zoom to contiguous 48 states (excluding Alaska and Hawaii for a closer view)
+                    // These coordinates approximately cover the contiguous 48 states
+                    const continentalUSExtent = {
+                        xmin: -125.0,
+                        ymin: 24.0,
+                        xmax: -66.0,
+                        ymax: 49.0,
+                        spatialReference: { wkid: 4326 }
+                    };
+                    
+                    // Zoom to this extent with some padding
+                    view.goTo({
+                        target: continentalUSExtent,
+                        padding: { left: 40, right: 40, top: 40, bottom: 40 }
+                    });
                     
                     // Then start the tutorial after the zoom animation completes
                     setTimeout(function() {
