@@ -1146,40 +1146,30 @@
                 try {
                     // Toggle the active layer
                     activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
-                    updateLayerSwitchText();
-                    
                     console.log('Toggling active layer to:', activeLayer);
                     
-                    // Update layer visibility and opacity based on active layer
+                    // Update the layer opacities
                     if (psapLayer) {
-                        psapLayer.visible = true; // Always keep both layers visible
                         psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.5;
                         console.log('PSAP layer visibility:', psapLayer.visible, 'opacity:', psapLayer.opacity);
                     }
                     
                     if (canadaTownsLayer) {
-                        canadaTownsLayer.visible = true; // Always keep both layers visible
                         canadaTownsLayer.opacity = activeLayer === 'canada' ? 1 : 0.5;
                         console.log('Canadian Towns layer visibility:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
                     }
                     
-                    // Force a refresh of the view
-                    if (view) {
-                        // Save current extent
-                        const currentExtent = view.extent;
-                        // Slightly modify the extent to force a refresh
-                        view.extent = null;
-                        // Restore the extent
-                        view.extent = currentExtent;
-                    }
+                    // Update the button text
+                    updateLayerSwitchText();
                     
-                    // Clear any current search results
-                    if (searchResults) {
-                        searchResults.innerHTML = '';
-                        searchResults.style.display = 'none';
-                    }
-                    if (searchInput) {
-                        searchInput.value = '';
+                    // Clear any existing search results when switching layers
+                    searchResults.innerHTML = '';
+                    searchResults.style.display = 'none';
+                    
+                    // Update the status to show which layer is active
+                    if (status) {
+                        status.textContent = `Now searching in ${activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns'} layer`;
+                        setTimeout(() => { status.textContent = ''; }, 3000);
                     }
                     
                     console.log('Switched to', activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns', 'layer');
