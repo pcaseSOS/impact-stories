@@ -761,18 +761,35 @@
                 tooltip.style.display = 'none';
             });
             
-            // Show tooltip with PSAP name on hover
+            // Show tooltip with feature name on hover for both layers
             view.on("pointer-move", function(event) {
                 view.hitTest(event).then(function(response) {
+                    // Check for PSAP layer feature
                     const psapResult = response.results.find(result => 
                         result.graphic && result.graphic.layer === psapLayer
                     );
                     
-                    if (psapResult) {
+                    // Check for Canada Towns layer feature
+                    const canadaResult = response.results.find(result => 
+                        result.graphic && result.graphic.layer === canadaTownsLayer
+                    );
+                    
+                    // First check for PSAP result if that layer is visible
+                    if (activeLayer === 'psap' && psapResult) {
                         const feature = psapResult.graphic;
                         const psapName = getPsapName(feature.attributes);
                         
                         tooltip.textContent = psapName;
+                        tooltip.style.display = 'block';
+                        tooltip.style.left = `${event.x + 10}px`;
+                        tooltip.style.top = `${event.y + 10}px`;
+                    } 
+                    // Then check for Canada Towns result if that layer is visible
+                    else if (activeLayer === 'canada' && canadaResult) {
+                        const feature = canadaResult.graphic;
+                        const townName = feature.attributes.NAME || feature.attributes.TOWN_NAME || `Town ${feature.attributes.OBJECTID}`;
+                        
+                        tooltip.textContent = townName;
                         tooltip.style.display = 'block';
                         tooltip.style.left = `${event.x + 10}px`;
                         tooltip.style.top = `${event.y + 10}px`;
@@ -856,8 +873,10 @@
                     
                     if (activeLayer === 'psap') {
                         status.textContent = `Downloaded ${selectedFeatures.length} PSAP boundary polygons in WGS84 format`;
+                    } else if (activeLayer === 'canada') {
+                        status.textContent = `Downloaded ${selectedFeatures.length} Canada Towns polygons in WGS84 format`;
                     } else {
-                        status.textContent = `Downloaded ${selectedFeatures.length} Canada town polygons in WGS84 format`;
+                        status.textContent = `Downloaded ${selectedFeatures.length} features in WGS84 format`;
                     }
                 } catch (error) {
                     console.error('Error downloading GeoJSON:', error);
@@ -1521,6 +1540,87 @@
                 }, 1500);
             });
             
+            // Add click handler for feature selection from both layers
+            view.on("click", function(event) {
+                // Don't process clicks if drawing mode is active
+                if (sketch) return;
+                
+                // Get the screen point for hit testing
+                const screenPoint = {
+                    x: event.x,
+                    y: event.y
+                };
+                
+                // Perform hit test to see if user clicked on a feature
+                view.hitTest(screenPoint).then(function(response) {
+                    // Determine which layer is active and find matching features
+                    let clickedFeature;
+                    
+                    if (activeLayer === 'psap') {
+                        // Look for PSAP features
+                        clickedFeature = response.results.find(result => 
+                            result.graphic && result.graphic.layer === psapLayer
+                        );
+                    } else {
+                        // Look for Canada Towns features
+                        clickedFeature = response.results.find(result => 
+                            result.graphic && result.graphic.layer === canadaTownsLayer
+                        );
+                    }
+                    
+                    if (clickedFeature) {
+                        const feature = clickedFeature.graphic;
+                        const featureId = feature.attributes.OBJECTID;
+                        
+                        // Check if already selected
+                        const index = selectedFeatures.findIndex(f => f.attributes.OBJECTID === featureId);
+                        
+                        if (index > -1) {
+                            // If already selected, remove it
+                            selectedFeatures.splice(index, 1);
+                            
+                            if (activeLayer === 'psap') {
+                                status.textContent = `Removed PSAP from selection`;
+                            } else {
+                                status.textContent = `Removed town from selection`;
+                            }
+                        } else {
+                            // If single select mode and we already have selections, clear them first
+                            if (!multiSelectMode && selectedFeatures.length > 0) {
+                                clearAllSelections();
+                            }
+                            
+                            // Add to selection
+                            selectedFeatures.push(feature);
+                            
+                            // Get feature name based on layer type
+                            if (activeLayer === 'psap') {
+                                const psapName = getPsapName(feature.attributes);
+                                status.textContent = `Selected PSAP: ${psapName}`;
+                            } else {
+                                const townName = feature.attributes.NAME || feature.attributes.TOWN_NAME || `Town ${featureId}`;
+                                status.textContent = `Selected town: ${townName}`;
+                            }
+                        }
+                        
+                        // Update UI after selection change
+                        updateSelectionPanel();
+                        
+                        // Highlight selected features
+                        if (activeLayer === 'psap' && psapLayerView) {
+                            const objectIds = selectedFeatures.map(f => f.attributes.OBJECTID);
+                            psapLayerView.highlight(objectIds);
+                        } else if (activeLayer === 'canada' && canadaTownsLayerView) {
+                            const objectIds = selectedFeatures.map(f => f.attributes.OBJECTID);
+                            canadaTownsLayerView.highlight(objectIds);
+                        }
+                    } else if (!multiSelectMode && !event.native.ctrlKey && !event.native.metaKey) {
+                        // Clicked on empty area - clear selection if not in multi-select mode
+                        clearAllSelections();
+                    }
+                });
+            });
+            
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
                 console.log("PSAP layer loaded successfully");
@@ -1533,6 +1633,12 @@
 
                 // Initialize UI
                 updateStatus();
+                
+                // Also initialize Canada Towns layer view for highlighting
+                view.whenLayerView(canadaTownsLayer).then(function(layerView) {
+                    canadaTownsLayerView = layerView;
+                    console.log("Canada Towns layer view created");
+                });
 
             }).catch(function(error) {
                 console.error("Error loading layer:", error);
