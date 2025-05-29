@@ -378,10 +378,12 @@
             
             // Variables for features, highlighting, and user interactions
             let selectedFeatures = [];
-            let highlightHandles = [];
-            let selectMode = false;
+            let highlightSelections = []; // Used in clearAllSelections and highlight functions
+            let multiSelectMode = false; // Used in toggleMultiSelectMode
             let initialLoadComplete = false;
             let drawnPolygons = [];
+            let drawingMode = false; // Used in toggleDrawingMode
+            let sketch = null; // For sketch widget
 
             // UI Elements
             const downloadBtn = document.getElementById('downloadBtn');
@@ -985,7 +987,9 @@
                     status.textContent = "Drawing mode active. Click to create polygon vertices, double-click to complete.";
                 } else {
                     // Deactivate drawing mode
-                    view.ui.remove(sketch);
+                    if (sketch) {
+                        view.ui.remove(sketch);
+                    }
                     drawPolygonBtn.textContent = "✏️ Draw Polygon";
                     drawPolygonBtn.classList.remove("active");
                     status.textContent = "Drawing mode exited.";
@@ -1079,7 +1083,7 @@
                 }
             }
             
-            // Define the function references for event handlers
+            // Define the multi-select mode toggle function
             function toggleMultiSelectMode() {
                 multiSelectMode = !multiSelectMode;
                 
