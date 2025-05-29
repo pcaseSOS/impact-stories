@@ -840,7 +840,7 @@
                     if (!sketch) {
                         sketch = setupDrawTools();
                     }
-                    view.ui.add(sketch, "top-right");
+                    view.ui.add(sketch, { position: "bottom-right" });
                     drawPolygonBtn.textContent = "✏️ Exit Drawing Mode";
                     drawPolygonBtn.classList.add("active");
                     status.textContent = "Drawing mode active. Click to create polygon vertices, double-click to complete.";
