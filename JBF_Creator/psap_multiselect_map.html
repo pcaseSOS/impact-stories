@@ -464,6 +464,26 @@
         .select-area-btn:active {
             transform: translateY(0);
         }
+        
+        /* Map container styles */
+        #viewDiv {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        
+        html, body {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
     </style>
 </head>
 
@@ -597,7 +617,7 @@
             "esri/geometry/projection",
             "esri/geometry/SpatialReference",
             "esri/widgets/Expand"
-        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
+        ], function(Map, MapView, FeatureLayer, AddressToLocationsParams, Locator, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
             // Initialize variables
             let psapLayerView, canadaTownsLayerView;
