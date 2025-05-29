@@ -975,7 +975,12 @@
             
             function performSearch() {
                 const searchTerm = searchInput.value.trim();
-                if (searchTerm.length < 2) return;
+                if (searchTerm.length < 2) {
+                    searchResults.style.display = 'none';
+                    return;
+                }
+                
+                console.log('Searching for:', searchTerm);
                 
                 // Show loading state
                 searchResults.innerHTML = '<div class="search-result-item">Searching...</div>';
@@ -983,66 +988,102 @@
                 
                 // Search PSAP layer
                 const psapPromise = new Promise((resolve) => {
-                    const query = psapLayer.createQuery();
-                    query.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR 
-                                 UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR 
-                                 UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
-                    query.outFields = ["*"];
-                    query.returnGeometry = true;
+                    if (!psapLayer) {
+                        console.warn('PSAP layer not available');
+                        return resolve({ features: [], type: 'psap' });
+                    }
                     
-                    psapLayer.queryFeatures(query)
-                        .then(result => ({
-                            features: result.features.map(f => ({
-                                ...f,
-                                layerType: 'psap'
-                            })),
-                            type: 'psap'
-                        }))
-                        .catch(error => {
-                            console.error("PSAP search error:", error);
-                            return { features: [], type: 'psap' };
-                        })
-                        .then(resolve);
+                    try {
+                        const query = psapLayer.createQuery();
+                        query.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR 
+                                     UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR 
+                                     UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
+                        query.outFields = ["*"];
+                        query.returnGeometry = true;
+                        
+                        console.log('PSAP query:', query.where);
+                        
+                        psapLayer.queryFeatures(query)
+                            .then(result => {
+                                console.log('PSAP results:', result.features.length);
+                                return {
+                                    features: result.features.map(f => ({
+                                        ...f,
+                                        layerType: 'psap'
+                                    })),
+                                    type: 'psap'
+                                };
+                            })
+                            .catch(error => {
+                                console.error("PSAP search error:", error);
+                                return { features: [], type: 'psap' };
+                            })
+                            .then(resolve);
+                    } catch (error) {
+                        console.error('Error creating PSAP query:', error);
+                        resolve({ features: [], type: 'psap' });
+                    }
                 });
                 
                 // Search Canadian Towns layer
                 const canadaPromise = new Promise((resolve) => {
-                    const query = canadaTownsLayer.createQuery();
+                    if (!canadaTownsLayer) {
+                        console.warn('Canadian Towns layer not available');
+                        return resolve({ features: [], type: 'canada' });
+                    }
                     
-                    // Create a more comprehensive search query for town names
-                    const nameFields = ['NAME', 'TOWN_NAME', 'CITY_NAME', 'MUNICIPALITY', 'COMMUNITY', 'SETTLEMENT'];
-                    const whereClause = nameFields
-                        .map(field => `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`)
-                        .join(' OR ');
-                    
-                    query.where = whereClause || "1=0";
-                    query.outFields = ["*"];
-                    query.returnGeometry = true;
-                    
-                    canadaTownsLayer.queryFeatures(query)
-                        .then(result => ({
-                            features: result.features.map(f => ({
-                                ...f,
-                                layerType: 'canada'
-                            })),
-                            type: 'canada'
-                        }))
-                        .catch(error => {
-                            console.error("Canadian Towns search error:", error);
-                            return { features: [], type: 'canada' };
-                        })
-                        .then(resolve);
+                    try {
+                        const query = canadaTownsLayer.createQuery();
+                        
+                        // Create a more comprehensive search query for town names
+                        const nameFields = ['NAME', 'TOWN_NAME', 'CITY_NAME', 'MUNICIPALITY', 'COMMUNITY', 'SETTLEMENT'];
+                        const whereClause = nameFields
+                            .map(field => `UPPER(${field}) LIKE UPPER('%${searchTerm}%')`)
+                            .join(' OR ');
+                        
+                        query.where = whereClause || "1=0";
+                        query.outFields = ["*"];
+                        query.returnGeometry = true;
+                        
+                        console.log('Canadian Towns query:', query.where);
+                        
+                        canadaTownsLayer.queryFeatures(query)
+                            .then(result => {
+                                console.log('Canadian Towns results:', result.features.length);
+                                return {
+                                    features: result.features.map(f => ({
+                                        ...f,
+                                        layerType: 'canada'
+                                    })),
+                                    type: 'canada'
+                                };
+                            })
+                            .catch(error => {
+                                console.error("Canadian Towns search error:", error);
+                                return { features: [], type: 'canada' };
+                            })
+                            .then(resolve);
+                    } catch (error) {
+                        console.error('Error creating Canadian Towns query:', error);
+                        resolve({ features: [], type: 'canada' });
+                    }
                 });
                 
                 // Combine results from both layers
-                Promise.all([psapPromise, canadaPromise]).then(([psapResults, canadaResults]) => {
-                    const allResults = [
-                        ...psapResults.features,
-                        ...canadaResults.features
-                    ];
-                    
-                    displaySearchResults(allResults);
-                });
+                Promise.all([psapPromise, canadaPromise])
+                    .then(([psapResults, canadaResults]) => {
+                        const allResults = [
+                            ...(psapResults?.features || []),
+                            ...(canadaResults?.features || [])
+                        ];
+                        
+                        console.log('Total results:', allResults.length);
+                        displaySearchResults(allResults);
+                    })
+                    .catch(error => {
+                        console.error('Error in search:', error);
+                        searchResults.innerHTML = '<div class="search-result-item">Error performing search. Please try again.</div>';
+                    });
             }
             
             function displaySearchResults(features) {
@@ -1445,11 +1486,31 @@
                 }
             }
             
-            // Get a reference to the layer view for highlighting
-            view.whenLayerView(psapLayer).then(function(layerView) {
-                psapLayerView = layerView;
-                console.log("Layer view created for highlighting");
-            });
+            // Initialize layer views for both PSAP and Canadian Towns
+            function initializeLayerViews() {
+                // PSAP Layer View
+                view.whenLayerView(psapLayer)
+                    .then(function(layerView) {
+                        psapLayerView = layerView;
+                        console.log("PSAP layer view initialized");
+                    })
+                    .catch(error => {
+                        console.error("Error initializing PSAP layer view:", error);
+                    });
+                
+                // Canadian Towns Layer View
+                view.whenLayerView(canadaTownsLayer)
+                    .then(function(layerView) {
+                        canadaTownsLayerView = layerView;
+                        console.log("Canadian Towns layer view initialized");
+                    })
+                    .catch(error => {
+                        console.error("Error initializing Canadian Towns layer view:", error);
+                    });
+            }
+            
+            // Initialize layer views when the map is ready
+            view.when(initializeLayerViews);
 
             // Function to download drawn polygons as GeoJSON
             async function downloadDrawnPolygons() {
