@@ -9,6 +9,125 @@
     <script src="https://js.arcgis.com/4.28/"></script>
 
     <style>
+        /* Tutorial Overlay Styles */
+        #tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        
+        .tutorial-container {
+            background: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .tutorial-header {
+            background: var(--royal-blue);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .tutorial-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        
+        .tutorial-content {
+            padding: 20px;
+        }
+        
+        .tutorial-step {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .tutorial-step:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .tutorial-step h3 {
+            color: var(--royal-blue);
+            margin-top: 0;
+        }
+        
+        .tutorial-step p {
+            margin: 10px 0;
+            line-height: 1.5;
+        }
+        
+        .tutorial-step kbd {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: monospace;
+            font-size: 0.9em;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+        }
+        
+        .tutorial-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .tutorial-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .tutorial-button.primary {
+            background: var(--safety-blue);
+            color: white;
+        }
+        
+        .tutorial-button.secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .tutorial-step-number {
+            display: inline-block;
+            background: var(--safety-blue);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
         /* RapidSOS brand colors */
         :root {
             --royal-blue: #001559; /* Primary dark blue */
@@ -68,6 +187,36 @@
 
         .toolbar button.danger:hover {
             background: #c82333;
+        }
+        
+        /* Help Button */
+        .help-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--royal-blue);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+        
+        .help-button:hover {
+            background: var(--safety-blue);
+            transform: scale(1.1);
+        }
+        
+        .help-button svg {
+            width: 20px;
+            height: 20px;
         }
 
         #selectionPanel {
@@ -293,7 +442,68 @@
 </head>
 
 <body>
+    <!-- Help Button -->
+    <button id="helpButton" class="help-button" title="Show Help">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="16"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+    </button>
+    
     <div id="viewDiv"></div>
+    
+    <!-- Tutorial Overlay -->
+    <div id="tutorial-overlay">
+        <div class="tutorial-container">
+            <div class="tutorial-header">
+                <h2>PSAP Map Tutorial</h2>
+                <button class="tutorial-close">&times;</button>
+            </div>
+            <div class="tutorial-content">
+                <div class="tutorial-step">
+                    <h3><span class="tutorial-step-number">1</span>Selecting Features</h3>
+                    <p>Click on any PSAP or Canadian town to select it. Selected features will be highlighted.</p>
+                    <p>To select multiple features:</p>
+                    <ul>
+                        <li>Hold <kbd>Ctrl</kbd> (Windows) or <kbd>⌘</kbd> (Mac) while clicking</li>
+                        <li>Or enable <strong>Multi-Select Mode</strong> to select multiple features without holding keys</li>
+                    </ul>
+                </div>
+                
+                <div class="tutorial-step">
+                    <h3><span class="tutorial-step-number">2</span>Searching for Locations</h3>
+                    <p>Use the search bar in the top-left to find specific PSAPs or Canadian towns.</p>
+                    <p>Click on a search result to zoom to that location and select it.</p>
+                </div>
+                
+                <div class="tutorial-step">
+                    <h3><span class="tutorial-step-number">3</span>Managing Selections</h3>
+                    <p>View your selected features in the panel on the left. You can:</p>
+                    <ul>
+                        <li>Click the <strong>×</strong> next to an item to remove it</li>
+                        <li>Click <strong>Clear All</strong> to remove all selections</li>
+                        <li>Click <strong>Download Selected</strong> to export your selection as GeoJSON</li>
+                    </ul>
+                </div>
+                
+                <div class="tutorial-step">
+                    <h3><span class="tutorial-step-number">4</span>Drawing Tools</h3>
+                    <p>Use the drawing tools to create custom areas of interest:</p>
+                    <ul>
+                        <li>Click the <strong>Draw Polygon</strong> button to start drawing</li>
+                        <li>Click to add points, double-click to complete the shape</li>
+                        <li>Download your drawn areas using the download button</li>
+                    </ul>
+                </div>
+                
+                <div class="tutorial-buttons">
+                    <button class="tutorial-button secondary" id="dontShowAgain">Don't Show Again</button>
+                    <button class="tutorial-button primary" id="tutorialGotIt">Got it, thanks!</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Search Bar -->
     <div class="search-container">
@@ -1413,6 +1623,48 @@
                 });
             }
             
+            // Show tutorial on first visit or when help button is clicked
+            const tutorialOverlay = document.getElementById('tutorial-overlay');
+            const helpButton = document.getElementById('helpButton');
+            const tutorialClose = document.querySelector('.tutorial-close');
+            const tutorialGotIt = document.getElementById('tutorialGotIt');
+            const dontShowAgain = document.getElementById('dontShowAgain');
+            
+            // Check if user has seen the tutorial before
+            const hasSeenTutorial = localStorage.getItem('hasSeenPSAPMapTutorial');
+            
+            function showTutorial() {
+                tutorialOverlay.style.visibility = 'visible';
+                tutorialOverlay.style.opacity = '1';
+                document.body.style.overflow = 'hidden'; // Prevent scrolling
+            }
+            
+            function hideTutorial() {
+                tutorialOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    tutorialOverlay.style.visibility = 'hidden';
+                    document.body.style.overflow = ''; // Re-enable scrolling
+                }, 300);
+            }
+            
+            // Event listeners for tutorial controls
+            helpButton.addEventListener('click', showTutorial);
+            tutorialClose.addEventListener('click', hideTutorial);
+            tutorialGotIt.addEventListener('click', hideTutorial);
+            
+            dontShowAgain.addEventListener('click', function() {
+                localStorage.setItem('hasSeenPSAPMapTutorial', 'true');
+                hideTutorial();
+            });
+            
+            // Show tutorial on first visit
+            if (!hasSeenTutorial) {
+                // Wait for map to load
+                setTimeout(() => {
+                    showTutorial();
+                }, 2000);
+            }
+
             // Call the function ONE time at startup
             window.addEventListener('load', function() {
                 // Wait for the map to be fully loaded
