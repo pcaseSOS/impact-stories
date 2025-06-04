@@ -1275,46 +1275,74 @@
                     activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
                     console.log('Toggling active layer to:', activeLayer);
                     
-                    // Update layer visibility and opacity
+                    // Store the current visibility state
+                    const wasPsapVisible = psapLayer.visible;
+                    const wasCanadaVisible = canadaTownsLayer.visible;
+                    
+                    // Update the layer visibility and opacity
                     if (psapLayer) {
+                        psapLayer.visible = true; // Keep both layers visible
                         psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.5;
-                        psapLayer.visible = true; // Ensure layer is always visible
-                        console.log('PSAP layer visibility:', psapLayer.visible, 'opacity:', psapLayer.opacity);
                     }
                     
                     if (canadaTownsLayer) {
+                        canadaTownsLayer.visible = true; // Keep both layers visible
                         canadaTownsLayer.opacity = activeLayer === 'canada' ? 1 : 0.5;
-                        canadaTownsLayer.visible = true; // Ensure layer is always visible
-                        console.log('Canadian Towns layer visibility:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
+                    }
+                    
+                    // Re-initialize popups if the layer is becoming active
+                    if (psapLayer && activeLayer === 'psap') {
+                        setupLayerPopup(psapLayer, 'psap');
+                    }
+                    
+                    if (canadaTownsLayer && activeLayer === 'canada') {
+                        setupLayerPopup(canadaTownsLayer, 'canada');
                     }
                     
                     // Update the button text
                     updateLayerSwitchText();
                     
-                    // Update the status message
+                    // Update the map view to show the active layer's extent if available
+                    if (activeLayer === 'psap' && psapLayer) {
+                        zoomToLayerExtent(psapLayer);
+                    } else if (activeLayer === 'canada' && canadaTownsLayer) {
+                        zoomToLayerExtent(canadaTownsLayer);
+                    }
+                    
+                    // Clear any existing search results when switching layers
+                    if (searchResults) {
+                        searchResults.innerHTML = '';
+                        searchResults.style.display = 'none';
+                    }
+                    
+                    // Update status to show which layer is active
                     if (status) {
-                        status.textContent = `Now searching in ${activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns'} layer`;
-                        setTimeout(() => { status.textContent = ''; }, 3000);
+                        if (activeLayer === 'psap') {
+                            status.textContent = 'PSAP layer active. Click on a PSAP to select it.';
+                        } else {
+                            status.textContent = 'Canadian Towns layer active. Click on a town to select it.';
+                        }
                     }
                     
-                    // Clear any existing highlights
-                    if (psapHighlight) {
-                        psapHighlight.remove();
-                        psapHighlight = null;
+                    // Clear any existing highlights when switching layers
+                    if (psapLayerView) {
+                        psapLayerView.highlightRemoveAll();
                     }
-                    if (canadaTownsHighlight) {
-                        canadaTownsHighlight.remove();
-                        canadaTownsHighlight = null;
+                    if (canadaTownsLayerView) {
+                        canadaTownsLayerView.highlightRemoveAll();
                     }
                     
-                    // Clear any existing selections
-                    clearSelections();
+                    // Clear the selection panel when switching layers
+                    selectedFeatures = [];
+                    if (updateSelectionPanel) updateSelectionPanel();
+                    if (updateStatus) updateStatus();
                     
                     console.log('Switched to', activeLayer === 'psap' ? 'PSAP' : 'Canadian Towns', 'layer');
+                    
                 } catch (error) {
                     console.error('Error in toggleActiveLayer:', error);
                     if (status) {
-                        status.textContent = 'Error switching layers';
+                        status.textContent = 'Error switching layers. Please try again.';
                         setTimeout(() => { status.textContent = ''; }, 3000);
                     }
                 }
