@@ -1275,19 +1275,17 @@
                     activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
                     console.log('Toggling active layer to:', activeLayer);
                     
-                    // Store the current visibility state
-                    const wasPsapVisible = psapLayer.visible;
-                    const wasCanadaVisible = canadaTownsLayer.visible;
-                    
-                    // Update the layer visibility and opacity
+                    // Ensure both layers are visible but adjust opacity to show which is active
                     if (psapLayer) {
-                        psapLayer.visible = true; // Keep both layers visible
+                        psapLayer.visible = true;
                         psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.5;
+                        console.log('PSAP layer - visible:', psapLayer.visible, 'opacity:', psapLayer.opacity);
                     }
                     
                     if (canadaTownsLayer) {
-                        canadaTownsLayer.visible = true; // Keep both layers visible
+                        canadaTownsLayer.visible = true;
                         canadaTownsLayer.opacity = activeLayer === 'canada' ? 1 : 0.5;
+                        console.log('Canada Towns layer - visible:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
                     }
                     
                     // Re-initialize popups if the layer is becoming active
