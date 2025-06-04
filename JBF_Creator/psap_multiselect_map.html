@@ -357,34 +357,25 @@
         
         .search-results {
             position: absolute;
-            top: 60px;
-            right: 20px;
-            width: 350px;
-            max-height: 70vh;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 400px;
             overflow-y: auto;
             background: white;
             border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 100;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            z-index: 1000;
             display: none;
-            font-family: 'Arial', sans-serif;
-        }
-        
-        .search-result-count {
-            padding: 10px 15px;
-            background-color: #f8f9fa;
-            border-bottom: 1px solid #eee;
-            font-size: 0.9em;
-            color: #495057;
-            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         
         .search-result-item {
             padding: 12px 15px;
             border-bottom: 1px solid #eee;
             cursor: pointer;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.2s;
         }
         
         .search-result-item:last-child {
@@ -400,44 +391,34 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 8px;
-            font-weight: 600;
-            color: #212529;
         }
         
-        .layer-badge {
-            font-size: 0.7em;
-            background-color: #e9ecef;
-            color: #495057;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-weight: normal;
+        .search-result-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .search-result-type {
+            font-size: 12px;
+            color: #6c757d;
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 10px;
         }
         
         .search-result-details {
-            font-size: 0.85em;
+            font-size: 13px;
             color: #6c757d;
-            margin-bottom: 8px;
-            line-height: 1.4;
-            max-height: 150px;
+            margin: 8px 0;
+            max-height: 100px;
             overflow-y: auto;
             padding-right: 5px;
         }
         
-        .search-result-details div {
+        .search-result-detail {
             margin-bottom: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .search-result-details div:hover {
-            white-space: normal;
-            overflow: visible;
-        }
-        
-        .search-result-details strong {
-            color: #495057;
-            margin-right: 5px;
+            line-height: 1.4;
         }
         
         .search-result-actions {
@@ -446,71 +427,18 @@
             margin-top: 10px;
         }
         
-        .search-result-actions button {
-            display: inline-flex;
+        .search-result-actions .btn {
+            font-size: 12px;
+            padding: 3px 8px;
+            display: flex;
             align-items: center;
             gap: 4px;
-            padding: 4px 10px;
-            font-size: 0.8em;
-            border-radius: 4px;
-            border: 1px solid transparent;
-            transition: all 0.2s ease;
-            cursor: pointer;
         }
         
-        .search-result-actions button i {
-            font-size: 0.9em;
-        }
-        
-        .search-result-actions .btn-primary {
-            background-color: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        
-        .search-result-actions .btn-primary:hover {
-            background-color: #0069d9;
-            border-color: #0062cc;
-        }
-        
-        .search-result-actions .btn-secondary {
-            background-color: #6c757d;
-            color: white;
-            border-color: #6c757d;
-        }
-        
-        .search-result-actions .btn-secondary:hover {
-            background-color: #5a6268;
-            border-color: #545b62;
-        }
-        
-        .search-result-header {
-            font-size: 1.1em;
-            margin-bottom: 6px;
-        }
-        
-        .search-result-item.highlighted {
-            background-color: #e7f5ff;
-            border-left: 3px solid #339af0;
-        }
-        
-        /* Scrollbar styling */
-        .search-results::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .search-results::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .search-results::-webkit-scrollbar-thumb {
-            background: #adb5bd;
-            border-radius: 4px;
-        }
-        
-        .search-results::-webkit-scrollbar-thumb:hover {
-            background: #868e96;
+        .no-details {
+            color: #adb5bd;
+            font-style: italic;
+            font-size: 12px;
         }
         
         /* Area Selection Modal Styles */
@@ -1207,22 +1135,43 @@
                         
                         return psapLayer.queryFeatures(psapQuery)
                             .then(psapResults => {
-                                console.log('PSAP search results:', psapResults.features.length, 'features found');
-                                if (psapResults.features.length === 0) {
+                                console.log('PSAP search results:', psapResults);
+                                if (!psapResults || !psapResults.features || psapResults.features.length === 0) {
                                     searchResults.innerHTML = `
                                         <div class="search-result-item">
                                             No results found for "${searchTerm}" in PSAP layer
                                         </div>`;
                                     searchResults.style.display = 'block';
-                                    console.log('PSAP search results:', psapResults);
-                                } else {
-                                    displaySearchResults(psapResults.features.map(f => ({
-                                        ...f,
-                                        layerType: 'psap',
-                                        layerName: 'PSAP'
-                                    })));
-                                    searchResults.style.display = 'block';
+                                    return;
                                 }
+                                
+                                // Process features to ensure they have the required structure
+                                const processedFeatures = psapResults.features.map(feature => {
+                                    // Ensure the feature has attributes
+                                    if (!feature.attributes) {
+                                        feature.attributes = {};
+                                    }
+                                    
+                                    // Add layer information
+                                    feature.layerType = 'psap';
+                                    feature.layerName = 'PSAP';
+                                    
+                                    // Ensure we have a name attribute
+                                    if (!feature.attributes.name && !feature.attributes.NAME && feature.attributes.psap_name) {
+                                        feature.attributes.name = feature.attributes.psap_name;
+                                    } else if (!feature.attributes.name && feature.attributes.NAME) {
+                                        feature.attributes.name = feature.attributes.NAME;
+                                    } else if (!feature.attributes.name && feature.attributes.account_id) {
+                                        feature.attributes.name = feature.attributes.account_id;
+                                    } else if (!feature.attributes.name) {
+                                        feature.attributes.name = 'Unnamed PSAP';
+                                    }
+                                    
+                                    return feature;
+                                });
+                                
+                                console.log('Processed PSAP features:', processedFeatures);
+                                displaySearchResults(processedFeatures);
                             });
                     } catch (error) {
                         console.error('Error in PSAP search:', error);
@@ -1338,8 +1287,8 @@
                         
                         return canadaTownsLayer.queryFeatures(canadaQuery)
                             .then(canadaResults => {
-                                console.log('Canadian Towns search results:', canadaResults.features.length, 'features found');
-                                if (canadaResults.features.length === 0) {
+                                console.log('Canadian Towns search results:', canadaResults);
+                                if (!canadaResults || !canadaResults.features || canadaResults.features.length === 0) {
                                     searchResults.innerHTML = `
                                         <div class="search-result-item">
                                             No results found for "${searchTerm}" in Canadian Towns layer
@@ -1347,12 +1296,35 @@
                                     searchResults.style.display = 'block';
                                     return;
                                 }
-                                displaySearchResults(canadaResults.features.map(f => ({
-                                    ...f,
-                                    layerType: 'canada',
-                                    layerName: 'Canadian Towns'
-                                })));
-                                searchResults.style.display = 'block';
+                                
+                                // Process features to ensure they have the required structure
+                                const processedFeatures = canadaResults.features.map(feature => {
+                                    // Ensure the feature has attributes
+                                    if (!feature.attributes) {
+                                        feature.attributes = {};
+                                    }
+                                    
+                                    // Add layer information
+                                    feature.layerType = 'canada';
+                                    feature.layerName = 'Canadian Town';
+                                    
+                                    // Find a suitable name field
+                                    const nameField = Object.keys(feature.attributes).find(key => 
+                                        /(name|town|city|municipal|nom|ville|community|place)/i.test(key)
+                                    );
+                                    
+                                    // Set a name if we don't have one
+                                    if (!feature.attributes.name && nameField) {
+                                        feature.attributes.name = feature.attributes[nameField];
+                                    } else if (!feature.attributes.name) {
+                                        feature.attributes.name = 'Unnamed Location';
+                                    }
+                                    
+                                    return feature;
+                                });
+                                
+                                console.log('Processed Canadian features:', processedFeatures);
+                                displaySearchResults(processedFeatures);
                             });
                     } catch (error) {
                         console.error('Error in Canadian Towns search:', error);
@@ -1505,45 +1477,60 @@
                         const item = document.createElement('div');
                         item.className = 'search-result-item';
                         
+                        // Ensure feature has attributes and geometry
+                        if (!feature.attributes) {
+                            feature.attributes = {};
+                        }
+                        
                         // Get the feature's attributes with a fallback to empty object
-                        const attrs = feature.attributes || feature.properties || {};
+                        const attrs = feature.attributes || {};
                         
-                        // Helper function to get a display name from common field names
-                        const getNameFromAttrs = (attrs) => {
-                            if (!attrs) return 'Unnamed Feature';
-                            
-                            // Try to find a name field in a case-insensitive way
-                            const nameField = Object.keys(attrs).find(key => 
-                                /(name|title|description|psap|town|city|municipality|label)/i.test(key)
-                            );
-                            
-                            if (nameField && attrs[nameField]) {
-                                return String(attrs[nameField]);
-                            }
-                            
-                            // If no name field found, return the first non-empty string value
-                            for (const [key, value] of Object.entries(attrs)) {
-                                if (typeof value === 'string' && value.trim() !== '') {
-                                    return value;
-                                }
-                            }
-                            
-                            return 'Unnamed Feature';
-                        };
-                        
-                        const name = getNameFromAttrs(attrs);
+                        // Get the display name
+                        let displayName = 'Unnamed Feature';
+                        if (attrs.name) {
+                            displayName = attrs.name;
+                        } else if (attrs.NAME) {
+                            displayName = attrs.NAME;
+                        } else if (attrs.psap_name) {
+                            displayName = attrs.psap_name;
+                        } else if (attrs.account_id) {
+                            displayName = attrs.account_id;
+                        } else if (attrs.town) {
+                            displayName = attrs.town;
+                        } else if (attrs.city) {
+                            displayName = attrs.city;
+                        } else if (attrs.municipality) {
+                            displayName = attrs.municipality;
+                        } else if (attrs.community) {
+                            displayName = attrs.community;
+                        } else if (attrs.place_name) {
+                            displayName = attrs.place_name;
+                        }
                         
                         // Create a more informative display with available attributes
                         let details = '';
+                        const excludeFields = ['shape', 'objectid', 'globalid', 'geometry', 'name', 'NAME', 'psap_name', 'account_id'];
+                        
                         if (attrs) {
                             Object.entries(attrs).forEach(([key, value]) => {
-                                if (value !== null && value !== undefined && value !== '' && 
-                                    !key.toLowerCase().includes('shape') && 
-                                    !key.toLowerCase().includes('objectid') &&
-                                    !key.toLowerCase().includes('globalid') &&
-                                    !key.toLowerCase().includes('geometry')) {
-                                    details += `<div><strong>${key}:</strong> ${value}</div>`;
+                                // Skip if value is empty or key is in exclude list
+                                if (!value || 
+                                    excludeFields.some(field => key.toLowerCase().includes(field.toLowerCase()))) {
+                                    return;
                                 }
+                                
+                                // Format the value for display
+                                let displayValue = value;
+                                if (typeof value === 'object') {
+                                    displayValue = JSON.stringify(value);
+                                } else if (typeof value === 'boolean') {
+                                    displayValue = value ? 'Yes' : 'No';
+                                } else if (typeof value === 'number') {
+                                    // Format numbers with commas for better readability
+                                    displayValue = value.toLocaleString();
+                                }
+                                
+                                details += `<div class="search-result-detail"><strong>${key}:</strong> ${displayValue}</div>`;
                             });
                         }
                         
@@ -1556,35 +1543,24 @@
                         item.dataset.featureId = featureId;
                         item.featureData = feature;
                         
+                        // Set the HTML content for the search result item
                         item.innerHTML = `
                             <div class="search-result-header">
-                                <strong>${name}</strong>
-                                <span class="layer-badge">${layerType === 'psap' ? 'PSAP' : 'Canada'}</span>
+                                <span class="search-result-title">${displayName}</span>
+                                <span class="search-result-type">${layerType === 'psap' ? 'PSAP' : 'Canadian Town'}</span>
                             </div>
                             <div class="search-result-details">
-                                ${details || 'No additional details available'}
+                                ${details || '<div class="no-details">No additional details available</div>'}
                             </div>
                             <div class="search-result-actions">
                                 <button class="btn btn-sm btn-primary zoom-to-feature" data-feature-id="${featureId}">
-                                    <i class="fas fa-search-plus"></i> Zoom to
+                                    <i class="fas fa-search-location"></i> Zoom to
                                 </button>
-                                <button class="btn btn-sm btn-secondary select-feature" data-feature-id="${featureId}">
+                                <button class="btn btn-sm btn-success select-feature" data-feature-id="${featureId}">
                                     <i class="fas fa-check"></i> Select
                                 </button>
                             </div>
                         `;
-                        
-                        // Add click handler for the entire item
-                        item.addEventListener('click', (e) => {
-                            // Don't trigger if clicking on buttons (they have their own handlers)
-                            if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-                            
-                            // Zoom to the feature
-                            zoomToFeature(feature);
-                            
-                            // Highlight the feature
-                            selectFeature(feature);
-                        });
                         
                         // Add click handler for the zoom button
                         const zoomBtn = item.querySelector('.zoom-to-feature');
@@ -1592,7 +1568,6 @@
                             zoomBtn.addEventListener('click', (e) => {
                                 e.stopPropagation();
                                 zoomToFeature(feature);
-                                selectFeature(feature);
                             });
                         }
                         
@@ -1607,15 +1582,15 @@
                         
                         return item;
                     } catch (error) {
-                        console.error('Error creating search result item:', error, feature);
+                        console.error('Error creating search result item:', error);
                         const errorItem = document.createElement('div');
                         errorItem.className = 'search-result-item';
                         errorItem.innerHTML = `
                             <div class="search-result-header">
-                                <strong>Error displaying feature</strong>
+                                <span class="search-result-title">Error displaying feature</span>
                             </div>
-                            <div class="text-muted">
-                                ${error.message || 'Unknown error'}
+                            <div class="search-result-details">
+                                <div class="no-details">${error.message || 'Unknown error occurred'}</div>
                             </div>
                         `;
                         return errorItem;
