@@ -1133,46 +1133,112 @@
                         
                         console.log('Executing PSAP query with where clause:', psapQuery.where);
                         
-                        return psapLayer.queryFeatures(psapQuery)
-                            .then(psapResults => {
-                                console.log('PSAP search results:', psapResults);
-                                if (!psapResults || !psapResults.features || psapResults.features.length === 0) {
-                                    searchResults.innerHTML = `
-                                        <div class="search-result-item">
-                                            No results found for "${searchTerm}" in PSAP layer
-                                        </div>`;
-                                    searchResults.style.display = 'block';
-                                    return;
+                        // Search both PSAP and Canadian Towns layers in parallel
+                        return Promise.all([
+                            // PSAP search
+                            psapLayer.queryFeatures(psapQuery)
+                                .then(psapResults => {
+                                    console.log('PSAP search results:', psapResults);
+                                    if (!psapResults || !psapResults.features || psapResults.features.length === 0) {
+                                        return [];
+                                    }
+                                    
+                                    // Process PSAP features
+                                    return psapResults.features.map(feature => {
+                                        // Ensure the feature has attributes
+                                        if (!feature.attributes) {
+                                            feature.attributes = {};
+                                        }
+                                        
+                                        // Add layer information
+                                        feature.layerType = 'psap';
+                                        feature.layerName = 'PSAP';
+                                        
+                                        // Ensure we have a name attribute
+                                        if (!feature.attributes.name && !feature.attributes.NAME && feature.attributes.psap_name) {
+                                            feature.attributes.name = feature.attributes.psap_name;
+                                        } else if (!feature.attributes.name && feature.attributes.NAME) {
+                                            feature.attributes.name = feature.attributes.NAME;
+                                        } else if (!feature.attributes.name && feature.attributes.account_id) {
+                                            feature.attributes.name = feature.attributes.account_id;
+                                        } else if (!feature.attributes.name) {
+                                            feature.attributes.name = 'Unnamed PSAP';
+                                        }
+                                        
+                                        return feature;
+                                    });
+                                }),
+                                
+                            // Canadian Towns search
+                            canadaTownsLayer.queryFeatures({
+                                where: `UPPER(NAME) LIKE UPPER('%${searchTerm}%') OR UPPER(NAME_FR) LIKE UPPER('%${searchTerm}%')`,
+                                outFields: ["*"],
+                                returnGeometry: true
+                            }).then(canadaResults => {
+                                console.log('Canadian Towns search results:', canadaResults);
+                                if (!canadaResults || !canadaResults.features || canadaResults.features.length === 0) {
+                                    return [];
                                 }
                                 
-                                // Process features to ensure they have the required structure
-                                const processedFeatures = psapResults.features.map(feature => {
+                                // Process Canadian Towns features
+                                return canadaResults.features.map(feature => {
                                     // Ensure the feature has attributes
                                     if (!feature.attributes) {
                                         feature.attributes = {};
                                     }
                                     
                                     // Add layer information
-                                    feature.layerType = 'psap';
-                                    feature.layerName = 'PSAP';
+                                    feature.layerType = 'canada';
+                                    feature.layerName = 'Canadian Town';
                                     
                                     // Ensure we have a name attribute
-                                    if (!feature.attributes.name && !feature.attributes.NAME && feature.attributes.psap_name) {
-                                        feature.attributes.name = feature.attributes.psap_name;
-                                    } else if (!feature.attributes.name && feature.attributes.NAME) {
+                                    if (!feature.attributes.name && feature.attributes.NAME) {
                                         feature.attributes.name = feature.attributes.NAME;
-                                    } else if (!feature.attributes.name && feature.attributes.account_id) {
-                                        feature.attributes.name = feature.attributes.account_id;
+                                    } else if (!feature.attributes.name && feature.attributes.NAME_FR) {
+                                        feature.attributes.name = feature.attributes.NAME_FR;
                                     } else if (!feature.attributes.name) {
-                                        feature.attributes.name = 'Unnamed PSAP';
+                                        feature.attributes.name = 'Unnamed Location';
                                     }
                                     
                                     return feature;
                                 });
-                                
-                                console.log('Processed PSAP features:', processedFeatures);
-                                displaySearchResults(processedFeatures);
-                            });
+                            })
+                        ]).then(([psapFeatures, canadaFeatures]) => {
+                            // Combine and deduplicate features
+                            const allFeatures = [];
+                            const seenIds = new Set();
+                            
+                            function addIfNotExists(feature) {
+                                const id = feature.attributes.OBJECTID || feature.attributes.objectid || feature.attributes.id;
+                                if (!id || !seenIds.has(id)) {
+                                    if (id) seenIds.add(id);
+                                    allFeatures.push(feature);
+                                }
+                            }
+                            
+                            // Add PSAP features first
+                            if (psapFeatures && psapFeatures.length > 0) {
+                                psapFeatures.forEach(addIfNotExists);
+                            }
+                            
+                            // Add Canadian Towns features
+                            if (canadaFeatures && canadaFeatures.length > 0) {
+                                canadaFeatures.forEach(addIfNotExists);
+                            }
+                            
+                            // Display combined results
+                            if (allFeatures.length === 0) {
+                                searchResults.innerHTML = `
+                                    <div class="search-result-item">
+                                        No results found for "${searchTerm}"
+                                    </div>`;
+                            } else {
+                                displaySearchResults(allFeatures);
+                            }
+                            
+                            searchResults.style.display = 'block';
+                            return allFeatures;
+                        });
                     } catch (error) {
                         console.error('Error in PSAP search:', error);
                         searchResults.innerHTML = `
