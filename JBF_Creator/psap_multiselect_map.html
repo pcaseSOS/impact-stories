@@ -1097,6 +1097,36 @@
             
             searchButton.addEventListener('click', performSearch);
             
+            // Handle clicks on search result buttons
+            searchResults.addEventListener('click', function(e) {
+                const zoomBtn = e.target.closest('.zoom-to-feature');
+                const selectBtn = e.target.closest('.select-feature');
+                
+                if (zoomBtn || selectBtn) {
+                    const featureId = (zoomBtn || selectBtn).getAttribute('data-feature-id');
+                    const feature = searchResults.querySelector(`[data-feature-id="${featureId}"]`);
+                    
+                    if (feature) {
+                        const featureData = feature.featureData;
+                        if (zoomBtn) {
+                            // Zoom to the feature
+                            view.goTo({
+                                target: featureData.geometry,
+                                zoom: 12
+                            });
+                        }
+                        
+                        if (selectBtn) {
+                            // Select the feature
+                            selectFeature(featureData);
+                        }
+                        
+                        // Hide search results after selection
+                        searchResults.style.display = 'none';
+                    }
+                }
+            });
+            
             function performSearch() {
                 const searchTerm = searchInput.value.trim();
                 if (searchTerm.length < 2) return;
@@ -1455,6 +1485,10 @@
                         // Create a unique ID for this feature
                         const featureId = feature.OBJECTID || feature.objectid || feature.OBJECTID_1 || feature.objectid_1 || 
                                         feature.FID || feature.fid || Math.random().toString(36).substr(2, 9);
+                        
+                        // Store the feature data on the item element
+                        item.dataset.featureId = featureId;
+                        item.featureData = feature;
                         
                         item.innerHTML = `
                             <div class="search-result-header">
