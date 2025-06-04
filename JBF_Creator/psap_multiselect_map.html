@@ -1102,27 +1102,74 @@
                 const zoomBtn = e.target.closest('.zoom-to-feature');
                 const selectBtn = e.target.closest('.select-feature');
                 
-                if (zoomBtn || selectBtn) {
-                    const featureId = (zoomBtn || selectBtn).getAttribute('data-feature-id');
-                    const feature = searchResults.querySelector(`[data-feature-id="${featureId}"]`);
-                    
-                    if (feature) {
-                        const featureData = feature.featureData;
-                        if (zoomBtn) {
-                            // Zoom to the feature
+                if (!(zoomBtn || selectBtn)) return;
+                
+                e.stopPropagation();
+                e.preventDefault();
+                
+                const featureItem = (zoomBtn || selectBtn).closest('.search-result-item');
+                if (!featureItem || !featureItem.featureData) return;
+                
+                const featureData = featureItem.featureData;
+                console.log('Search result clicked:', featureData);
+                
+                if (zoomBtn) {
+                    // Zoom to the feature
+                    try {
+                        if (featureData.geometry) {
                             view.goTo({
                                 target: featureData.geometry,
                                 zoom: 12
                             });
+                        } else if (featureData.extent) {
+                            view.goTo({
+                                target: featureData.extent,
+                                zoom: 12
+                            });
+                        } else if (featureData.attributes && featureData.attributes.Shape) {
+                            view.goTo({
+                                target: featureData.attributes.Shape,
+                                zoom: 12
+                            });
                         }
+                        // Don't hide results when just zooming
+                        return;
+                    } catch (error) {
+                        console.error('Error zooming to feature:', error);
+                    }
+                }
+                
+                if (selectBtn) {
+                    try {
+                        // Make sure the feature has the required properties
+                        const featureToSelect = {
+                            attributes: featureData.attributes || {},
+                            geometry: featureData.geometry,
+                            layer: featureData.layerType === 'psap' ? psapLayer : canadaTownsLayer
+                        };
                         
-                        if (selectBtn) {
-                            // Select the feature
-                            selectFeature(featureData);
+                        // Select the feature
+                        selectFeature(featureToSelect);
+                        
+                        // Highlight the feature
+                        try {
+                            if (featureData.layerType === 'psap' && psapLayerView) {
+                                const highlight = psapLayerView.highlight(featureToSelect);
+                                highlightSelections.push(highlight);
+                            } else if (featureData.layerType === 'canada' && canadaTownsLayerView) {
+                                const highlight = canadaTownsLayerView.highlight(featureToSelect);
+                                highlightSelections.push(highlight);
+                            }
+                        } catch (highlightError) {
+                            console.error('Error highlighting feature:', highlightError);
                         }
                         
                         // Hide search results after selection
                         searchResults.style.display = 'none';
+                        
+                    } catch (error) {
+                        console.error('Error selecting feature:', error);
+                        status.textContent = 'Error selecting feature: ' + (error.message || 'Unknown error');
                     }
                 }
             });
@@ -1595,32 +1642,56 @@
 
             // Select a feature programmatically (used by search)
             function selectFeature(feature) {
+                console.log('selectFeature called with:', feature);
+                
                 if (!multiSelectMode && selectedFeatures.length > 0) {
                     clearAllSelections();
                 }
                 
-                // Check if already selected
-                const existingIndex = selectedFeatures.findIndex(f => 
-                    getFeatureId(f) === getFeatureId(feature)
-                );
+                // Check if already selected using a more robust comparison
+                const existingIndex = selectedFeatures.findIndex(f => {
+                    // If features have OBJECTID, compare those
+                    if (f.attributes && feature.attributes && 
+                        f.attributes.OBJECTID !== undefined && 
+                        feature.attributes.OBJECTID !== undefined) {
+                        return f.attributes.OBJECTID === feature.attributes.OBJECTID;
+                    }
+                    // If features have objectid, compare those
+                    if (f.attributes && feature.attributes && 
+                        f.attributes.objectid !== undefined && 
+                        feature.attributes.objectid !== undefined) {
+                        return f.attributes.objectid === feature.attributes.objectid;
+                    }
+                    // If features have a geometry, compare the geometry
+                    if (f.geometry && feature.geometry) {
+                        return f.geometry === feature.geometry;
+                    }
+                    // Fallback to strict equality
+                    return f === feature;
+                });
                 
                 if (existingIndex >= 0) {
-                    // Already selected - do nothing
+                    console.log('Feature already selected');
                     return;
                 }
                 
-                // Add to selection
-                selectedFeatures.push(feature);
-                
-                // Highlight the feature
-                if (psapLayerView) {
-                    const highlight = psapLayerView.highlight(feature);
-                    highlightSelections.push(highlight);
+                try {
+                    // Add to selection
+                    selectedFeatures.push(feature);
+                    console.log('Added feature to selection. Total selected:', selectedFeatures.length);
+                    
+                    // Update the UI
+                    updateSelectionPanel();
+                    updateStatus();
+                    
+                    // Enable the download and clear buttons
+                    downloadBtn.disabled = false;
+                    clearAllBtn.disabled = false;
+                    
+                } catch (error) {
+                    console.error('Error in selectFeature:', error);
+                    status.textContent = 'Error selecting feature: ' + (error.message || 'Unknown error');
                 }
-                
-                // Update selection panel with newly selected feature
-                updateSelectionPanel();
-                updateStatus();
             }
             
             // Hide tooltip when leaving map area
