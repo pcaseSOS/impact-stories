@@ -1442,6 +1442,7 @@
             }
             
             function displaySearchResults(features) {
+                console.log('Displaying search results:', features);
                 searchResults.innerHTML = '';
                 
                 if (features.length === 0) {
@@ -1450,36 +1451,48 @@
                     return;
                 }
                 
-                // Group results by layer type
-                const resultsByLayer = {
-                    psap: features.filter(f => f.layerType === 'psap'),
-                    canada: features.filter(f => f.layerType === 'canada')
-                };
-                
                 const resultsCount = document.createElement('div');
                 resultsCount.className = 'search-result-count';
                 resultsCount.textContent = `Found ${features.length} result${features.length !== 1 ? 's' : ''}`;
                 searchResults.appendChild(resultsCount);
                 
+                // Group results by layer type
+                const resultsByLayer = {
+                    psap: features.filter(f => f.layerType === 'psap' || f.layer?.id === 'psap-layer'),
+                    canada: features.filter(f => f.layerType === 'canada' || f.layer?.id === 'canada-towns')
+                };
+                
+                // Display PSAP results
                 if (resultsByLayer.psap.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'search-result-header';
                     header.textContent = `US PSAPs (${resultsByLayer.psap.length})`;
                     searchResults.appendChild(header);
                     
-                    resultsByLayer.psap.forEach(feature => {
-                        searchResults.appendChild(createSearchResultItem(feature, 'psap'));
+                    resultsByLayer.psap.forEach((feature, index) => {
+                        const item = createSearchResultItem(feature, 'psap');
+                        if (item) {
+                            searchResults.appendChild(item);
+                        } else {
+                            console.error('Failed to create search result item for PSAP feature:', feature);
+                        }
                     });
                 }
                 
+                // Display Canadian Towns results
                 if (resultsByLayer.canada.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'search-result-header';
                     header.textContent = `Canadian Towns (${resultsByLayer.canada.length})`;
                     searchResults.appendChild(header);
                     
-                    resultsByLayer.canada.forEach(feature => {
-                        searchResults.appendChild(createSearchResultItem(feature));
+                    resultsByLayer.canada.forEach((feature, index) => {
+                        const item = createSearchResultItem(feature, 'canada');
+                        if (item) {
+                            searchResults.appendChild(item);
+                        } else {
+                            console.error('Failed to create search result item for Canada feature:', feature);
+                        }
                     });
                 }
                 
@@ -1487,32 +1500,34 @@
                 
                 function createSearchResultItem(feature, layerType) {
                     try {
+                        console.log('Creating search result item:', feature, 'Layer type:', layerType);
+                        
                         const item = document.createElement('div');
                         item.className = 'search-result-item';
                         
                         // Get the feature's attributes with a fallback to empty object
-                        const attrs = feature.attributes || {};
+                        const attrs = feature.attributes || feature.properties || {};
                         
                         // Helper function to get a display name from common field names
                         const getNameFromAttrs = (attrs) => {
-                            const possibleNameFields = [
-                                'name', 'NAME', 'psap_name', 'PSAP_NAME', 'psapname', 'PSAPNAME',
-                                'account_id', 'ACCOUNT_ID', 'accountid', 'ACCOUNTID',
-                                'description', 'DESCRIPTION', 'desc', 'DESC',
-                                'label', 'LABEL', 'title', 'TITLE',
-                                'town', 'TOWN', 'city', 'CITY', 'municipality', 'MUNICIPALITY',
-                                'municipal_name', 'MUNICIPAL_NAME', 'municipalname', 'MUNICIPALNAME',
-                                'nom_ville', 'NOM_VILLE', 'nom_municipalite', 'NOM_MUNICIPALITE',
-                                'community', 'COMMUNITY', 'location', 'LOCATION', 'place_name', 'PLACE_NAME',
-                                'csdname', 'CSDNAME', 'cmaname', 'CMANAME', 'prname', 'PRNAME', 'prename', 'PRENAME',
-                                'english_name', 'ENGLISH_NAME', 'french_name', 'FRENCH_NAME', 'geo_name', 'GEO_NAME'
-                            ];
+                            if (!attrs) return 'Unnamed Feature';
                             
-                            for (const field of possibleNameFields) {
-                                if (attrs[field] !== undefined && attrs[field] !== null && attrs[field] !== '') {
-                                    return String(attrs[field]);
+                            // Try to find a name field in a case-insensitive way
+                            const nameField = Object.keys(attrs).find(key => 
+                                /(name|title|description|psap|town|city|municipality|label)/i.test(key)
+                            );
+                            
+                            if (nameField && attrs[nameField]) {
+                                return String(attrs[nameField]);
+                            }
+                            
+                            // If no name field found, return the first non-empty string value
+                            for (const [key, value] of Object.entries(attrs)) {
+                                if (typeof value === 'string' && value.trim() !== '') {
+                                    return value;
                                 }
                             }
+                            
                             return 'Unnamed Feature';
                         };
                         
@@ -1520,18 +1535,22 @@
                         
                         // Create a more informative display with available attributes
                         let details = '';
-                        Object.entries(attrs).forEach(([key, value]) => {
-                            if (value !== null && value !== undefined && value !== '' && 
-                                !key.toLowerCase().includes('shape') && 
-                                !key.toLowerCase().includes('objectid') &&
-                                !key.toLowerCase().includes('globalid')) {
-                                details += `<div><strong>${key}:</strong> ${value}</div>`;
-                            }
-                        });
+                        if (attrs) {
+                            Object.entries(attrs).forEach(([key, value]) => {
+                                if (value !== null && value !== undefined && value !== '' && 
+                                    !key.toLowerCase().includes('shape') && 
+                                    !key.toLowerCase().includes('objectid') &&
+                                    !key.toLowerCase().includes('globalid') &&
+                                    !key.toLowerCase().includes('geometry')) {
+                                    details += `<div><strong>${key}:</strong> ${value}</div>`;
+                                }
+                            });
+                        }
                         
                         // Create a unique ID for this feature
-                        const featureId = feature.OBJECTID || feature.objectid || feature.OBJECTID_1 || feature.objectid_1 || 
-                                        feature.FID || feature.fid || Math.random().toString(36).substr(2, 9);
+                        const featureId = attrs.OBJECTID || attrs.objectid || attrs.id || 
+                                       feature.OBJECTID || feature.objectid || feature.id || 
+                                       Math.random().toString(36).substr(2, 9);
                         
                         // Store the feature data on the item element
                         item.dataset.featureId = featureId;
