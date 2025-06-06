@@ -289,75 +289,8 @@
             const map = new Map({
                 basemap: "satellite"
             });
-            
-            // Add Google Maps as a basemap
-            const googleMapsAPIKey = "AIzaSyCzDGrRiILLXTXgVWH-37LpDu--8kjXz9I";
-            if (googleMapsAPIKey) {
-                const googleMapsLayer = new WebTileLayer({
-                    urlTemplate: `https://mt1.google.com/vt/lyrs=m&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
-                    copyright: "Google Maps"
-                });
-                
-                const googleSatelliteLayer = new WebTileLayer({
-                    urlTemplate: `https://mt1.google.com/vt/lyrs=s&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
-                    copyright: "Google Satellite"
-                });
-                
-                const googleHybridLayer = new WebTileLayer({
-                    urlTemplate: `https://mt1.google.com/vt/lyrs=y&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
-                    copyright: "Google Hybrid"
-                });
-                
-                // Store custom basemaps for later use
-                window.customBasemaps = {
-                    "google-streets": {
-                        baseLayers: [googleMapsLayer],
-                        title: "Google Maps"
-                    },
-                    "google-satellite": {
-                        baseLayers: [googleSatelliteLayer],
-                        title: "Google Satellite"
-                    },
-                    "google-hybrid": {
-                        baseLayers: [googleHybridLayer],
-                        title: "Google Hybrid"
-                    }
-                };
-            }
 
-            // Create a view for the map
-            const view = new MapView({
-                container: "viewDiv",
-                map: map,
-                center: [-98.5795, 39.8283], // Center of the US
-                zoom: 4,
-                popup: {
-                    dockEnabled: true,
-                    dockOptions: {
-                        buttonEnabled: false,
-                        breakpoint: false,
-                        position: "top-right"
-                    }
-                },
-                ui: {
-                    components: ["attribution", "zoom"]
-                },
-                constraints: {
-                    minZoom: 2
-                }
-            });
-            
-            // Add a basemap toggle for switching between different map types
-            view.when(function() {
-                const basemapToggle = new BasemapToggle({
-                    view: view,
-                    nextBasemap: "satellite"
-                });
-                
-                // Add the basemap toggle to the UI
-                view.ui.add(basemapToggle, "bottom-right");
-            });
-
+            // Create a graphics layer for building footprints
             const buildingFootprintsLayer = new GraphicsLayer();
             map.add(buildingFootprintsLayer);
             
@@ -389,12 +322,123 @@
                         { responseType: "json" }
                     );
                     
-                    return response.data.elements || [];
+                    if (response.data && response.data.elements) {
+                        processOSMBuildings(response.data.elements);
+                    }
                 } catch (error) {
                     console.error("Error fetching building data:", error);
-                    return [];
+                    const statusElement = document.getElementById('status');
+                    if (statusElement) {
+                        statusElement.textContent = "Error loading building data. Please try again.";
+                    }
                 }
             }
+            
+            // Function to process OSM data and create graphics
+            function processOSMBuildings(elements) {
+                // Clear previous footprints
+                buildingFootprintsLayer.removeAll();
+                
+                const buildings = elements.filter(el => el.type === 'way' && el.tags && el.tags.building);
+                let buildingCount = 0;
+                
+                buildings.forEach(building => {
+                    if (building.nodes && building.nodes.length >= 3) {
+                        // Convert OSM nodes to points
+                        const points = building.nodes.map(nodeId => {
+                            const node = elements.find(el => el.type === 'node' && el.id === nodeId);
+                            return node ? [node.lon, node.lat] : null;
+                        }).filter(Boolean);
+                        
+                        if (points.length >= 3) {
+                            // Create a polygon graphic
+                            const polygon = {
+                                type: "polygon",
+                                rings: [points.map(p => [p[0], p[1]])]
+                            };
+                            
+                            const graphic = new Graphic({
+                                geometry: polygon,
+                                symbol: {
+                                    type: "simple-fill",
+                                    color: [0, 0, 255, 0.3],
+                                    outline: {
+                                        color: [0, 0, 200],
+                                        width: 1
+                                    }
+                                },
+                                attributes: {
+                                    id: building.id,
+                                    type: building.tags.building || 'building',
+                                    source: 'OSM',
+                                    timestamp: new Date().toISOString()
+                                },
+                                popupTemplate: {
+                                    title: "Building {id}",
+                                    content: [
+                                        {
+                                            type: "fields",
+                                            fieldInfos: [
+                                                { fieldName: "type", label: "Type" },
+                                                { fieldName: "source", label: "Source" }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            });
+                            
+                            buildingFootprintsLayer.add(graphic);
+                            buildingCount++;
+                        }
+                    }
+                });
+                
+                const statusElement = document.getElementById('status');
+                if (statusElement) {
+                    statusElement.textContent = `Loaded ${buildingCount} buildings`;
+                }
+            }
+
+            // Create a view for the map
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [-98.5795, 39.8283], // Center of the US
+                zoom: 4,
+                
+                // Add event listener for view extent changes
+                extentChanged: function() {
+                    fetchBuildingFootprints(view.extent);
+                },
+                popup: {
+                    dockEnabled: true,
+                    dockOptions: {
+                        buttonEnabled: false,
+                        breakpoint: false,
+                        position: "top-right"
+                    }
+                },
+                ui: {
+                    components: ["attribution", "zoom"]
+                },
+                constraints: {
+                    minZoom: 2
+                }
+            });
+            
+            // Add a basemap toggle for switching between different map types
+            view.when(function() {
+                const basemapToggle = new BasemapToggle({
+                    view: view,
+                    nextBasemap: "satellite"
+                });
+                
+                // Add the basemap toggle to the UI
+                view.ui.add(basemapToggle, "bottom-right");
+            });
+
+            // Initial load of buildings for current view
+            fetchBuildingFootprints(view.extent);
             
             // Function to process OSM data and create graphics
             function processOSMBuildings(elements) {
