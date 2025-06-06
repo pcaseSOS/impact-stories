@@ -25,18 +25,19 @@
         /* Instructions panel */
         #instructions {
             position: absolute;
-            bottom: 20px;
+            top: 70px;
             right: 20px;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 100;
             max-width: 300px;
             max-height: 70vh;
             overflow-y: auto;
             font-size: 14px;
             line-height: 1.4;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
         }
         
         #instructions h3 {
@@ -284,9 +285,9 @@
             Expand, BasemapToggle, BasemapGallery, geometryEngineAsync,
             Extent, Polygon, Point, webMercatorUtils, esriRequest
         ) {
-            // Create a basic map with a default basemap
+            // Create a map with satellite as the default basemap
             const map = new Map({
-                basemap: "streets-navigation-vector"
+                basemap: "satellite"
             });
             
             // Add Google Maps as a basemap
