@@ -5,6 +5,104 @@
     <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
     <title>Building Outline Mapper</title>
     <style>
+        /* Ensure map container takes full viewport */
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        /* Position the map container */
+        #viewDiv {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 0;
+        }
+        
+        /* Instructions panel */
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 100;
+            max-width: 300px;
+            max-height: 70vh;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        #instructions h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        
+        #instructions ol {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+        
+        #instructions li {
+            margin-bottom: 8px;
+        }
+        
+        /* Help button */
+        .help-button {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            width: 100%;
+            margin-bottom: 10px;
+            transition: background-color 0.2s;
+        }
+        
+        .help-button:hover {
+            background: #005e95;
+        }
+        
+        #toggleInstructions {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        
+        #toggleInstructions:hover {
+            background: #005e95;
+        }
+        
+        /* Ensure popups are always on top */
+        .esri-popup {
+            z-index: 1002 !important;
+        }
+        
+        /* Make sure the building info dialog is on top */
+        #buildingInfo {
+            z-index: 1003 !important;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
         html, body, #viewDiv {
             padding: 0;
             margin: 0;
@@ -25,6 +123,27 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+        }
+
+        /* Toolbar styles */
+        #topbar {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            z-index: 100;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            pointer-events: none;
+            max-width: calc(100% - 30px);
+        }
+        
+        /* Make sure toolbar buttons are clickable */
+        #topbar button, 
+        #topbar .esri-widget,
+        #topbar .esri-component {
+            pointer-events: auto;
         }
 
         .tool-button {
@@ -81,16 +200,17 @@
         /* Building info window styles */
         #buildingInfo {
             display: none;
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             background: white;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 1000;
-            width: 300px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1001;
+            width: 320px;
+            max-width: 90vw;
         }
         
         #buildingInfo h3 {
@@ -384,102 +504,70 @@
                 document.addEventListener('keydown', keyHandler);
             }
 
-            // Add the search widget with custom behavior
+            // Create a container for the search widget
+            const searchContainer = document.createElement("div");
+            searchContainer.id = "searchWidget";
+            document.body.appendChild(searchContainer);
+            
+            // Initialize the search widget
             const searchWidget = new Search({
                 view: view,
-                container: "search",
+                container: searchContainer,
+                includeDefaultSources: true,
                 popupEnabled: false,
-                includeDefaultSources: false,
-                sources: [{
-                    name: "Esri World Geocoder",
-                    placeholder: "Search for an address or place",
-                    apiKey: null, // You can add an API key here if needed
-                    singleLineFieldName: "SingleLine",
-                    outFields: ["*"],
-                    zoomScale: 2000,
-                    maxResults: 6,
-                    searchExtent: null,
-                    countryCode: ""
-                }]
+                popupOpenOnSelect: false,
+                resultGraphicEnabled: false
             });
             
-            // When search completes, fetch buildings in the area
-            searchWidget.on("search-complete", async (event) => {
+            // Position the search widget
+            searchContainer.style.position = 'absolute';
+            searchContainer.style.top = '15px';
+            searchContainer.style.right = '15px';
+            searchContainer.style.zIndex = '100';
+            
+            // Handle search completion
+            searchWidget.on("search-complete", function(event) {
                 if (event.results && event.results.length > 0) {
                     const result = event.results[0];
-                    const extent = result.extent;
-                    
-                    // Show loading message
-                    document.getElementById('status').textContent = "Detecting buildings in this area...";
-                    
-                    try {
-                        // Fetch buildings from OSM
-                        const elements = await fetchBuildingFootprints(extent);
-                        const buildingCount = processOSMBuildings(elements);
-                        
-                        // Update status
+                    // Zoom to the search result
+                    view.goTo({
+                        target: result.extent || result.feature.geometry,
+                        padding: 100
+                    }).then(() => {
+                        // Show a message to refresh buildings
                         document.getElementById('status').textContent = 
-                            `Detected ${buildingCount} buildings. Click on a building to edit its details.`;
-                            
-                        // Zoom to the buildings with some padding
-                        await view.goTo({
-                            target: buildingFootprintsLayer.graphics,
-                            padding: 50
-                        });
-                        
-                    } catch (error) {
-                        console.error("Error processing buildings:", error);
-                        document.getElementById('status').textContent = 
-                            "Error detecting buildings. Please try another location.";
-                    }
+                            'Click "Refresh Buildings" to detect buildings in this area.';
+                    });
                 }
             });
             
-            // Function to create a new building with default attributes
-            function createNewBuilding(geometry) {
-                const id = 'custom_' + Date.now();
-                const area = geometryEngine.geodesicArea(geometry, "square-meters").toFixed(2) + " m²";
-                
-                return new Graphic({
-                    geometry: geometry,
-                    symbol: {
-                        type: "simple-fill",
-                        color: [0, 200, 0, 0.5],
-                        outline: {
-                            color: [0, 150, 0],
-                            width: 2
-                        }
-                    },
-                    attributes: {
-                        id: id,
-                        name: `Building ${id}`,
-                        type: 'building',
-                        source: 'custom',
-                        notes: '',
-                        area: area,
-                        timestamp: new Date().toISOString()
-                    },
-                    popupTemplate: {
-                        title: "{name}",
-                        content: [
-                            {
-                                type: "fields",
-                                fieldInfos: [
-                                    { fieldName: "type", label: "Type" },
-                                    { fieldName: "area", label: "Area" },
-                                    { fieldName: "notes", label: "Notes" }
-                                ]
-                            }
-                        ]
-                    }
-                });
-            }
-
-            // Create the sketch widget
-            let sketch;
-            const sketchLayer = new GraphicsLayer();
-            map.add(sketchLayer);
+            // Handle search errors
+            searchWidget.on("search-error", function() {
+                document.getElementById('status').textContent = 
+                    'Search error. Please try a different location or check your connection.';
+            });
             
+            // Toggle instructions panel
+            document.getElementById('toggleInstructions').addEventListener('click', function() {
+                const content = document.getElementById('instructions-content');
+                const button = document.getElementById('toggleInstructions');
+                
+                if (content.classList.contains('hidden')) {
+                    content.classList.remove('hidden');
+                    button.textContent = 'Hide Help';
+                    button.title = 'Hide help instructions';
+                } else {
+                    content.classList.add('hidden');
+                    button.textContent = 'Show Help';
+                    button.title = 'Show help instructions';
+                }
+            });
+            
+            // Initially hide the instructions
+            document.getElementById('instructions-content').classList.add('hidden');
+            document.getElementById('toggleInstructions').textContent = 'Show Help';
+            document.getElementById('toggleInstructions').title = 'Show help instructions';
+
             // Create a layer for custom buildings
             const customBuildingsLayer = new GraphicsLayer();
             map.add(customBuildingsLayer);
@@ -631,6 +719,11 @@
                 });
                 document.getElementById('topbar').appendChild(reportOutdatedBtn);
 
+                // Create the sketch widget
+                let sketch;
+                const sketchLayer = new GraphicsLayer();
+                map.add(sketchLayer);
+                
                 // Update UI when the sketch is created
                 sketch.on("create", function(event) {
                     if (event.state === "complete") {
@@ -766,6 +859,13 @@
                         const buildingCount = processOSMBuildings(elements);
                         document.getElementById('status').textContent = 
                             `Updated: ${buildingCount} buildings detected in this area.`;
+                            
+                        // Zoom to the buildings with some padding
+                        await view.goTo({
+                            target: buildingFootprintsLayer.graphics,
+                            padding: 50
+                        });
+                        
                     } catch (error) {
                         console.error("Error refreshing buildings:", error);
                         document.getElementById('status').textContent = 
@@ -835,6 +935,28 @@
 </head>
 
 <body>
+    <div id="instructions">
+        <button id="toggleInstructions" class="help-button">Show Help</button>
+        <div id="instructions-content" class="hidden">
+            <h3>Building Outline Mapper</h3>
+            <ol>
+                <li><strong>Search</strong> for a location using the box in the top-right</li>
+                <li>Click <strong>Refresh Buildings</strong> to detect buildings</li>
+                <li><strong>Click</strong> on any building to view details</li>
+                <li>Toggle <strong>Edit Mode</strong> to modify buildings</li>
+                <li>Use <strong>Draw</strong> to add new buildings</li>
+                <li>Click <strong>Show Newest Imagery</strong> for updated images</li>
+            </ol>
+            <p><strong>Tips:</strong></p>
+            <ul>
+                <li>Zoom in for better building detection</li>
+                <li>Click and hold to pan the map</li>
+                <li>Use mouse wheel to zoom in/out</li>
+                <li>Right-click and drag to rotate (3D mode)</li>
+            </ul>
+        </div>
+    </div>
+    
     <div id="viewDiv"></div>
     
     <div id="search">
