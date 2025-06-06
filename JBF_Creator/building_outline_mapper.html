@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Building Outline Mapper</title>
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            font-family: Arial, sans-serif;
+        }
+
+        #topbar {
+            background: #fff;
+            padding: 10px;
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 1;
+            border-radius: 4px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tool-button {
+            padding: 8px 12px;
+            background: #f8f8f8;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .tool-button.active {
+            background: #0079c1;
+            color: white;
+            border-color: #005e95;
+        }
+
+        #search {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 1;
+            width: 300px;
+        }
+
+        #search input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+        }
+
+        #status {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px;
+            border-radius: 4px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            z-index: 1;
+            font-size: 14px;
+        }
+
+        .esri-ui-top-right {
+            top: 60px !important;
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+    
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/widgets/Search",
+            "esri/widgets/Sketch",
+            "esri/layers/GraphicsLayer",
+            "esri/Graphic",
+            "esri/geometry/geometryEngine",
+            "esri/widgets/Expand",
+            "esri/widgets/BasemapToggle",
+            "esri/widgets/BasemapGallery",
+            "esri/geometry/geometryEngineAsync"
+        ], function(
+            Map, MapView, Search, Sketch, GraphicsLayer, Graphic, geometryEngine, 
+            Expand, BasemapToggle, BasemapGallery, geometryEngineAsync
+        ) {
+            // Create a map with the latest imagery basemap
+            const map = new Map({
+                basemap: "satellite"
+            });
+
+            // Create a view for the map
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                center: [-98.5795, 39.8283], // Center of the US
+                zoom: 4
+            });
+
+            // Create a graphics layer for the building outlines
+            const graphicsLayer = new GraphicsLayer();
+            map.add(graphicsLayer);
+
+            // Add the search widget
+            const searchWidget = new Search({
+                view: view,
+                container: "search",
+                popupEnabled: false
+            });
+
+            // Create the sketch widget
+            let sketch;
+            const sketchLayer = new GraphicsLayer();
+            map.add(sketchLayer);
+
+            // Initialize the sketch widget when the view is ready
+            view.when(() => {
+                sketch = new Sketch({
+                    layer: sketchLayer,
+                    view: view,
+                    creationMode: "update",
+                    availableCreateTools: ["polygon"],
+                    container: document.createElement("div"),
+                    defaultCreateOptions: {
+                        mode: "hybrid"
+                    }
+                });
+
+                // Add a basemap gallery in the top right corner
+                const basemapGallery = new BasemapGallery({
+                    view: view
+                });
+
+                const bgExpand = new Expand({
+                    view: view,
+                    content: basemapGallery,
+                    expandTooltip: "Basemap Gallery"
+                });
+
+                view.ui.add(bgExpand, "top-right");
+                
+                // Add a basemap toggle
+                const basemapToggle = new BasemapToggle({
+                    view: view,
+                    nextBasemap: "hybrid"
+                });
+                
+                view.ui.add(basemapToggle, "bottom-right");
+
+                // Update UI when the sketch is created
+                sketch.on("create", function(event) {
+                    if (event.state === "complete") {
+                        // Convert the sketch to a graphic and add it to the graphics layer
+                        const graphic = event.graphic.clone();
+                        graphic.symbol = {
+                            type: "simple-fill",
+                            color: [255, 0, 0, 0.3],
+                            style: "solid",
+                            outline: {
+                                color: [255, 0, 0],
+                                width: 2
+                            }
+                        };
+                        graphicsLayer.add(graphic);
+                        
+                        // Clear the sketch layer
+                        sketchLayer.removeAll();
+                        
+                        // Update status
+                        document.getElementById('status').textContent = 
+                            `Building outline added. Total: ${graphicsLayer.graphics.length} buildings`;
+                    }
+                });
+
+                // Update status when sketch is updated
+                sketch.on("update", function(event) {
+                    if (event.state === "complete") {
+                        document.getElementById('status').textContent = 
+                            `Building outline updated. Total: ${graphicsLayer.graphics.length} buildings`;
+                    }
+                });
+            });
+
+            // Toggle drawing mode
+            document.getElementById('drawBtn').addEventListener('click', function() {
+                if (this.classList.contains('active')) {
+                    // Disable drawing
+                    view.ui.remove(sketch);
+                    this.classList.remove('active');
+                    document.getElementById('status').textContent = "Drawing mode deactivated";
+                } else {
+                    // Enable drawing
+                    view.ui.add(sketch, "top-right");
+                    this.classList.add('active');
+                    document.getElementById('status').textContent = "Click on the map to start drawing a building outline";
+                }
+            });
+
+            // Clear all graphics
+            document.getElementById('clearBtn').addEventListener('click', function() {
+                if (confirm("Are you sure you want to clear all building outlines?")) {
+                    graphicsLayer.removeAll();
+                    document.getElementById('status').textContent = "All building outlines cleared";
+                }
+            });
+
+            // Download the building outlines as GeoJSON
+            document.getElementById('downloadBtn').addEventListener('click', function() {
+                if (graphicsLayer.graphics.length === 0) {
+                    alert("No building outlines to download");
+                    return;
+                }
+
+                
+                // Create a GeoJSON feature collection
+                const featureCollection = {
+                    type: "FeatureCollection",
+                    features: graphicsLayer.graphics.map(g => ({
+                        type: "Feature",
+                        geometry: g.geometry.toJSON(),
+                        properties: {
+                            id: g.attributes?.id || Date.now(),
+                            area: geometryEngine.geodesicArea(g.geometry, "square-meters").toFixed(2) + " m²"
+                        }
+                    }))
+                };
+
+                // Create a download link
+                const dataStr = "data:text/json;charset=utf-8," + 
+                    encodeURIComponent(JSON.stringify(featureCollection, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `building_outlines_${new Date().toISOString().split('T')[0]}.geojson`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                
+                document.getElementById('status').textContent = `Downloaded ${graphicsLayer.graphics.length} building outlines`;
+            });
+
+            // Update status when the view is ready
+            view.when(() => {
+                document.getElementById('status').textContent = "Map is ready. Use the search box to find a location.";
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="viewDiv"></div>
+    
+    <div id="search">
+        <input type="text" placeholder="Search for a location..." />
+    </div>
+    
+    <div id="topbar">
+        <button id="drawBtn" class="tool-button" title="Draw Building Outline">
+            <span>✏️ Draw</span>
+        </button>
+        <button id="clearBtn" class="tool-button" title="Clear All Outlines">
+            <span>🗑️ Clear All</span>
+        </button>
+        <button id="downloadBtn" class="tool-button" title="Download Outlines">
+            <span>💾 Download</span>
+        </button>
+    </div>
+    
+    <div id="status">Loading map...</div>
+</body>
+</html>
