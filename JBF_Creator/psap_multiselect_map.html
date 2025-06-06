@@ -1345,16 +1345,14 @@
                 }
             }
             
-            // Initialize layer switch button
+            // Initialize the layer switch button
             const layerSwitchBtn = document.getElementById('layerSwitchBtn');
             if (layerSwitchBtn) {
-                // Remove any existing event listeners to prevent duplicates
-                const newBtn = layerSwitchBtn.cloneNode(true);
-                layerSwitchBtn.parentNode.replaceChild(newBtn, layerSwitchBtn);
-                newBtn.addEventListener('click', toggleActiveLayer);
-                
-                // Set initial button text
+                // Update the button text based on initial active layer
                 updateLayerSwitchText();
+                
+                // Add event listener to the button
+                layerSwitchBtn.addEventListener('click', toggleActiveLayer);
             } else {
                 console.error('Layer switch button not found');
             }
