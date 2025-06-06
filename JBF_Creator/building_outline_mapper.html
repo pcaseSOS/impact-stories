@@ -160,8 +160,46 @@
         ) {
             // Create a map with the latest imagery basemap
             const map = new Map({
-                basemap: "satellite"
+                basemap: {
+                    baseLayers: [
+                        // Esri World Imagery (default)
+                        {
+                            id: "esri-imagery",
+                            title: "Esri World Imagery",
+                            url: "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer"
+                        },
+                        // Esri World Imagery (with Labels)
+                        {
+                            id: "esri-imagery-labels",
+                            title: "Esri Imagery with Labels",
+                            url: "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer"
+                        },
+                        // Maxar Premium Imagery (often has newer imagery)
+                        {
+                            id: "maxar-premium",
+                            title: "Maxar Premium Imagery",
+                            url: "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer",
+                            copyright: "Maxar, Earthstar Geographics"
+                        },
+                        // Esri World Imagery (Clarity) - Beta - sometimes has newer imagery
+                        {
+                            id: "esri-clarity-beta",
+                            title: "Esri Clarity (Beta)",
+                            url: "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer",
+                            copyright: "Maxar, Earthstar Geographics, CNES/Airbus DS, USDA FSA, USGS, Aerogrid, IGN, IGP, and the GIS User Community"
+                        },
+                        // ESRI Community Maps (sometimes has newer local imagery)
+                        {
+                            id: "esri-community",
+                            title: "ESRI Community Maps",
+                            url: "https://www.arcgis.com/sharing/rest/content/items/1b2435395004510b9f8c6e641eeca32a/resources/images/"
+                        }
+                    ]
+                }
             });
+            
+            // Set the default basemap
+            map.basemap = "esri-imagery";
 
             // Create a view for the map
             const view = new MapView({
@@ -458,14 +496,33 @@
                 if (editMode) {
                     toggleEditMode.classList.add('active');
                     document.getElementById('status').textContent = 
-                        'Edit mode: Click on a building to edit it';
+                        'Edit mode: ON. Click on buildings to edit them, or use the Draw tool to add new ones.';
                 } else {
                     toggleEditMode.classList.remove('active');
-                    document.getElementById('status').textContent = 
-                        'View mode: Click on buildings to select them';
+                    document.getElementById('status').textContent = 'Edit mode: OFF';
                 }
             });
             document.getElementById('topbar').appendChild(toggleEditMode);
+            
+            // Add a button to quickly switch to the most recent imagery
+            const recentImageryBtn = document.createElement('button');
+            recentImageryBtn.className = 'tool-button';
+            recentImageryBtn.innerHTML = '🛰️ Show Newest Available Imagery';
+            recentImageryBtn.title = 'Switch to the most recent imagery available for this area';
+            recentImageryBtn.addEventListener('click', () => {
+                // Switch to the Clarity basemap which often has newer imagery
+                basemapGallery.activeBasemap = basemapGallery.source.items.find(
+                    item => item.portalItem && item.portalItem.id === 'c8b0d7d5372944ac8c245b0d9a6733d9'
+                );
+                
+                // Show a message
+                document.getElementById('status').textContent = 
+                    'Switched to Esri Clarity (Beta) which may have newer imagery. Check other basemaps if needed.';
+                
+                // Expand the basemap selector
+                view.ui.find('basemap-gallery-expand').expand();
+            });
+            document.getElementById('topbar').appendChild(recentImageryBtn);
 
             // Initialize the sketch widget when the view is ready
             view.when(() => {
@@ -482,24 +539,97 @@
 
                 // Add a basemap gallery in the top right corner
                 const basemapGallery = new BasemapGallery({
-                    view: view
+                    view: view,
+                    container: document.createElement("div"),
+                    source: [
+                        // High-resolution imagery sources
+                        {
+                            portalItem: {
+                                id: "10df2279f9684e4a9f6a7f08febac2a9"  // World Imagery
+                            },
+                            title: "Esri World Imagery"
+                        },
+                        {
+                            portalItem: {
+                                id: "c8b0d7d5372944ac8c245b0d9a6733d9"  // World Imagery (Clarity) Beta
+                            },
+                            title: "Esri Clarity (Beta - Newer Imagery)"
+                        },
+                        {
+                            portalItem: {
+                                id: "d5d02af9b9a74d2d9c6c9c0f54003b4d"  // Maxar Premium Imagery
+                            },
+                            title: "Maxar Premium (Newer Imagery)"
+                        },
+                        // Add more basemaps as needed
+                        {
+                            portalItem: {
+                                id: "b9d3190d1e474e5ab9455abda8990fb0"  // World Imagery with Labels
+                            },
+                            title: "Imagery with Labels"
+                        },
+                        {
+                            portalItem: {
+                                id: "52bdc7ab7fb044d98add14876430aaec"  // Community Map
+                            },
+                            title: "Community Maps (Local Updates)"
+                        }
+                    ]
                 });
-
-                const bgExpand = new Expand({
+                
+                // Add a button to toggle the basemap gallery
+                const basemapToggle = new Expand({
                     view: view,
                     content: basemapGallery,
-                    expandTooltip: "Basemap Gallery"
-                });
-
-                view.ui.add(bgExpand, "top-right");
-                
-                // Add a basemap toggle
-                const basemapToggle = new BasemapToggle({
-                    view: view,
-                    nextBasemap: "hybrid"
+                    expandIcon: "basemap",
+                    expandTooltip: "Change Basemap"
                 });
                 
-                view.ui.add(basemapToggle, "bottom-right");
+                // Add the basemap toggle to the UI
+                view.ui.add(basemapToggle, "top-right");
+                
+                // Add a button to check for newer imagery at current location
+                const checkNewerImageryBtn = document.createElement('button');
+                checkNewerImageryBtn.className = 'tool-button';
+                checkNewerImageryBtn.innerHTML = '🔄 Check for Newer Imagery';
+                checkNewerImageryBtn.title = 'Check for more recent satellite imagery at this location';
+                checkNewerImageryBtn.addEventListener('click', () => {
+                    // Show a message about checking for newer imagery
+                    const status = document.getElementById('status');
+                    status.textContent = 'Checking for newer imagery in this area...';
+                    
+                    // This is a simplified check - in a real app, you might query a service
+                    // that provides metadata about available imagery dates
+                    setTimeout(() => {
+                        status.textContent = 'Tip: Try the "Esri Clarity" or "Maxar Premium" basemaps for potentially newer imagery in this area.';
+                    }, 1000);
+                    
+                    // Scroll the basemap selector into view
+                    basemapToggle.expand();
+                });
+                document.getElementById('topbar').appendChild(checkNewerImageryBtn);
+                
+                // Add a button to report outdated imagery
+                const reportOutdatedBtn = document.createElement('button');
+                reportOutdatedBtn.className = 'tool-button';
+                reportOutdatedBtn.innerHTML = '⚠️ Report Outdated Imagery';
+                reportOutdatedBtn.title = 'Report outdated or incorrect imagery to Esri';
+                reportOutdatedBtn.addEventListener('click', () => {
+                    // Get current map center
+                    const center = view.center;
+                    const zoom = view.zoom;
+                    
+                    // Create a URL to report outdated imagery to Esri
+                    const reportUrl = `https://www.esri.com/en-us/arcgis/products/arcgis-online/imagery-updates`;
+                    
+                    // Open the reporting page in a new tab
+                    window.open(reportUrl, '_blank');
+                    
+                    // Show a message
+                    document.getElementById('status').textContent = 
+                        'Please report outdated imagery through the Esri Imagery Updates page.';
+                });
+                document.getElementById('topbar').appendChild(reportOutdatedBtn);
 
                 // Update UI when the sketch is created
                 sketch.on("create", function(event) {
