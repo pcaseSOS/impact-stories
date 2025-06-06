@@ -528,13 +528,24 @@
                 </div>
                 
                 <div class="tutorial-step">
-                    <h3><span class="tutorial-step-number">2</span>Searching for Locations</h3>
+                    <h3><span class="tutorial-step-number">2</span>Switching Between Layers</h3>
+                    <p>Use the <strong>Focus</strong> button in the top-right to switch between US PSAPs and Canadian Towns layers.</p>
+                    <p>The active layer will be highlighted, and the search will only look in the currently selected layer.</p>
+                </div>
+                
+                <div class="tutorial-step">
+                    <h3><span class="tutorial-step-number">3</span>Searching for Locations</h3>
                     <p>Use the search bar in the top-left to find specific PSAPs or Canadian towns.</p>
+                    <ul>
+                        <li>Searches are case-insensitive and look for partial matches</li>
+                        <li>For Canadian Towns, search by the town name in the CSDNAME field</li>
+                        <li>For PSAPs, search by PSAP name, account ID, or name</li>
+                    </ul>
                     <p>Click on a search result to zoom to that location and select it.</p>
                 </div>
                 
                 <div class="tutorial-step">
-                    <h3><span class="tutorial-step-number">3</span>Managing Selections</h3>
+                    <h3><span class="tutorial-step-number">4</span>Managing Selections</h3>
                     <p>View your selected features in the panel on the left. You can:</p>
                     <ul>
                         <li>Click the <strong>×</strong> next to an item to remove it</li>
@@ -544,7 +555,7 @@
                 </div>
                 
                 <div class="tutorial-step">
-                    <h3><span class="tutorial-step-number">4</span>Drawing Tools</h3>
+                    <h3><span class="tutorial-step-number">5</span>Drawing Tools</h3>
                     <p>Use the drawing tools to create custom areas of interest:</p>
                     <ul>
                         <li>Click the <strong>Draw Polygon</strong> button to start drawing</li>
@@ -1362,10 +1373,11 @@
                 searchResults.innerHTML = '';
                 
                 if (features.length === 0) {
+                    const searchTerm = searchInput.value.trim();
                     const layerName = activeLayer === 'psap' ? 'US PSAPs' : 'Canadian Towns';
                     searchResults.innerHTML = `
                         <div class="search-result-item">
-                            No results found in ${layerName} layer
+                            No results found for "${searchTerm}" in ${layerName} layer - do you have the right layer selected in the top right?
                         </div>`;
                     searchResults.style.display = 'block';
                     return;
