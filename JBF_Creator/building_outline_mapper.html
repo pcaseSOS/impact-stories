@@ -94,10 +94,16 @@
             "esri/widgets/Expand",
             "esri/widgets/BasemapToggle",
             "esri/widgets/BasemapGallery",
-            "esri/geometry/geometryEngineAsync"
+            "esri/geometry/geometryEngineAsync",
+            "esri/geometry/Extent",
+            "esri/geometry/Polygon",
+            "esri/geometry/Point",
+            "esri/geometry/support/webMercatorUtils",
+            "esri/request"
         ], function(
             Map, MapView, Search, Sketch, GraphicsLayer, Graphic, geometryEngine, 
-            Expand, BasemapToggle, BasemapGallery, geometryEngineAsync
+            Expand, BasemapToggle, BasemapGallery, geometryEngineAsync,
+            Extent, Polygon, Point, webMercatorUtils, esriRequest
         ) {
             // Create a map with the latest imagery basemap
             const map = new Map({
@@ -115,18 +121,171 @@
             // Create a graphics layer for the building outlines
             const graphicsLayer = new GraphicsLayer();
             map.add(graphicsLayer);
+            
+            // Layer for detected building footprints
+            const buildingFootprintsLayer = new GraphicsLayer();
+            map.add(buildingFootprintsLayer);
+            
+            // Function to fetch building footprints from OSM
+            async function fetchBuildingFootprints(extent) {
+                // Convert extent to WGS84 for OSM query
+                const wgs84Extent = webMercatorUtils.webMercatorToGeographic(extent);
+                const [xmin, ymin, xmax, ymax] = [
+                    wgs84Extent.xmin, 
+                    wgs84Extent.ymin, 
+                    wgs84Extent.xmax, 
+                    wgs84Extent.ymax
+                ];
+                
+                // Overpass API query for buildings
+                const query = `
+                    [out:json][timeout:25];
+                    (
+                      way[building](${ymin},${xmin},${ymax},${xmax});
+                      relation[building](${ymin},${xmin},${ymax},${xmax});
+                    );
+                    (._;>;);
+                    out body;
+                `.replace(/\s+/g, ' ').trim();
+                
+                try {
+                    const response = await esriRequest(
+                        `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,
+                        { responseType: "json" }
+                    );
+                    
+                    return response.data.elements || [];
+                } catch (error) {
+                    console.error("Error fetching building data:", error);
+                    return [];
+                }
+            }
+            
+            // Function to process OSM data and create graphics
+            function processOSMBuildings(elements) {
+                // Clear previous footprints
+                buildingFootprintsLayer.removeAll();
+                
+                const buildings = elements.filter(el => el.type === 'way' && el.tags && el.tags.building);
+                let buildingCount = 0;
+                
+                buildings.forEach(building => {
+                    if (building.nodes && building.nodes.length >= 3) {
+                        // Convert OSM nodes to points
+                        const points = building.nodes.map(nodeId => {
+                            const node = elements.find(el => el.type === 'node' && el.id === nodeId);
+                            return node ? [node.lon, node.lat] : null;
+                        }).filter(Boolean);
+                        
+                        if (points.length >= 3) {
+                            // Create a polygon graphic
+                            const polygon = {
+                                type: "polygon",
+                                rings: [points.map(p => [p[0], p[1]])]
+                            };
+                            
+                            const graphic = new Graphic({
+                                geometry: polygon,
+                                symbol: {
+                                    type: "simple-fill",
+                                    color: [0, 0, 255, 0.5],
+                                    outline: {
+                                        color: [0, 0, 200],
+                                        width: 1
+                                    }
+                                },
+                                attributes: {
+                                    id: building.id,
+                                    type: building.tags.building || 'building',
+                                    source: 'OSM'
+                                }
+                            });
+                            
+                            buildingFootprintsLayer.add(graphic);
+                            buildingCount++;
+                        }
+                    }
+                });
+                
+                return buildingCount;
+            }
 
-            // Add the search widget
+            // Add the search widget with custom behavior
             const searchWidget = new Search({
                 view: view,
                 container: "search",
-                popupEnabled: false
+                popupEnabled: false,
+                includeDefaultSources: false,
+                sources: [{
+                    name: "Esri World Geocoder",
+                    placeholder: "Search for an address or place",
+                    apiKey: null, // You can add an API key here if needed
+                    singleLineFieldName: "SingleLine",
+                    outFields: ["*"],
+                    zoomScale: 2000,
+                    maxResults: 6,
+                    searchExtent: null,
+                    countryCode: ""
+                }]
+            });
+            
+            // When search completes, fetch buildings in the area
+            searchWidget.on("search-complete", async (event) => {
+                if (event.results && event.results.length > 0) {
+                    const result = event.results[0];
+                    const extent = result.extent;
+                    
+                    // Show loading message
+                    document.getElementById('status').textContent = "Detecting buildings in this area...";
+                    
+                    try {
+                        // Fetch buildings from OSM
+                        const elements = await fetchBuildingFootprints(extent);
+                        const buildingCount = processOSMBuildings(elements);
+                        
+                        // Update status
+                        document.getElementById('status').textContent = 
+                            `Detected ${buildingCount} buildings. Use the Draw tool to add or edit footprints.`;
+                            
+                        // Zoom to the buildings with some padding
+                        await view.goTo({
+                            target: buildingFootprintsLayer.graphics,
+                            padding: 50
+                        });
+                        
+                    } catch (error) {
+                        console.error("Error processing buildings:", error);
+                        document.getElementById('status').textContent = 
+                            "Error detecting buildings. Please try another location.";
+                    }
+                }
             });
 
             // Create the sketch widget
             let sketch;
             const sketchLayer = new GraphicsLayer();
             map.add(sketchLayer);
+            
+            // Add a button to toggle between viewing and editing mode
+            let editMode = false;
+            const toggleEditMode = document.createElement('button');
+            toggleEditMode.id = 'toggleEditMode';
+            toggleEditMode.className = 'tool-button';
+            toggleEditMode.innerHTML = '✏️ Toggle Edit Mode';
+            toggleEditMode.title = 'Toggle between viewing and editing building footprints';
+            toggleEditMode.addEventListener('click', () => {
+                editMode = !editMode;
+                if (editMode) {
+                    toggleEditMode.classList.add('active');
+                    document.getElementById('status').textContent = 
+                        'Edit mode: Click on a building to edit it';
+                } else {
+                    toggleEditMode.classList.remove('active');
+                    document.getElementById('status').textContent = 
+                        'View mode: Click on buildings to select them';
+                }
+            });
+            document.getElementById('topbar').appendChild(toggleEditMode);
 
             // Initialize the sketch widget when the view is ready
             view.when(() => {
@@ -255,8 +414,54 @@
 
             // Update status when the view is ready
             view.when(() => {
-                document.getElementById('status').textContent = "Map is ready. Use the search box to find a location.";
+                document.getElementById('status').textContent = 
+                    "Search for a location to detect buildings or use the Draw tool to create custom outlines.";
+                
+                // Add click handler for selecting buildings
+                view.on('click', async (event) => {
+                    if (!editMode) return;
+                    
+                    // Check if we clicked on a building
+                    const hitTest = await view.hitTest(event);
+                    const buildingGraphic = hitTest.results.find(result => 
+                        result.graphic && 
+                        result.graphic.layer === buildingFootprintsLayer
+                    );
+                    
+                    if (buildingGraphic) {
+                        // Start editing the clicked building
+                        if (sketch) {
+                            sketchLayer.removeAll();
+                            sketchLayer.add(buildingGraphic.graphic);
+                            sketch.update([buildingGraphic.graphic]);
+                            document.getElementById('status').textContent = 
+                                'Editing building. Click to add points, double-click to finish.';
+                        }
+                    }
+                });
             });
+            
+            // Add a button to refresh buildings in the current view
+            const refreshButton = document.createElement('button');
+            refreshButton.className = 'tool-button';
+            refreshButton.innerHTML = '🔄 Refresh Buildings';
+            refreshButton.title = 'Refresh building detection in the current view';
+            refreshButton.addEventListener('click', async () => {
+                const extent = view.extent;
+                document.getElementById('status').textContent = "Updating building data...";
+                
+                try {
+                    const elements = await fetchBuildingFootprints(extent);
+                    const buildingCount = processOSMBuildings(elements);
+                    document.getElementById('status').textContent = 
+                        `Updated: ${buildingCount} buildings detected in this area.`;
+                } catch (error) {
+                    console.error("Error refreshing buildings:", error);
+                    document.getElementById('status').textContent = 
+                        "Error updating building data. Please try again.";
+                }
+            });
+            document.getElementById('topbar').appendChild(refreshButton);
         });
     </script>
 </head>
