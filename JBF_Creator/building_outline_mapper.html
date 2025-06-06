@@ -77,6 +77,59 @@
         .esri-ui-top-right {
             top: 60px !important;
         }
+        
+        /* Building info window styles */
+        #buildingInfo {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            width: 300px;
+        }
+        
+        #buildingInfo h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        #buildingInfo label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        
+        #buildingInfo input, #buildingInfo textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        #buildingInfo button {
+            background: #0079c1;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        #buildingInfo button:hover {
+            background: #005e95;
+        }
+        
+        .building-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
     </style>
 
     <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
@@ -184,6 +237,10 @@
                                 rings: [points.map(p => [p[0], p[1]])]
                             };
                             
+                            // Get building name from OSM tags if available
+                            const buildingName = building.tags.name || `Building ${building.id}`;
+                            const buildingType = building.tags.building || 'building';
+                            
                             const graphic = new Graphic({
                                 geometry: polygon,
                                 symbol: {
@@ -196,8 +253,32 @@
                                 },
                                 attributes: {
                                     id: building.id,
-                                    type: building.tags.building || 'building',
-                                    source: 'OSM'
+                                    name: buildingName,
+                                    type: buildingType,
+                                    source: 'OSM',
+                                    notes: '',
+                                    area: geometryEngine.geodesicArea(polygon, "square-meters").toFixed(2) + " m²",
+                                    timestamp: new Date().toISOString()
+                                },
+                                popupTemplate: {
+                                    title: "{name}",
+                                    content: [
+                                        {
+                                            type: "fields",
+                                            fieldInfos: [
+                                                { fieldName: "type", label: "Type" },
+                                                { fieldName: "area", label: "Area" },
+                                                { fieldName: "notes", label: "Notes" }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            });
+                            
+                            // Add click event to show edit dialog
+                            graphic.on('click', (event) => {
+                                if (editMode) {
+                                    showBuildingInfo(graphic);
                                 }
                             });
                             
@@ -208,6 +289,61 @@
                 });
                 
                 return buildingCount;
+            }
+            
+            // Show building info dialog
+            function showBuildingInfo(graphic) {
+                const infoDiv = document.getElementById('buildingInfo');
+                const nameInput = document.getElementById('buildingName');
+                const notesInput = document.getElementById('buildingNotes');
+                const saveBtn = document.getElementById('saveBuildingInfo');
+                const cancelBtn = document.getElementById('cancelBuildingInfo');
+                
+                // Set current values
+                nameInput.value = graphic.attributes.name || '';
+                notesInput.value = graphic.attributes.notes || '';
+                
+                // Position the dialog
+                infoDiv.style.display = 'block';
+                
+                // Save handler
+                const saveHandler = () => {
+                    graphic.attributes.name = nameInput.value.trim() || `Building ${graphic.attributes.id}`;
+                    graphic.attributes.notes = notesInput.value.trim();
+                    
+                    // Update the popup title
+                    if (graphic.popupTemplate) {
+                        graphic.popupTemplate.title = graphic.attributes.name;
+                    }
+                    
+                    infoDiv.style.display = 'none';
+                    
+                    // Clean up event listeners
+                    saveBtn.removeEventListener('click', saveHandler);
+                    cancelBtn.removeEventListener('click', cancelHandler);
+                };
+                
+                // Cancel handler
+                const cancelHandler = () => {
+                    infoDiv.style.display = 'none';
+                    
+                    // Clean up event listeners
+                    saveBtn.removeEventListener('click', saveHandler);
+                    cancelBtn.removeEventListener('click', cancelHandler);
+                };
+                
+                // Add event listeners
+                saveBtn.addEventListener('click', saveHandler);
+                cancelBtn.addEventListener('click', cancelHandler);
+                
+                // Close on escape key
+                const keyHandler = (e) => {
+                    if (e.key === 'Escape') {
+                        cancelHandler();
+                        document.removeEventListener('keydown', keyHandler);
+                    }
+                };
+                document.addEventListener('keydown', keyHandler);
             }
 
             // Add the search widget with custom behavior
@@ -245,7 +381,7 @@
                         
                         // Update status
                         document.getElementById('status').textContent = 
-                            `Detected ${buildingCount} buildings. Use the Draw tool to add or edit footprints.`;
+                            `Detected ${buildingCount} buildings. Click on a building to edit its details.`;
                             
                         // Zoom to the buildings with some padding
                         await view.goTo({
@@ -260,11 +396,55 @@
                     }
                 }
             });
+            
+            // Function to create a new building with default attributes
+            function createNewBuilding(geometry) {
+                const id = 'custom_' + Date.now();
+                const area = geometryEngine.geodesicArea(geometry, "square-meters").toFixed(2) + " m²";
+                
+                return new Graphic({
+                    geometry: geometry,
+                    symbol: {
+                        type: "simple-fill",
+                        color: [0, 200, 0, 0.5],
+                        outline: {
+                            color: [0, 150, 0],
+                            width: 2
+                        }
+                    },
+                    attributes: {
+                        id: id,
+                        name: `Building ${id}`,
+                        type: 'building',
+                        source: 'custom',
+                        notes: '',
+                        area: area,
+                        timestamp: new Date().toISOString()
+                    },
+                    popupTemplate: {
+                        title: "{name}",
+                        content: [
+                            {
+                                type: "fields",
+                                fieldInfos: [
+                                    { fieldName: "type", label: "Type" },
+                                    { fieldName: "area", label: "Area" },
+                                    { fieldName: "notes", label: "Notes" }
+                                ]
+                            }
+                        ]
+                    }
+                });
+            }
 
             // Create the sketch widget
             let sketch;
             const sketchLayer = new GraphicsLayer();
             map.add(sketchLayer);
+            
+            // Create a layer for custom buildings
+            const customBuildingsLayer = new GraphicsLayer();
+            map.add(customBuildingsLayer);
             
             // Add a button to toggle between viewing and editing mode
             let editMode = false;
@@ -447,21 +627,79 @@
             refreshButton.innerHTML = '🔄 Refresh Buildings';
             refreshButton.title = 'Refresh building detection in the current view';
             refreshButton.addEventListener('click', async () => {
-                const extent = view.extent;
-                document.getElementById('status').textContent = "Updating building data...";
-                
-                try {
-                    const elements = await fetchBuildingFootprints(extent);
-                    const buildingCount = processOSMBuildings(elements);
-                    document.getElementById('status').textContent = 
-                        `Updated: ${buildingCount} buildings detected in this area.`;
-                } catch (error) {
-                    console.error("Error refreshing buildings:", error);
-                    document.getElementById('status').textContent = 
-                        "Error updating building data. Please try again.";
+                if (confirm("Refreshing will remove all detected buildings. Your custom buildings will be preserved. Continue?")) {
+                    const extent = view.extent;
+                    document.getElementById('status').textContent = "Updating building data...";
+                    
+                    try {
+                        const elements = await fetchBuildingFootprints(extent);
+                        const buildingCount = processOSMBuildings(elements);
+                        document.getElementById('status').textContent = 
+                            `Updated: ${buildingCount} buildings detected in this area.`;
+                    } catch (error) {
+                        console.error("Error refreshing buildings:", error);
+                        document.getElementById('status').textContent = 
+                            "Error updating building data. Please try again.";
+                    }
                 }
             });
             document.getElementById('topbar').appendChild(refreshButton);
+            
+            // Update the download function to include all buildings
+            document.getElementById('downloadBtn').addEventListener('click', function() {
+                // Combine both OSM and custom buildings
+                const allBuildings = [...buildingFootprintsLayer.graphics.toArray(), ...customBuildingsLayer.graphics.toArray()];
+                
+                if (allBuildings.length === 0) {
+                    alert("No buildings to download");
+                    return;
+                }
+                
+                // Create a GeoJSON feature collection
+                const featureCollection = {
+                    type: "FeatureCollection",
+                    features: allBuildings.map(g => ({
+                        type: "Feature",
+                        geometry: g.geometry.toJSON(),
+                        properties: {
+                            id: g.attributes.id,
+                            name: g.attributes.name,
+                            type: g.attributes.type,
+                            source: g.attributes.source,
+                            notes: g.attributes.notes,
+                            area: g.attributes.area,
+                            timestamp: g.attributes.timestamp || new Date().toISOString()
+                        }
+                    }))
+                };
+
+                // Create a download link
+                const dataStr = "data:text/json;charset=utf-8," + 
+                    encodeURIComponent(JSON.stringify(featureCollection, null, 2));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", `building_footprints_${new Date().toISOString().split('T')[0]}.geojson`);
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+                
+                document.getElementById('status').textContent = 
+                    `Downloaded ${allBuildings.length} buildings as GeoJSON`;
+            });
+            
+            // Add a button to clear all custom buildings
+            const clearCustomBtn = document.createElement('button');
+            clearCustomBtn.className = 'tool-button';
+            clearCustomBtn.innerHTML = '🗑️ Clear Custom Buildings';
+            clearCustomBtn.title = 'Remove all custom buildings';
+            clearCustomBtn.addEventListener('click', () => {
+                if (customBuildingsLayer.graphics.length > 0 && 
+                    confirm(`Are you sure you want to remove all ${customBuildingsLayer.graphics.length} custom buildings?`)) {
+                    customBuildingsLayer.removeAll();
+                    document.getElementById('status').textContent = 'All custom buildings removed';
+                }
+            });
+            document.getElementById('topbar').appendChild(clearCustomBtn);
         });
     </script>
 </head>
@@ -486,5 +724,22 @@
     </div>
     
     <div id="status">Loading map...</div>
+    
+    <!-- Building Info Dialog -->
+    <div id="buildingInfo">
+        <h3>Building Details</h3>
+        <div class="form-group">
+            <label for="buildingName">Building Name:</label>
+            <input type="text" id="buildingName" placeholder="Enter building name" />
+        </div>
+        <div class="form-group">
+            <label for="buildingNotes">Notes:</label>
+            <textarea id="buildingNotes" rows="3" placeholder="Add any notes about this building"></textarea>
+        </div>
+        <div class="form-actions">
+            <button id="cancelBuildingInfo" class="btn btn-secondary">Cancel</button>
+            <button id="saveBuildingInfo" class="btn btn-primary">Save</button>
+        </div>
+    </div>
 </body>
 </html>
