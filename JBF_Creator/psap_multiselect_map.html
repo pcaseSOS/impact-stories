@@ -1201,22 +1201,16 @@
 
                         console.log('Searching Canadian Towns layer for:', searchTerm);
                         
-                        // Create query
+                        // Create query specifically for CSDNAME field
                         const canadaQuery = canadaTownsLayer.createQuery();
                         
-                        // Simple search query - let the server handle the field matching
-                        // This is more reliable than trying to guess field names
-                        canadaQuery.where = `1=1`; // Start with a valid WHERE clause
-                        canadaQuery.text = searchTerm; // Let the server handle text search
-                        canadaQuery.outFields = ["*"];
+                        // Search only in the CSDNAME field
+                        canadaQuery.where = `UPPER(CSDNAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                        canadaQuery.outFields = ["*", "CSDNAME"];
                         canadaQuery.returnGeometry = true;
                         canadaQuery.returnDistinctValues = true;
                         
-                        // Set the search fields to all string fields that might contain names
-                        // This is a server-side optimization
-                        canadaQuery.searchFields = ["NAME", "NAME_FR", "CITY", "TOWN", "MUNICIPAL", "COMMUNITY", "PLACE", "NOM", "VILLE"];
-                        
-                        console.log('Executing Canadian Towns query with text search:', searchTerm);
+                        console.log('Executing Canadian Towns query on CSDNAME field:', searchTerm);
                         
                         return canadaTownsLayer.queryFeatures(canadaQuery)
                             .then(canadaResults => {
