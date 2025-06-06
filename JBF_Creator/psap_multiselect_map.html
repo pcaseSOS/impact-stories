@@ -136,6 +136,18 @@
             --safety-gap: #FFF300; /* Yellow highlight */
             --glow: #005eFF; /* Bright blue highlight */
         }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(41, 168, 221, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(41, 168, 221, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(41, 168, 221, 0); }
+        }
+        
+        .drawing-tools-highlight {
+            animation: pulse 2s ease-in-out;
+            border: 2px solid var(--safety-blue) !important;
+            border-radius: 4px;
+        }
 
         html, body, #viewDiv {
             padding: 0;
@@ -559,9 +571,30 @@
                     <p>Use the drawing tools to create custom areas of interest:</p>
                     <ul>
                         <li>Click the <strong>Draw Polygon</strong> button to start drawing</li>
-                        <li>Click to add points, double-click to complete the shape</li>
+                        <li>After clicking, the drawing tools will appear in the bottom-right corner of the map</li>
+                        <li>Use these tools to draw different shapes:
+                            <ul>
+                                <li>Point: Draw individual points</li>
+                                <li>Line: Draw line segments</li>
+                                <li>Polygon: Draw custom shapes (selected by default)</li>
+                                <li>Rectangle: Draw rectangular areas</li>
+                                <li>Circle: Draw circular areas</li>
+                                <li>Trash: Delete the current drawing</li>
+                                <li>Complete: Finish and save your drawing</li>
+                            </ul>
+                        </li>
+                        <li>When drawing a polygon:
+                            <ul>
+                                <li>Click on the map to add each vertex of your shape</li>
+                                <li>Double-click or click <strong>Complete</strong> to finish the shape</li>
+                                <li>Click <strong>Trash</strong> to start over</li>
+                            </ul>
+                        </li>
                         <li>Download your drawn areas using the download button</li>
                     </ul>
+                    <div style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">
+                        <strong>💡 Tip:</strong> The drawing tools will be highlighted with a blue border when active
+                    </div>
                 </div>
                 
                 <div class="tutorial-buttons">
@@ -1893,6 +1926,17 @@
                         sketch = setupDrawTools();
                     }
                     view.ui.add(sketch, { position: "bottom-right" });
+                    
+                    // Add highlight class to the drawing tools
+                    const sketchContainer = document.querySelector('.esri-sketch');
+                    if (sketchContainer) {
+                        sketchContainer.classList.add('drawing-tools-highlight');
+                        // Remove highlight after animation completes
+                        setTimeout(() => {
+                            sketchContainer.classList.remove('drawing-tools-highlight');
+                        }, 3000);
+                    }
+                    
                     drawPolygonBtn.textContent = "✏️ Exit Drawing Mode";
                     drawPolygonBtn.classList.add("active");
                     status.textContent = "Drawing mode active. Click to create polygon vertices, double-click to complete.";
