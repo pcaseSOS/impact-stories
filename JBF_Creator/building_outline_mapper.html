@@ -267,6 +267,7 @@
             "esri/widgets/Search",
             "esri/widgets/Sketch",
             "esri/layers/GraphicsLayer",
+            "esri/layers/WebTileLayer",
             "esri/Graphic",
             "esri/geometry/geometryEngine",
             "esri/widgets/Expand",
@@ -279,7 +280,7 @@
             "esri/geometry/support/webMercatorUtils",
             "esri/request"
         ], function(
-            Map, MapView, Search, Sketch, GraphicsLayer, Graphic, geometryEngine, 
+            Map, MapView, Search, Sketch, GraphicsLayer, WebTileLayer, Graphic, geometryEngine, 
             Expand, BasemapToggle, BasemapGallery, geometryEngineAsync,
             Extent, Polygon, Point, webMercatorUtils, esriRequest
         ) {
@@ -288,9 +289,9 @@
                 basemap: "streets-navigation-vector"
             });
             
-            // Add Google Maps as a basemap if API key is provided
-            const googleMapsAPIKey = "YOUR_GOOGLE_MAPS_API_KEY"; // Replace with your Google Maps API key
-            if (googleMapsAPIKey && googleMapsAPIKey !== "YOUR_GOOGLE_MAPS_API_KEY") {
+            // Add Google Maps as a basemap
+            const googleMapsAPIKey = "AIzaSyCzDGrRiILLXTXgVWH-37LpDu--8kjXz9I";
+            if (googleMapsAPIKey) {
                 const googleMapsLayer = new WebTileLayer({
                     urlTemplate: `https://mt1.google.com/vt/lyrs=m&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
                     copyright: "Google Maps"
