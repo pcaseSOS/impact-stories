@@ -1127,7 +1127,7 @@
                         }
                         
                         const psapQuery = psapLayer.createQuery();
-                        psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm}%')`;
+                        psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
                         psapQuery.outFields = ["*"];
                         psapQuery.returnGeometry = true;
                         
@@ -1201,35 +1201,23 @@
 
                         console.log('Searching Canadian Towns layer for:', searchTerm);
                         
-                        // First, get the layer's fields to see what's available
-                        console.log('Searching Canadian Towns layer for:', searchTerm);
-                        
-                        // First, get the layer's fields to see what's available
+                        // Create query
                         const canadaQuery = canadaTownsLayer.createQuery();
                         
-                        // Try to find name fields that exist in the layer
-                        const possibleNameFields = ['NAME', 'NAME_FR', 'CITY', 'TOWN', 'MUNICIPAL', 'COMMUNITY', 'PLACE', 'NOM', 'VILLE'];
-                        
-                        // Get the layer fields
-                        const layerFields = canadaTownsLayer.fields || [];
-                        console.log('Canadian Towns layer fields:', layerFields.map(f => f.name));
-                        
-                        const existingFields = possibleNameFields.filter(field => 
-                            layerFields.some(f => f.name.toUpperCase() === field)
-                        );
-                        
-                        console.log('Existing name fields in Canadian Towns layer:', existingFields);
-                        
-                        // Build the WHERE clause with all existing name fields
-                        const conditions = existingFields.map(field => `UPPER(${field}) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`);
-                        canadaQuery.where = conditions.length > 0 ? conditions.join(' OR ') : "1=0";
-                        
-                        console.log('Canadian Towns query WHERE clause:', canadaQuery.where);
-                        
+                        // Simple search query - let the server handle the field matching
+                        // This is more reliable than trying to guess field names
+                        canadaQuery.where = `1=1`; // Start with a valid WHERE clause
+                        canadaQuery.text = searchTerm; // Let the server handle text search
                         canadaQuery.outFields = ["*"];
                         canadaQuery.returnGeometry = true;
                         canadaQuery.returnDistinctValues = true;
-
+                        
+                        // Set the search fields to all string fields that might contain names
+                        // This is a server-side optimization
+                        canadaQuery.searchFields = ["NAME", "NAME_FR", "CITY", "TOWN", "MUNICIPAL", "COMMUNITY", "PLACE", "NOM", "VILLE"];
+                        
+                        console.log('Executing Canadian Towns query with text search:', searchTerm);
+                        
                         return canadaTownsLayer.queryFeatures(canadaQuery)
                             .then(canadaResults => {
                                 console.log('Canadian Towns search results:', canadaResults);
