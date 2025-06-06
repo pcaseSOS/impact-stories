@@ -1199,9 +1199,33 @@
                                 });
                         }
 
+                        console.log('Searching Canadian Towns layer for:', searchTerm);
+                        
+                        // First, get the layer's fields to see what's available
+                        console.log('Searching Canadian Towns layer for:', searchTerm);
+                        
+                        // First, get the layer's fields to see what's available
                         const canadaQuery = canadaTownsLayer.createQuery();
-                        // ...construct where clause dynamically based on valid fields...
-                        canadaQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm}%') OR UPPER(NAME_FR) LIKE UPPER('%${searchTerm}%')`;
+                        
+                        // Try to find name fields that exist in the layer
+                        const possibleNameFields = ['NAME', 'NAME_FR', 'CITY', 'TOWN', 'MUNICIPAL', 'COMMUNITY', 'PLACE', 'NOM', 'VILLE'];
+                        
+                        // Get the layer fields
+                        const layerFields = canadaTownsLayer.fields || [];
+                        console.log('Canadian Towns layer fields:', layerFields.map(f => f.name));
+                        
+                        const existingFields = possibleNameFields.filter(field => 
+                            layerFields.some(f => f.name.toUpperCase() === field)
+                        );
+                        
+                        console.log('Existing name fields in Canadian Towns layer:', existingFields);
+                        
+                        // Build the WHERE clause with all existing name fields
+                        const conditions = existingFields.map(field => `UPPER(${field}) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`);
+                        canadaQuery.where = conditions.length > 0 ? conditions.join(' OR ') : "1=0";
+                        
+                        console.log('Canadian Towns query WHERE clause:', canadaQuery.where);
+                        
                         canadaQuery.outFields = ["*"];
                         canadaQuery.returnGeometry = true;
                         canadaQuery.returnDistinctValues = true;
