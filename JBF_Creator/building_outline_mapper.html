@@ -129,14 +129,16 @@
         #topbar {
             position: absolute;
             top: 15px;
-            left: 15px;
             right: 15px;
             z-index: 100;
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            flex-direction: column;
+            gap: 5px;
             pointer-events: none;
-            max-width: calc(100% - 30px);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         }
         
         /* Make sure toolbar buttons are clickable */
@@ -144,6 +146,9 @@
         #topbar .esri-widget,
         #topbar .esri-component {
             pointer-events: auto;
+            margin: 2px 0;
+            padding: 6px 8px;
+            font-size: 13px;
         }
 
         .tool-button {
@@ -282,6 +287,41 @@
             const map = new Map({
                 basemap: "streets-navigation-vector"
             });
+            
+            // Add Google Maps as a basemap if API key is provided
+            const googleMapsAPIKey = "YOUR_GOOGLE_MAPS_API_KEY"; // Replace with your Google Maps API key
+            if (googleMapsAPIKey && googleMapsAPIKey !== "YOUR_GOOGLE_MAPS_API_KEY") {
+                const googleMapsLayer = new WebTileLayer({
+                    urlTemplate: `https://mt1.google.com/vt/lyrs=m&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
+                    copyright: "Google Maps"
+                });
+                
+                const googleSatelliteLayer = new WebTileLayer({
+                    urlTemplate: `https://mt1.google.com/vt/lyrs=s&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
+                    copyright: "Google Satellite"
+                });
+                
+                const googleHybridLayer = new WebTileLayer({
+                    urlTemplate: `https://mt1.google.com/vt/lyrs=y&x={col}&y={row}&z={level}&key=${googleMapsAPIKey}`,
+                    copyright: "Google Hybrid"
+                });
+                
+                // Store custom basemaps for later use
+                window.customBasemaps = {
+                    "google-streets": {
+                        baseLayers: [googleMapsLayer],
+                        title: "Google Maps"
+                    },
+                    "google-satellite": {
+                        baseLayers: [googleSatelliteLayer],
+                        title: "Google Satellite"
+                    },
+                    "google-hybrid": {
+                        baseLayers: [googleHybridLayer],
+                        title: "Google Hybrid"
+                    }
+                };
+            }
 
             // Create a view for the map
             const view = new MapView({
@@ -607,18 +647,41 @@
                     }
                 });
 
-                // Add a basemap gallery for switching between different map types
+                // Create basemap gallery with additional options
                 const basemapGallery = new BasemapGallery({
                     view: view,
-                    container: document.createElement("div")
+                    container: document.createElement("div"),
+                    source: [
+                        {
+                            portalItem: {
+                                id: "10df2279f9684e4a9f6a7f08febac2a9"  // World Imagery
+                            },
+                            title: "Esri World Imagery"
+                        },
+                        {
+                            portalItem: {
+                                id: "b9d3190d1e474e5ab9455abda8990fb0"  // World Imagery with Labels
+                            },
+                            title: "Imagery with Labels"
+                        },
+                        ...(window.customBasemaps ? [
+                            window.customBasemaps["google-streets"],
+                            window.customBasemaps["google-satellite"],
+                            window.customBasemaps["google-hybrid"]
+                        ] : [])
+                    ]
                 });
                 
-                // Add the basemap gallery to the UI
+                // Add the basemap gallery to the UI in a compact expand widget
                 const bgExpand = new Expand({
                     view: view,
                     content: basemapGallery,
-                    expandIcon: "basemap"
+                    expandIcon: "basemap",
+                    expandTooltip: "Change Basemap",
+                    expandIconClass: "esri-icon-basemap",
+                    group: "top-right"
                 });
+                
                 view.ui.add(bgExpand, "top-right");
                 
                 // Add a button to check for newer imagery at current location
