@@ -1288,14 +1288,7 @@
                         console.log('Canada Towns layer - visible:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
                     }
                     
-                    // Re-initialize popups if the layer is becoming active
-                    if (psapLayer && activeLayer === 'psap') {
-                        setupLayerPopup(psapLayer, 'psap');
-                    }
-                    
-                    if (canadaTownsLayer && activeLayer === 'canada') {
-                        setupLayerPopup(canadaTownsLayer, 'canada');
-                    }
+                    // No need to re-initialize popups as both layers are now always visible
                     
                     // Update the button text
                     updateLayerSwitchText();
