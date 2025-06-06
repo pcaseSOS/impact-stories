@@ -278,62 +278,44 @@
             Expand, BasemapToggle, BasemapGallery, geometryEngineAsync,
             Extent, Polygon, Point, webMercatorUtils, esriRequest
         ) {
-            // Create a map with the latest imagery basemap
+            // Create a basic map with a default basemap
             const map = new Map({
-                basemap: {
-                    baseLayers: [
-                        // Esri World Imagery (default)
-                        {
-                            id: "esri-imagery",
-                            title: "Esri World Imagery",
-                            url: "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer"
-                        },
-                        // Esri World Imagery (with Labels)
-                        {
-                            id: "esri-imagery-labels",
-                            title: "Esri Imagery with Labels",
-                            url: "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer"
-                        },
-                        // Maxar Premium Imagery (often has newer imagery)
-                        {
-                            id: "maxar-premium",
-                            title: "Maxar Premium Imagery",
-                            url: "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer",
-                            copyright: "Maxar, Earthstar Geographics"
-                        },
-                        // Esri World Imagery (Clarity) - Beta - sometimes has newer imagery
-                        {
-                            id: "esri-clarity-beta",
-                            title: "Esri Clarity (Beta)",
-                            url: "https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer",
-                            copyright: "Maxar, Earthstar Geographics, CNES/Airbus DS, USDA FSA, USGS, Aerogrid, IGN, IGP, and the GIS User Community"
-                        },
-                        // ESRI Community Maps (sometimes has newer local imagery)
-                        {
-                            id: "esri-community",
-                            title: "ESRI Community Maps",
-                            url: "https://www.arcgis.com/sharing/rest/content/items/1b2435395004510b9f8c6e641eeca32a/resources/images/"
-                        }
-                    ]
-                }
+                basemap: "streets-navigation-vector"
             });
-            
-            // Set the default basemap
-            map.basemap = "esri-imagery";
 
             // Create a view for the map
             const view = new MapView({
                 container: "viewDiv",
                 map: map,
                 center: [-98.5795, 39.8283], // Center of the US
-                zoom: 4
+                zoom: 4,
+                popup: {
+                    dockEnabled: true,
+                    dockOptions: {
+                        buttonEnabled: false,
+                        breakpoint: false,
+                        position: "top-right"
+                    }
+                },
+                ui: {
+                    components: ["attribution", "zoom"]
+                },
+                constraints: {
+                    minZoom: 2
+                }
+            });
+            
+            // Add a basemap toggle for switching between different map types
+            view.when(function() {
+                const basemapToggle = new BasemapToggle({
+                    view: view,
+                    nextBasemap: "satellite"
+                });
+                
+                // Add the basemap toggle to the UI
+                view.ui.add(basemapToggle, "bottom-right");
             });
 
-            // Create a graphics layer for the building outlines
-            const graphicsLayer = new GraphicsLayer();
-            map.add(graphicsLayer);
-            
-            // Layer for detected building footprints
             const buildingFootprintsLayer = new GraphicsLayer();
             map.add(buildingFootprintsLayer);
             
@@ -625,56 +607,19 @@
                     }
                 });
 
-                // Add a basemap gallery in the top right corner
+                // Add a basemap gallery for switching between different map types
                 const basemapGallery = new BasemapGallery({
                     view: view,
-                    container: document.createElement("div"),
-                    source: [
-                        // High-resolution imagery sources
-                        {
-                            portalItem: {
-                                id: "10df2279f9684e4a9f6a7f08febac2a9"  // World Imagery
-                            },
-                            title: "Esri World Imagery"
-                        },
-                        {
-                            portalItem: {
-                                id: "c8b0d7d5372944ac8c245b0d9a6733d9"  // World Imagery (Clarity) Beta
-                            },
-                            title: "Esri Clarity (Beta - Newer Imagery)"
-                        },
-                        {
-                            portalItem: {
-                                id: "d5d02af9b9a74d2d9c6c9c0f54003b4d"  // Maxar Premium Imagery
-                            },
-                            title: "Maxar Premium (Newer Imagery)"
-                        },
-                        // Add more basemaps as needed
-                        {
-                            portalItem: {
-                                id: "b9d3190d1e474e5ab9455abda8990fb0"  // World Imagery with Labels
-                            },
-                            title: "Imagery with Labels"
-                        },
-                        {
-                            portalItem: {
-                                id: "52bdc7ab7fb044d98add14876430aaec"  // Community Map
-                            },
-                            title: "Community Maps (Local Updates)"
-                        }
-                    ]
+                    container: document.createElement("div")
                 });
                 
-                // Add a button to toggle the basemap gallery
-                const basemapToggle = new Expand({
+                // Add the basemap gallery to the UI
+                const bgExpand = new Expand({
                     view: view,
                     content: basemapGallery,
-                    expandIcon: "basemap",
-                    expandTooltip: "Change Basemap"
+                    expandIcon: "basemap"
                 });
-                
-                // Add the basemap toggle to the UI
-                view.ui.add(basemapToggle, "top-right");
+                view.ui.add(bgExpand, "top-right");
                 
                 // Add a button to check for newer imagery at current location
                 const checkNewerImageryBtn = document.createElement('button');
