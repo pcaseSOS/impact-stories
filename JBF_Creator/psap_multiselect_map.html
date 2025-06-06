@@ -1362,7 +1362,11 @@
                 searchResults.innerHTML = '';
                 
                 if (features.length === 0) {
-                    searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+                    const layerName = activeLayer === 'psap' ? 'US PSAPs' : 'Canadian Towns';
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            No results found in ${layerName} layer
+                        </div>`;
                     searchResults.style.display = 'block';
                     return;
                 }
