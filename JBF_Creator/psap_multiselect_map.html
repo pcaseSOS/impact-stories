@@ -761,12 +761,12 @@
                 })
             });
 
-            // Create the feature layer - PSAP layer using a CORS-friendly public service
+            // Create the feature layer - PSAP layer using a reliable public service
             const psapLayer = new FeatureLayer({
-                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Census_Boundaries/FeatureServer/0",
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Counties/FeatureServer/0",
                 renderer: renderer,
                 outFields: ["*"],
-                title: "US Census Boundaries (PSAP Alternative)",
+                title: "US Counties (PSAP Alternative)",
                 // This is a public service that allows CORS
                 visible: true,
                 opacity: 1.0,
@@ -796,8 +796,8 @@
             
             // Create the Canadian Towns layer with its own renderer
             const canadaTownsLayer = new FeatureLayer({
-                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
-                title: "Canadian Towns",
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Canada_Provinces/FeatureServer/0",
+                title: "Canadian Provinces",
                 renderer: new SimpleRenderer({
                     symbol: new SimpleFillSymbol({
                         color: [51, 51, 204, 0.3], // Blue with transparency
@@ -1867,7 +1867,7 @@
                     if (activeLayer === 'psap') {
                         button.textContent = 'Focus: US PSAPs';
                     } else if (activeLayer === 'canada') {
-                        button.textContent = 'Focus: Canadian Towns';
+                        button.textContent = 'Focus: Canadian Provinces';
                     } else if (activeLayer === 'statcan') {
                         button.textContent = 'Focus: StatCan Subdivisions';
                     } else if (activeLayer === 'koordinates') {
@@ -1885,7 +1885,7 @@
                     if (activeLayer === 'psap') {
                         searchInput.placeholder = 'Search for a PSAP 911 service area...';
                     } else if (activeLayer === 'canada') {
-                        searchInput.placeholder = 'Search for a Canadian town...';
+                        searchInput.placeholder = 'Search for a Canadian province...';
                     } else if (activeLayer === 'statcan') {
                         searchInput.placeholder = 'Search for a census subdivision...';
                     } else if (activeLayer === 'koordinates') {
@@ -3058,7 +3058,7 @@
                     activeLayer = 'canada';
                     psapLayer.opacity = 0.3;
                     canadaTownsLayer.opacity = 1.0;
-                    layerSwitchBtn.textContent = 'Focus: Canadian Towns';
+                    layerSwitchBtn.textContent = 'Focus: Canadian Provinces';
                     
                     // Zoom to Canada
                     view.goTo({
@@ -3073,7 +3073,7 @@
                     });
                     
                     // Update placeholder text for search input
-                    searchInput.placeholder = 'Search for a town...';
+                    searchInput.placeholder = 'Search for a province...';
                     
                 } else {
                     // Default to US/other
@@ -3118,7 +3118,7 @@
                 console.log("PSAP layer URL:", psapLayer.url);
                 console.log("PSAP layer visible:", psapLayer.visible);
                 console.log("PSAP layer opacity:", psapLayer.opacity);
-                status.textContent = "US Census boundaries loaded! Click to select boundaries or use Draw Polygon tool.";
+                status.textContent = "US Counties loaded! Click to select boundaries or use Draw Polygon tool.";
 
                 // Zoom to continental US for better default view
                 view.goTo({
