@@ -761,16 +761,13 @@
                 })
             });
 
-            // Create the feature layer - PSAP layer instead of Canada towns
+            // Create the feature layer - PSAP layer using a public service
             const psapLayer = new FeatureLayer({
-                url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Census_Boundaries/FeatureServer/0",
                 renderer: renderer,
                 outFields: ["*"],
-                // Force anonymous access
-                requestOptions: {
-                    useIdentity: false
-                },
-                // Set highlight options
+                title: "US Census Boundaries (PSAP Alternative)",
+                // This is a public service, no authentication needed
                 highlightOptions: {
                     color: [255, 243, 0, 0.8], // Bright yellow
                     fillOpacity: 0.8,
@@ -779,6 +776,8 @@
                     haloSize: 2
                 }
             });
+            
+
 
             // Create graphics layer for drawings
             const drawLayer = new GraphicsLayer({
@@ -1491,17 +1490,17 @@
                                     
                                     // Add layer information
                                     feature.layerType = 'psap';
-                                    feature.layerName = 'PSAP';
+                                    feature.layerName = 'US Census Area';
                                     
                                     // Ensure we have a name attribute
-                                    if (!feature.attributes.name && !feature.attributes.NAME && feature.attributes.psap_name) {
-                                        feature.attributes.name = feature.attributes.psap_name;
-                                    } else if (!feature.attributes.name && feature.attributes.NAME) {
+                                    if (!feature.attributes.name && feature.attributes.NAME) {
                                         feature.attributes.name = feature.attributes.NAME;
-                                    } else if (!feature.attributes.name && feature.attributes.account_id) {
-                                        feature.attributes.name = feature.attributes.account_id;
+                                    } else if (!feature.attributes.name && feature.attributes.STATE_NAME) {
+                                        feature.attributes.name = feature.attributes.STATE_NAME;
+                                    } else if (!feature.attributes.name && feature.attributes.COUNTY_NAME) {
+                                        feature.attributes.name = feature.attributes.COUNTY_NAME;
                                     } else if (!feature.attributes.name) {
-                                        feature.attributes.name = 'Unnamed PSAP';
+                                        feature.attributes.name = 'Unnamed US Census Area';
                                     }
                                     
                                     return feature;
@@ -1795,7 +1794,7 @@
                     }
                     
                     const psapQuery = psapLayer.createQuery();
-                    psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    psapQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(STATE_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(COUNTY_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
                     psapQuery.outFields = ["*"];
                     psapQuery.returnGeometry = true;
                     
@@ -3105,8 +3104,8 @@
             
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
-                console.log("PSAP layer loaded successfully");
-                status.textContent = "PSAP data loaded! Click to select boundaries or use Draw Polygon tool.";
+                console.log("US Census layer loaded successfully");
+                status.textContent = "US Census data loaded! Click to select boundaries or use Draw Polygon tool.";
 
                 // Zoom to continental US for better default view
                 view.goTo({
@@ -3123,8 +3122,17 @@
                 // Initialize UI
                 updateStatus();
             }).catch(function(error) {
-                console.error("Error loading layer:", error);
-                status.textContent = 'Error loading PSAP layer';
+                console.error("Error loading US Census layer:", error);
+                status.textContent = 'Error loading US Census layer - using Statistics Canada data instead';
+                
+                // Switch to StatCan layer as fallback
+                activeLayer = 'statcan';
+                psapLayer.visible = false;
+                statcanCSDLayer.visible = true;
+                statcanCSDLayer.opacity = 1.0;
+                
+                updateLayerSwitchText();
+                updateStatus();
             });
         });
     </script>
