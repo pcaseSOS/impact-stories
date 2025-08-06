@@ -761,66 +761,22 @@
                 })
             });
 
-            // Create a simple graphics layer for demonstration
-            const psapLayer = new GraphicsLayer({
-                title: "Demo Boundaries",
+            // Create the feature layer using a truly public service
+            const psapLayer = new FeatureLayer({
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States/FeatureServer/0",
+                renderer: renderer,
+                outFields: ["*"],
+                title: "US States",
                 visible: true,
-                opacity: 1.0
-            });
-            
-            // Add some simple demo polygons to show the functionality
-            const demoPolygon1 = new Graphic({
-                geometry: {
-                    type: "polygon",
-                    rings: [[
-                        [-120, 40],
-                        [-110, 40],
-                        [-110, 50],
-                        [-120, 50],
-                        [-120, 40]
-                    ]],
-                    spatialReference: { wkid: 4326 }
-                },
-                symbol: new SimpleFillSymbol({
-                    color: [255, 243, 0, 0.3],
-                    outline: new SimpleLineSymbol({
-                        color: [255, 243, 0, 0.8],
-                        width: 2
-                    })
-                }),
-                attributes: {
-                    name: "Demo Area 1",
-                    description: "This is a demonstration area"
+                opacity: 1.0,
+                highlightOptions: {
+                    color: [255, 243, 0, 0.8], // Bright yellow
+                    fillOpacity: 0.8,
+                    haloColor: [0, 94, 255], // Blue halo
+                    haloOpacity: 1.0,
+                    haloSize: 2
                 }
             });
-            
-            const demoPolygon2 = new Graphic({
-                geometry: {
-                    type: "polygon",
-                    rings: [[
-                        [-80, 30],
-                        [-70, 30],
-                        [-70, 40],
-                        [-80, 40],
-                        [-80, 30]
-                    ]],
-                    spatialReference: { wkid: 4326 }
-                },
-                symbol: new SimpleFillSymbol({
-                    color: [255, 243, 0, 0.3],
-                    outline: new SimpleLineSymbol({
-                        color: [255, 243, 0, 0.8],
-                        width: 2
-                    })
-                }),
-                attributes: {
-                    name: "Demo Area 2",
-                    description: "This is another demonstration area"
-                }
-            });
-            
-            psapLayer.add(demoPolygon1);
-            psapLayer.add(demoPolygon2);
             
 
             
@@ -837,66 +793,31 @@
                 visible: true
             });
             
-            // Create a simple graphics layer for Canadian demo
-            const canadaTownsLayer = new GraphicsLayer({
-                title: "Canadian Demo Areas",
-                visible: true,
-                opacity: 1.0
-            });
-            
-            // Add some simple demo polygons for Canada
-            const canadaDemoPolygon1 = new Graphic({
-                geometry: {
-                    type: "polygon",
-                    rings: [[
-                        [-80, 45],
-                        [-70, 45],
-                        [-70, 55],
-                        [-80, 55],
-                        [-80, 45]
-                    ]],
-                    spatialReference: { wkid: 4326 }
-                },
-                symbol: new SimpleFillSymbol({
-                    color: [51, 51, 204, 0.3],
-                    outline: new SimpleLineSymbol({
-                        color: [51, 51, 204, 0.8],
-                        width: 2
+            // Create the Canadian layer using a public service
+            const canadaTownsLayer = new FeatureLayer({
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Canada_Provinces/FeatureServer/0",
+                title: "Canadian Provinces",
+                renderer: new SimpleRenderer({
+                    symbol: new SimpleFillSymbol({
+                        color: [51, 51, 204, 0.3], // Blue with transparency
+                        outline: new SimpleLineSymbol({
+                            color: [51, 51, 204, 0.8], // Dark blue outline
+                            width: 1
+                        })
                     })
                 }),
-                attributes: {
-                    name: "Canadian Demo Area 1",
-                    description: "This is a Canadian demonstration area"
-                }
-            });
-            
-            const canadaDemoPolygon2 = new Graphic({
-                geometry: {
-                    type: "polygon",
-                    rings: [[
-                        [-120, 50],
-                        [-110, 50],
-                        [-110, 60],
-                        [-120, 60],
-                        [-120, 50]
-                    ]],
-                    spatialReference: { wkid: 4326 }
+                outFields: ["*"],
+                popupEnabled: false,
+                requestOptions: {
+                    useIdentity: false
                 },
-                symbol: new SimpleFillSymbol({
-                    color: [51, 51, 204, 0.3],
-                    outline: new SimpleLineSymbol({
-                        color: [51, 51, 204, 0.8],
-                        width: 2
-                    })
-                }),
-                attributes: {
-                    name: "Canadian Demo Area 2",
-                    description: "This is another Canadian demonstration area"
+                highlightOptions: {
+                    color: [0, 102, 255, 0.8], // Blue highlight
+                    fillOpacity: 0.7,
+                    haloColor: [0, 102, 255],
+                    haloOpacity: 0.7
                 }
             });
-            
-            canadaTownsLayer.add(canadaDemoPolygon1);
-            canadaTownsLayer.add(canadaDemoPolygon2);
             
             // Create the Statistics Canada Census Subdivisions (CSD) layer
             const statcanCSDLayer = new FeatureLayer({
@@ -1868,27 +1789,47 @@
                         throw new Error('PSAP layer not initialized');
                     }
                     
-                    // Search through graphics in the layer
-                    const graphics = psapLayer.graphics.toArray();
-                    const matchingGraphics = graphics.filter(graphic => {
-                        const name = graphic.attributes?.name || '';
-                        const description = graphic.attributes?.description || '';
-                        const searchLower = searchTerm.toLowerCase();
-                        return name.toLowerCase().includes(searchLower) || 
-                               description.toLowerCase().includes(searchLower);
-                    });
+                    // Ensure the layer is loaded
+                    if (!psapLayer.loaded) {
+                        console.log('PSAP layer not loaded yet, waiting...');
+                        await psapLayer.load();
+                        console.log('PSAP layer loaded, retrying search...');
+                    }
                     
-                    // Convert graphics to feature-like objects
-                    const processedFeatures = matchingGraphics.map(graphic => {
-                        return {
-                            geometry: graphic.geometry,
-                            attributes: {
-                                name: graphic.attributes.name || 'Demo Area',
-                                description: graphic.attributes.description || ''
-                            },
-                            layerType: 'psap',
-                            layerName: 'PSAP'
-                        };
+                    const psapQuery = psapLayer.createQuery();
+                    psapQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(STATE_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    psapQuery.outFields = ["*"];
+                    psapQuery.returnGeometry = true;
+                    
+                    console.log('Executing PSAP query with where clause:', psapQuery.where);
+                    
+                    const psapResults = await psapLayer.queryFeatures(psapQuery);
+                    console.log('PSAP search results:', psapResults);
+                    
+                    if (!psapResults || !psapResults.features || psapResults.features.length === 0) {
+                        return [];
+                    }
+                    
+                    // Process features to ensure they have the required structure
+                    const processedFeatures = psapResults.features.map(feature => {
+                        if (!feature.attributes) {
+                            feature.attributes = {};
+                        }
+                        
+                        // Add layer information
+                        feature.layerType = 'psap';
+                        feature.layerName = 'PSAP';
+                        
+                        // Ensure we have a name attribute
+                        if (!feature.attributes.name && feature.attributes.NAME) {
+                            feature.attributes.name = feature.attributes.NAME;
+                        } else if (!feature.attributes.name && feature.attributes.STATE_NAME) {
+                            feature.attributes.name = feature.attributes.STATE_NAME;
+                        } else if (!feature.attributes.name) {
+                            feature.attributes.name = 'Unnamed State';
+                        }
+                        
+                        return feature;
                     });
                     
                     console.log('Processed PSAP features:', processedFeatures);
@@ -1901,7 +1842,7 @@
                     if (activeLayer === 'psap') {
                         searchResults.innerHTML = `
                             <div class="search-result-item">
-                                <strong>Error searching demo areas:</strong><br>
+                                <strong>Error searching states:</strong><br>
                                 ${error.message || 'Unknown error occurred'}
                             </div>`;
                         searchResults.style.display = 'block';
@@ -3162,24 +3103,43 @@
                 selectArea('other');
             });
             
-            // Initialize the demo layers
-            console.log("Demo layers created successfully");
-            status.textContent = "Demo boundaries loaded! Click to select boundaries or use Draw Polygon tool.";
+            // Wait for layer to load and zoom to extent
+            psapLayer.when(function() {
+                console.log("PSAP layer loaded successfully");
+                console.log("PSAP layer URL:", psapLayer.url);
+                console.log("PSAP layer visible:", psapLayer.visible);
+                console.log("PSAP layer opacity:", psapLayer.opacity);
+                status.textContent = "US States loaded! Click to select boundaries or use Draw Polygon tool.";
 
-            // Zoom to a good default view
-            view.goTo({
-                target: {
-                    xmin: -125.0,
-                    ymin: 24.0,
-                    xmax: -66.0,
-                    ymax: 60.0,
-                    spatialReference: { wkid: 4326 }
-                },
-                padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                // Zoom to continental US for better default view
+                view.goTo({
+                    target: {
+                        xmin: -125.0,
+                        ymin: 24.0,
+                        xmax: -66.0,
+                        ymax: 49.0,
+                        spatialReference: { wkid: 4326 }
+                    },
+                    padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                });
+
+                // Initialize UI
+                updateStatus();
+            }).catch(function(error) {
+                console.error("Error loading PSAP layer:", error);
+                console.error("Error details:", error.message);
+                console.error("Error stack:", error.stack);
+                status.textContent = 'Error loading PSAP layer - using Statistics Canada data instead';
+                
+                // Switch to StatCan layer as fallback
+                activeLayer = 'statcan';
+                psapLayer.visible = false;
+                statcanCSDLayer.visible = true;
+                statcanCSDLayer.opacity = 1.0;
+                
+                updateLayerSwitchText();
+                updateStatus();
             });
-
-            // Initialize UI
-            updateStatus();
         });
     </script>
 </body>
