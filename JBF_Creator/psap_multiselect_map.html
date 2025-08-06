@@ -761,13 +761,13 @@
                 })
             });
 
-            // Create the feature layer - PSAP layer using NASA NCCS HIFLD service
+            // Create the feature layer - PSAP layer using a CORS-friendly public service
             const psapLayer = new FeatureLayer({
-                url: "https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10",
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Census_Boundaries/FeatureServer/0",
                 renderer: renderer,
                 outFields: ["*"],
-                title: "PSAP 911 Service Area Boundaries",
-                // This is a public service, no authentication needed
+                title: "US Census Boundaries (PSAP Alternative)",
+                // This is a public service that allows CORS
                 visible: true,
                 opacity: 1.0,
                 highlightOptions: {
@@ -779,15 +779,7 @@
                 }
             });
             
-            // Create a fallback PSAP layer using a different public service
-            const psapFallbackLayer = new FeatureLayer({
-                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Census_Boundaries/FeatureServer/0",
-                renderer: renderer,
-                outFields: ["*"],
-                title: "US Census Boundaries (PSAP Fallback)",
-                visible: false,
-                opacity: 1.0
-            });
+
             
 
 
@@ -858,7 +850,6 @@
             
             // Add all layers to the map
             map.add(psapLayer);
-            map.add(psapFallbackLayer);
             map.add(canadaTownsLayer);
             map.add(statcanCSDLayer);
             map.add(koordinatesLayer);
@@ -1811,7 +1802,7 @@
                     }
                     
                     const psapQuery = psapLayer.createQuery();
-                    psapQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(PSAP_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(STATE) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(COUNTY) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(CITY) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    psapQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(STATE) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(COUNTY) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(CITY) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
                     psapQuery.outFields = ["*"];
                     psapQuery.returnGeometry = true;
                     
@@ -1835,14 +1826,16 @@
                         feature.layerName = 'PSAP';
                         
                         // Ensure we have a name attribute
-                        if (!feature.attributes.name && !feature.attributes.NAME && feature.attributes.psap_name) {
-                            feature.attributes.name = feature.attributes.psap_name;
-                        } else if (!feature.attributes.name && feature.attributes.NAME) {
+                        if (!feature.attributes.name && feature.attributes.NAME) {
                             feature.attributes.name = feature.attributes.NAME;
+                        } else if (!feature.attributes.name && feature.attributes.STATE && feature.attributes.COUNTY) {
+                            feature.attributes.name = `${feature.attributes.COUNTY}, ${feature.attributes.STATE}`;
+                        } else if (!feature.attributes.name && feature.attributes.STATE) {
+                            feature.attributes.name = feature.attributes.STATE;
                         } else if (!feature.attributes.name && feature.attributes.account_id) {
-                            feature.attributes.name = feature.attributes.account_id;
+                            feature.attributes.name = `Census Area ${feature.attributes.account_id}`;
                         } else if (!feature.attributes.name) {
-                            feature.attributes.name = 'Unnamed PSAP';
+                            feature.attributes.name = 'Unnamed Census Area';
                         }
                         
                         return feature;
@@ -3125,7 +3118,7 @@
                 console.log("PSAP layer URL:", psapLayer.url);
                 console.log("PSAP layer visible:", psapLayer.visible);
                 console.log("PSAP layer opacity:", psapLayer.opacity);
-                status.textContent = "PSAP 911 service area boundaries loaded! Click to select boundaries or use Draw Polygon tool.";
+                status.textContent = "US Census boundaries loaded! Click to select boundaries or use Draw Polygon tool.";
 
                 // Zoom to continental US for better default view
                 view.goTo({
@@ -3145,49 +3138,16 @@
                 console.error("Error loading PSAP layer:", error);
                 console.error("Error details:", error.message);
                 console.error("Error stack:", error.stack);
-                status.textContent = 'Error loading PSAP layer - trying fallback...';
+                status.textContent = 'Error loading PSAP layer - using Statistics Canada data instead';
                 
-                // Try the fallback PSAP layer
-                psapFallbackLayer.when(function() {
-                    console.log("Fallback PSAP layer loaded successfully");
-                    status.textContent = "US Census data loaded as PSAP fallback! Click to select boundaries or use Draw Polygon tool.";
-                    
-                    // Hide the original layer and show the fallback
-                    psapLayer.visible = false;
-                    psapFallbackLayer.visible = true;
-                    
-                    // Update the active layer reference
-                    const originalPsapLayer = psapLayer;
-                    psapLayer = psapFallbackLayer;
-                    
-                    // Zoom to continental US for better default view
-                    view.goTo({
-                        target: {
-                            xmin: -125.0,
-                            ymin: 24.0,
-                            xmax: -66.0,
-                            ymax: 49.0,
-                            spatialReference: { wkid: 4326 }
-                        },
-                        padding: { left: 20, right: 20, top: 20, bottom: 20 }
-                    });
-
-                    // Initialize UI
-                    updateStatus();
-                }).catch(function(fallbackError) {
-                    console.error("Error loading fallback PSAP layer:", fallbackError);
-                    status.textContent = 'Error loading PSAP layers - using Statistics Canada data instead';
-                    
-                    // Switch to StatCan layer as final fallback
-                    activeLayer = 'statcan';
-                    psapLayer.visible = false;
-                    psapFallbackLayer.visible = false;
-                    statcanCSDLayer.visible = true;
-                    statcanCSDLayer.opacity = 1.0;
-                    
-                    updateLayerSwitchText();
-                    updateStatus();
-                });
+                // Switch to StatCan layer as fallback
+                activeLayer = 'statcan';
+                psapLayer.visible = false;
+                statcanCSDLayer.visible = true;
+                statcanCSDLayer.opacity = 1.0;
+                
+                updateLayerSwitchText();
+                updateStatus();
             });
         });
     </script>
