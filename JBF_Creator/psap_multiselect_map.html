@@ -618,6 +618,7 @@
     <div class="toolbar" id="toolbar">
         <button id="layerSwitchBtn">Focus: US PSAPs</button>
         <button id="multiSelectBtn">🔘 Multi-Select: ON</button>
+        <button id="loadKoordinatesBtn">🌐 Load Koordinates Data</button>
         <button id="drawPolygonBtn">✏️ Draw Polygon</button>
         <button id="downloadBtn" disabled>📥 Download Selected (0)</button>
         <button id="downloadDrawnBtn" style="display:none;">📥 Download Drawn Polygon</button>
@@ -699,6 +700,14 @@
             esriConfig.request.timeout = 60000; // Set a reasonable timeout
             esriConfig.request.httpsDomains.push("services3.arcgis.com"); // Trust the domain
 
+            // Koordinates API configuration
+            const KOORDINATES_API_KEY = '[api_token]'; // Replace with your actual API key
+            const KOORDINATES_LAYER_ID = '112378';
+            const KOORDINATES_BASE_URL = 'https://koordinates.com/services/query/v1/vector.json';
+            
+            // Statistics Canada Digital Boundary Files configuration
+            const STATCAN_BASE_URL = 'https://geo.statcan.gc.ca/geo_wa/rest/services/2021/Digital_boundary_files/MapServer';
+
             // Initialize variables
             let sketchGraphicsLayer;
             let drawnPolygon = null;
@@ -706,6 +715,7 @@
             let highlightSelections = [];
             let psapLayerView;
             let canadaTownsLayerView;
+            let statcanCSDLayerView;
             let activeLayer = 'psap'; // Default to PSAP layer
             let multiSelectMode = true; // Default multi-select to ON
             let drawnPolygons = [];
@@ -775,6 +785,12 @@
                 title: "User-Drawn Polygons"
             });
             
+            // Create graphics layer for Koordinates data
+            const koordinatesLayer = new GraphicsLayer({
+                title: "Koordinates Data",
+                visible: true
+            });
+            
             // Create the Canadian Towns layer with its own renderer
             const canadaTownsLayer = new FeatureLayer({
                 url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/Canada_Town/FeatureServer",
@@ -805,9 +821,35 @@
                 }
             });
             
+            // Create the Statistics Canada Census Subdivisions (CSD) layer
+            const statcanCSDLayer = new FeatureLayer({
+                url: `${STATCAN_BASE_URL}/9`, // CSD layer (Census Subdivisions)
+                title: "Statistics Canada Census Subdivisions",
+                renderer: new SimpleRenderer({
+                    symbol: new SimpleFillSymbol({
+                        color: [34, 139, 34, 0.3], // Forest green with transparency
+                        outline: new SimpleLineSymbol({
+                            color: [34, 139, 34, 0.8], // Dark green outline
+                            width: 1
+                        })
+                    })
+                }),
+                outFields: ["*"],
+                popupEnabled: false,
+                // This is a public service, no authentication needed
+                highlightOptions: {
+                    color: [50, 205, 50, 0.8], // Lime green highlight
+                    fillOpacity: 0.7,
+                    haloColor: [50, 205, 50],
+                    haloOpacity: 0.7
+                }
+            });
+            
             // Add all layers to the map
             map.add(psapLayer);
             map.add(canadaTownsLayer);
+            map.add(statcanCSDLayer);
+            map.add(koordinatesLayer);
             map.add(drawLayer);
 
             // Create tooltip element
@@ -922,6 +964,87 @@
                 // If no name found, combine the ID and any other useful information
                 return `Town ID: ${attributes.OBJECTID || attributes.FID || 'Unknown'}`;
             }
+            
+            // Helper function to get Koordinates feature name from attributes
+            function getKoordinatesName(attributes) {
+                console.log('Koordinates feature attributes:', attributes);
+                
+                // Try common name fields
+                if (attributes.name) {
+                    return attributes.name;
+                }
+                if (attributes.NAME) {
+                    return attributes.NAME;
+                }
+                if (attributes.title) {
+                    return attributes.title;
+                }
+                if (attributes.label) {
+                    return attributes.label;
+                }
+                
+                // Look for any field containing 'name'
+                const nameFields = Object.keys(attributes).filter(key => 
+                    key.toLowerCase().includes('name')
+                );
+                
+                for (const field of nameFields) {
+                    if (attributes[field] && typeof attributes[field] === 'string' && attributes[field].trim() !== '') {
+                        return attributes[field];
+                    }
+                }
+                
+                // If no name found, use the first string attribute or create a generic name
+                const stringFields = Object.keys(attributes).filter(key => 
+                    typeof attributes[key] === 'string' && attributes[key].trim() !== ''
+                );
+                
+                if (stringFields.length > 0) {
+                    return attributes[stringFields[0]];
+                }
+                
+                return 'Koordinates Feature';
+            }
+            
+            // Helper function to get Statistics Canada CSD feature name from attributes
+            function getStatCanCSDName(attributes) {
+                console.log('StatCan CSD feature attributes:', attributes);
+                
+                // Try common name fields for Census Subdivisions
+                if (attributes.CSDNAME) {
+                    return attributes.CSDNAME;
+                }
+                if (attributes.CSD_NAME) {
+                    return attributes.CSD_NAME;
+                }
+                if (attributes.name) {
+                    return attributes.name;
+                }
+                if (attributes.NAME) {
+                    return attributes.NAME;
+                }
+                
+                // Look for fields containing 'name'
+                const nameFields = Object.keys(attributes).filter(key => 
+                    key.toLowerCase().includes('name')
+                );
+                
+                for (const field of nameFields) {
+                    if (attributes[field] && typeof attributes[field] === 'string' && attributes[field].trim() !== '') {
+                        return attributes[field];
+                    }
+                }
+                
+                // Use ID if available
+                if (attributes.CSDUID) {
+                    return `CSD ${attributes.CSDUID}`;
+                }
+                if (attributes.CSD_UID) {
+                    return `CSD ${attributes.CSD_UID}`;
+                }
+                
+                return 'StatCan Census Subdivision';
+            }
 
             // Helper function to update selection panel - implementation from Canada app
             function updateSelectionPanel() {
@@ -933,16 +1056,29 @@
                 
                 // Count how many features of each type
                 const psapCount = selectedFeatures.filter(f => f.layer === psapLayer).length;
-                const townCount = selectedFeatures.filter(f => f.layer !== psapLayer).length;
+                const townCount = selectedFeatures.filter(f => f.layer === canadaTownsLayer).length;
+                const statcanCount = selectedFeatures.filter(f => f.layer === statcanCSDLayer).length;
+                const koordinatesCount = selectedFeatures.filter(f => f.layer === koordinatesLayer).length;
                 
                 // Create an appropriate header text based on what's selected
                 const headerTextElement = document.getElementById('selectionHeaderText');
-                if (psapCount > 0 && townCount > 0) {
-                    headerTextElement.textContent = `Selected Features (${psapCount} PSAPs, ${townCount} Towns)`;
+                const totalFeatureTypes = [psapCount > 0, townCount > 0, statcanCount > 0, koordinatesCount > 0].filter(Boolean).length;
+                
+                if (totalFeatureTypes > 1) {
+                    const parts = [];
+                    if (psapCount > 0) parts.push(`${psapCount} PSAPs`);
+                    if (townCount > 0) parts.push(`${townCount} Towns`);
+                    if (statcanCount > 0) parts.push(`${statcanCount} StatCan`);
+                    if (koordinatesCount > 0) parts.push(`${koordinatesCount} Koordinates`);
+                    headerTextElement.textContent = `Selected Features (${parts.join(', ')})`;
                 } else if (psapCount > 0) {
                     headerTextElement.textContent = `Selected PSAPs`;
                 } else if (townCount > 0) {
                     headerTextElement.textContent = `Selected Towns`;
+                } else if (statcanCount > 0) {
+                    headerTextElement.textContent = `Selected Census Subdivisions`;
+                } else if (koordinatesCount > 0) {
+                    headerTextElement.textContent = `Selected Koordinates Features`;
                 } else {
                     headerTextElement.textContent = `Selected Features`;
                 }
@@ -971,11 +1107,20 @@
                     
                     // Get appropriate name based on which layer the feature belongs to
                     const isPsapFeature = feature.layer === psapLayer;
+                    const isCanadaFeature = feature.layer === canadaTownsLayer;
+                    const isStatCanFeature = feature.layer === statcanCSDLayer;
+                    const isKoordinatesFeature = feature.layer === koordinatesLayer;
                     
                     if (isPsapFeature) {
                         nameSpan.textContent = getPsapName(feature.attributes);
-                    } else {
+                    } else if (isCanadaFeature) {
                         nameSpan.textContent = getTownName(feature.attributes);
+                    } else if (isStatCanFeature) {
+                        nameSpan.textContent = getStatCanCSDName(feature.attributes);
+                    } else if (isKoordinatesFeature) {
+                        nameSpan.textContent = getKoordinatesName(feature.attributes);
+                    } else {
+                        nameSpan.textContent = 'Unknown Feature';
                     }
                     
                     const removeBtn = document.createElement('button');
@@ -1065,15 +1210,127 @@
                 if (selectedFeatures.length === 0) {
                     if (activeLayer === 'psap') {
                         status.textContent = 'Click to select PSAPs. Hold Ctrl/Cmd for multiple selection.';
-                    } else {
+                    } else if (activeLayer === 'canada') {
                         status.textContent = 'Click to select Canadian towns. Hold Ctrl/Cmd for multiple selection.';
+                    } else if (activeLayer === 'statcan') {
+                        status.textContent = 'Click to select Census Subdivisions. Hold Ctrl/Cmd for multiple selection.';
+                    } else if (activeLayer === 'koordinates') {
+                        status.textContent = 'Click to select Koordinates features. Hold Ctrl/Cmd for multiple selection.';
                     }
                 } else {
                     if (activeLayer === 'psap') {
                         status.textContent = `${selectedFeatures.length} PSAP${selectedFeatures.length > 1 ? 's' : ''} selected. Use Ctrl/Cmd+click to add more.`;
-                    } else {
+                    } else if (activeLayer === 'canada') {
                         status.textContent = `${selectedFeatures.length} town${selectedFeatures.length > 1 ? 's' : ''} selected. Use Ctrl/Cmd+click to add more.`;
+                    } else if (activeLayer === 'statcan') {
+                        status.textContent = `${selectedFeatures.length} subdivision${selectedFeatures.length > 1 ? 's' : ''} selected. Use Ctrl/Cmd+click to add more.`;
+                    } else if (activeLayer === 'koordinates') {
+                        status.textContent = `${selectedFeatures.length} feature${selectedFeatures.length > 1 ? 's' : ''} selected. Use Ctrl/Cmd+click to add more.`;
                     }
+                }
+            }
+
+            // Functions for Koordinates API integration
+            async function queryKoordinatesData(x, y, maxResults = 3, radius = 10000) {
+                if (KOORDINATES_API_KEY === '[api_token]') {
+                    console.warn('Koordinates API key not configured');
+                    return [];
+                }
+
+                const url = `${KOORDINATES_BASE_URL}?key=${KOORDINATES_API_KEY}&layer=${KOORDINATES_LAYER_ID}&x=${x}&y=${y}&max_results=${maxResults}&radius=${radius}&geometry=true&with_field_names=true`;
+                
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    return data.vectorQuery?.layers?.[0]?.features || [];
+                } catch (error) {
+                    console.error('Error querying Koordinates data:', error);
+                    return [];
+                }
+            }
+
+            function createKoordinatesGraphic(feature) {
+                // Convert Koordinates geometry to ArcGIS geometry
+                let geometry = null;
+                
+                if (feature.geometry) {
+                    if (feature.geometry.type === 'Polygon') {
+                        geometry = {
+                            type: "polygon",
+                            rings: feature.geometry.coordinates,
+                            spatialReference: { wkid: 4326 }
+                        };
+                    } else if (feature.geometry.type === 'Point') {
+                        geometry = {
+                            type: "point",
+                            x: feature.geometry.coordinates[0],
+                            y: feature.geometry.coordinates[1],
+                            spatialReference: { wkid: 4326 }
+                        };
+                    } else if (feature.geometry.type === 'MultiPolygon') {
+                        // Flatten MultiPolygon to Polygon with multiple rings
+                        const rings = [];
+                        feature.geometry.coordinates.forEach(polygon => {
+                            polygon.forEach(ring => rings.push(ring));
+                        });
+                        geometry = {
+                            type: "polygon",
+                            rings: rings,
+                            spatialReference: { wkid: 4326 }
+                        };
+                    }
+                }
+
+                if (!geometry) return null;
+
+                // Create symbol based on geometry type
+                let symbol;
+                if (geometry.type === 'polygon') {
+                    symbol = new SimpleFillSymbol({
+                        color: [255, 165, 0, 0.4], // Orange with transparency
+                        outline: new SimpleLineSymbol({
+                            color: [255, 140, 0, 0.8], // Dark orange outline
+                            width: 2
+                        })
+                    });
+                } else if (geometry.type === 'point') {
+                    symbol = {
+                        type: "simple-marker",
+                        color: [255, 165, 0, 0.8],
+                        outline: {
+                            color: [255, 140, 0],
+                            width: 2
+                        },
+                        size: 8
+                    };
+                }
+
+                return new Graphic({
+                    geometry: geometry,
+                    symbol: symbol,
+                    attributes: feature.properties || {},
+                    layer: koordinatesLayer
+                });
+            }
+
+            async function loadKoordinatesDataInView() {
+                // Clear existing Koordinates graphics
+                koordinatesLayer.removeAll();
+
+                const extent = view.extent;
+                const center = extent.center;
+                
+                // Query data at the center of the current view
+                const features = await queryKoordinatesData(center.x, center.y, 50, 50000);
+                
+                if (features.length > 0) {
+                    const graphics = features.map(createKoordinatesGraphic).filter(g => g !== null);
+                    koordinatesLayer.addMany(graphics);
+                    console.log(`Loaded ${graphics.length} Koordinates features`);
+                    status.textContent = `Loaded ${graphics.length} Koordinates features`;
                 }
             }
 
@@ -1189,7 +1446,7 @@
                 // Clear previous search results
                 searchResults.innerHTML = '';
                 
-                // Search only the currently focused layer
+                // Search the currently focused layer, but also support searching all layers
                 if (activeLayer === 'psap') {
                     try {
                         if (!psapLayer) {
@@ -1262,87 +1519,335 @@
                             </div>`;
                         searchResults.style.display = 'block';
                     }
-                } else {
+                } else if (activeLayer === 'canada') {
                     // Canadian Towns search
-                    try {
-                        if (!canadaTownsLayer) {
-                            throw new Error('Canadian Towns layer not initialized');
-                        }
+                    return searchCanadianTowns(searchTerm);
+                } else if (activeLayer === 'statcan') {
+                    // Statistics Canada search
+                    return searchStatCanLayer(searchTerm);
+                } else if (activeLayer === 'koordinates') {
+                    // Koordinates search
+                    return searchKoordinatesLayer(searchTerm);
+                } else {
+                    // Default fallback - search all layers
+                    return searchAllLayers(searchTerm);
+                }
+            }
+            
+            // Separate function for Canadian Towns search
+            async function searchCanadianTowns(searchTerm) {
+                try {
+                    if (!canadaTownsLayer) {
+                        throw new Error('Canadian Towns layer not initialized');
+                    }
 
-                        // Ensure the layer is loaded
-                        if (!canadaTownsLayer.loaded) {
-                            console.log('Canadian Towns layer not loaded yet, waiting...');
-                            return canadaTownsLayer.load()
-                                .then(() => {
-                                    console.log('Canadian Towns layer loaded, retrying search...');
-                                    return performSearch();
-                                });
-                        }
+                    // Ensure the layer is loaded
+                    if (!canadaTownsLayer.loaded) {
+                        console.log('Canadian Towns layer not loaded yet, waiting...');
+                        await canadaTownsLayer.load();
+                        console.log('Canadian Towns layer loaded, retrying search...');
+                    }
 
-                        console.log('Searching Canadian Towns layer for:', searchTerm);
-                        
-                        // Create query specifically for CSDNAME field
-                        const canadaQuery = canadaTownsLayer.createQuery();
-                        
-                        // Search only in the CSDNAME field
-                        canadaQuery.where = `UPPER(CSDNAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
-                        canadaQuery.outFields = ["*", "CSDNAME"];
-                        canadaQuery.returnGeometry = true;
-                        canadaQuery.returnDistinctValues = true;
-                        
-                        console.log('Executing Canadian Towns query on CSDNAME field:', searchTerm);
-                        
-                        return canadaTownsLayer.queryFeatures(canadaQuery)
-                            .then(canadaResults => {
-                                console.log('Canadian Towns search results:', canadaResults);
-                                if (!canadaResults || !canadaResults.features || canadaResults.features.length === 0) {
-                                    searchResults.innerHTML = `
-                                        <div class="search-result-item">
-                                            No results found for "${searchTerm}" in Canadian Towns layer
-                                        </div>`;
-                                    searchResults.style.display = 'block';
-                                    return;
-                                }
-                                
-                                // Process features to ensure they have the required structure
-                                const processedFeatures = canadaResults.features.map(feature => {
-                                    // Ensure the feature has attributes
-                                    if (!feature.attributes) {
-                                        feature.attributes = {};
-                                    }
-                                    
-                                    // Add layer information
-                                    feature.layerType = 'canada';
-                                    feature.layerName = 'Canadian Town';
-                                    
-                                    // Find a suitable name field
-                                    const nameField = Object.keys(feature.attributes).find(key => 
-                                        /(name|town|city|municipal|nom|ville|community|place)/i.test(key)
-                                    );
-                                    
-                                    // Set a name if we don't have one
-                                    if (!feature.attributes.name && nameField) {
-                                        feature.attributes.name = feature.attributes[nameField];
-                                    } else if (!feature.attributes.name) {
-                                        feature.attributes.name = 'Unnamed Location';
-                                    }
-                                    
-                                    return feature;
-                                });
-                                
-                                console.log('Processed Canadian features:', processedFeatures);
-                                displaySearchResults(processedFeatures);
-                            });
-                    } catch (error) {
-                        console.error('Error in Canadian Towns search:', error);
+                    console.log('Searching Canadian Towns layer for:', searchTerm);
+                    
+                    // Create query specifically for CSDNAME field
+                    const canadaQuery = canadaTownsLayer.createQuery();
+                    
+                    // Search only in the CSDNAME field
+                    canadaQuery.where = `UPPER(CSDNAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    canadaQuery.outFields = ["*", "CSDNAME"];
+                    canadaQuery.returnGeometry = true;
+                    canadaQuery.returnDistinctValues = true;
+                    
+                    console.log('Executing Canadian Towns query on CSDNAME field:', searchTerm);
+                    
+                    const canadaResults = await canadaTownsLayer.queryFeatures(canadaQuery);
+                    console.log('Canadian Towns search results:', canadaResults);
+                    
+                    if (!canadaResults || !canadaResults.features || canadaResults.features.length === 0) {
                         searchResults.innerHTML = `
                             <div class="search-result-item">
-                                <strong>Error searching Canadian Towns:</strong><br>
+                                No results found for "${searchTerm}" in Canadian Towns layer
+                            </div>`;
+                        searchResults.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Process features to ensure they have the required structure
+                    const processedFeatures = canadaResults.features.map(feature => {
+                        // Ensure the feature has attributes
+                        if (!feature.attributes) {
+                            feature.attributes = {};
+                        }
+                        
+                        // Add layer information
+                        feature.layerType = 'canada';
+                        feature.layerName = 'Canadian Town';
+                        
+                        // Find a suitable name field
+                        const nameField = Object.keys(feature.attributes).find(key => 
+                            /(name|town|city|municipal|nom|ville|community|place)/i.test(key)
+                        );
+                        
+                        // Set a name if we don't have one
+                        if (!feature.attributes.name && nameField) {
+                            feature.attributes.name = feature.attributes[nameField];
+                        } else if (!feature.attributes.name) {
+                            feature.attributes.name = 'Unnamed Location';
+                        }
+                        
+                        return feature;
+                    });
+                    
+                    console.log('Processed Canadian features:', processedFeatures);
+                    displaySearchResults(processedFeatures);
+                } catch (error) {
+                    console.error('Error in Canadian Towns search:', error);
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            <strong>Error searching Canadian Towns:</strong><br>
+                            ${error.message || 'Unknown error occurred'}
+                        </div>`;
+                    searchResults.style.display = 'block';
+                    throw error;
+                }
+            }
+            
+            // New function for Statistics Canada search
+            async function searchStatCanLayer(searchTerm) {
+                try {
+                    if (!statcanCSDLayer) {
+                        throw new Error('Statistics Canada layer not initialized');
+                    }
+
+                    // Ensure the layer is loaded
+                    if (!statcanCSDLayer.loaded) {
+                        console.log('StatCan layer not loaded yet, waiting...');
+                        await statcanCSDLayer.load();
+                        console.log('StatCan layer loaded, retrying search...');
+                    }
+
+                    console.log('Searching Statistics Canada layer for:', searchTerm);
+                    
+                    // Create query for StatCan CSD layer
+                    const statcanQuery = statcanCSDLayer.createQuery();
+                    
+                    // Search in common name fields for Census Subdivisions
+                    statcanQuery.where = `UPPER(CSDNAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    statcanQuery.outFields = ["*"];
+                    statcanQuery.returnGeometry = true;
+                    
+                    console.log('Executing StatCan query:', statcanQuery.where);
+                    
+                    const statcanResults = await statcanCSDLayer.queryFeatures(statcanQuery);
+                    console.log('StatCan search results:', statcanResults);
+                    
+                    if (!statcanResults || !statcanResults.features || statcanResults.features.length === 0) {
+                        searchResults.innerHTML = `
+                            <div class="search-result-item">
+                                No results found for "${searchTerm}" in Statistics Canada layer
+                            </div>`;
+                        searchResults.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Process features
+                    const processedFeatures = statcanResults.features.map(feature => {
+                        if (!feature.attributes) {
+                            feature.attributes = {};
+                        }
+                        
+                        // Add layer information
+                        feature.layerType = 'statcan';
+                        feature.layerName = 'StatCan Census Subdivision';
+                        
+                        // Ensure we have a name
+                        if (!feature.attributes.name) {
+                            feature.attributes.name = feature.attributes.CSDNAME || feature.attributes.NAME || 'Unnamed Subdivision';
+                        }
+                        
+                        return feature;
+                    });
+                    
+                    console.log('Processed StatCan features:', processedFeatures);
+                    displaySearchResults(processedFeatures);
+                } catch (error) {
+                    console.error('Error in StatCan search:', error);
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            <strong>Error searching Statistics Canada layer:</strong><br>
+                            ${error.message || 'Unknown error occurred'}
+                        </div>`;
+                    searchResults.style.display = 'block';
+                    throw error;
+                }
+            }
+            
+            // New function for Koordinates search
+            async function searchKoordinatesLayer(searchTerm) {
+                try {
+                    if (KOORDINATES_API_KEY === '[api_token]') {
+                        searchResults.innerHTML = `
+                            <div class="search-result-item">
+                                <strong>Koordinates API key not configured</strong><br>
+                                Please set your API key to search Koordinates data.
+                            </div>`;
+                        searchResults.style.display = 'block';
+                        return;
+                    }
+
+                    console.log('Searching Koordinates layer for:', searchTerm);
+                    
+                    // For Koordinates, we'll search the currently loaded features
+                    const loadedFeatures = koordinatesLayer.graphics.toArray();
+                    
+                    if (loadedFeatures.length === 0) {
+                        searchResults.innerHTML = `
+                            <div class="search-result-item">
+                                No Koordinates data loaded. Click "Load Koordinates Data" first.
+                            </div>`;
+                        searchResults.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Filter features by search term
+                    const matchingFeatures = loadedFeatures.filter(graphic => {
+                        const attrs = graphic.attributes || {};
+                        
+                        // Search in all string attributes
+                        return Object.values(attrs).some(value => {
+                            if (typeof value === 'string') {
+                                return value.toLowerCase().includes(searchTerm.toLowerCase());
+                            }
+                            return false;
+                        });
+                    });
+                    
+                    if (matchingFeatures.length === 0) {
+                        searchResults.innerHTML = `
+                            <div class="search-result-item">
+                                No results found for "${searchTerm}" in loaded Koordinates data
+                            </div>`;
+                        searchResults.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Convert graphics to features for display
+                    const processedFeatures = matchingFeatures.map(graphic => ({
+                        geometry: graphic.geometry,
+                        attributes: graphic.attributes,
+                        layerType: 'koordinates',
+                        layerName: 'Koordinates Feature'
+                    }));
+                    
+                    console.log('Processed Koordinates features:', processedFeatures);
+                    displaySearchResults(processedFeatures);
+                } catch (error) {
+                    console.error('Error in Koordinates search:', error);
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            <strong>Error searching Koordinates data:</strong><br>
+                            ${error.message || 'Unknown error occurred'}
+                        </div>`;
+                    searchResults.style.display = 'block';
+                }
+            }
+            
+            // New function to search all layers
+            async function searchAllLayers(searchTerm) {
+                try {
+                    console.log('Searching all layers for:', searchTerm);
+                    
+                    // Search all layers in parallel
+                    const searchPromises = [
+                        searchPSAPLayer(searchTerm),
+                        searchCanadianTowns(searchTerm), 
+                        searchStatCanLayer(searchTerm),
+                        searchKoordinatesLayer(searchTerm)
+                    ];
+                    
+                    // Wait for all searches to complete
+                    await Promise.allSettled(searchPromises);
+                    
+                } catch (error) {
+                    console.error('Error in multi-layer search:', error);
+                    searchResults.innerHTML = `
+                        <div class="search-result-item">
+                            <strong>Error searching layers:</strong><br>
+                            ${error.message || 'Unknown error occurred'}
+                        </div>`;
+                    searchResults.style.display = 'block';
+                }
+            }
+            
+            // Extract PSAP search into separate function
+            async function searchPSAPLayer(searchTerm) {
+                try {
+                    if (!psapLayer) {
+                        throw new Error('PSAP layer not initialized');
+                    }
+                    
+                    // Ensure the layer is loaded
+                    if (!psapLayer.loaded) {
+                        console.log('PSAP layer not loaded yet, waiting...');
+                        await psapLayer.load();
+                        console.log('PSAP layer loaded, retrying search...');
+                    }
+                    
+                    const psapQuery = psapLayer.createQuery();
+                    psapQuery.where = `UPPER(psap_name) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(account_id) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    psapQuery.outFields = ["*"];
+                    psapQuery.returnGeometry = true;
+                    
+                    console.log('Executing PSAP query with where clause:', psapQuery.where);
+                    
+                    const psapResults = await psapLayer.queryFeatures(psapQuery);
+                    console.log('PSAP search results:', psapResults);
+                    
+                    if (!psapResults || !psapResults.features || psapResults.features.length === 0) {
+                        return [];
+                    }
+                    
+                    // Process features to ensure they have the required structure
+                    const processedFeatures = psapResults.features.map(feature => {
+                        if (!feature.attributes) {
+                            feature.attributes = {};
+                        }
+                        
+                        // Add layer information
+                        feature.layerType = 'psap';
+                        feature.layerName = 'PSAP';
+                        
+                        // Ensure we have a name attribute
+                        if (!feature.attributes.name && !feature.attributes.NAME && feature.attributes.psap_name) {
+                            feature.attributes.name = feature.attributes.psap_name;
+                        } else if (!feature.attributes.name && feature.attributes.NAME) {
+                            feature.attributes.name = feature.attributes.NAME;
+                        } else if (!feature.attributes.name && feature.attributes.account_id) {
+                            feature.attributes.name = feature.attributes.account_id;
+                        } else if (!feature.attributes.name) {
+                            feature.attributes.name = 'Unnamed PSAP';
+                        }
+                        
+                        return feature;
+                    });
+                    
+                    console.log('Processed PSAP features:', processedFeatures);
+                    if (activeLayer === 'psap') {
+                        displaySearchResults(processedFeatures);
+                    }
+                    return processedFeatures;
+                } catch (error) {
+                    console.error('Error in PSAP search:', error);
+                    if (activeLayer === 'psap') {
+                        searchResults.innerHTML = `
+                            <div class="search-result-item">
+                                <strong>Error searching PSAPs:</strong><br>
                                 ${error.message || 'Unknown error occurred'}
                             </div>`;
                         searchResults.style.display = 'block';
-                        throw error; // Re-throw to be caught by the outer catch
                     }
+                    throw error;
                 }
             }
             
@@ -1350,28 +1855,81 @@
             function updateLayerSwitchText() {
                 const button = document.getElementById('layerSwitchBtn');
                 if (button) {
-                    button.textContent = activeLayer === 'psap' ? 'Focus: PSAP' : 'Focus: Canadian Towns';
+                    if (activeLayer === 'psap') {
+                        button.textContent = 'Focus: US PSAPs';
+                    } else if (activeLayer === 'canada') {
+                        button.textContent = 'Focus: Canadian Towns';
+                    } else if (activeLayer === 'statcan') {
+                        button.textContent = 'Focus: StatCan Subdivisions';
+                    } else if (activeLayer === 'koordinates') {
+                        button.textContent = 'Focus: Koordinates Data';
+                    }
+                }
+                
+                // Update search placeholder based on active layer
+                updateSearchPlaceholder();
+            }
+            
+            // Update search placeholder text based on active layer
+            function updateSearchPlaceholder() {
+                if (searchInput) {
+                    if (activeLayer === 'psap') {
+                        searchInput.placeholder = 'Search for a PSAP...';
+                    } else if (activeLayer === 'canada') {
+                        searchInput.placeholder = 'Search for a Canadian town...';
+                    } else if (activeLayer === 'statcan') {
+                        searchInput.placeholder = 'Search for a census subdivision...';
+                    } else if (activeLayer === 'koordinates') {
+                        searchInput.placeholder = 'Search Koordinates data...';
+                    } else {
+                        searchInput.placeholder = 'Search...';
+                    }
                 }
             }
             
-            // Toggle between PSAP and Canadian Towns layers
+            // Toggle between layers (PSAP -> Canadian Towns -> StatCan -> Koordinates -> PSAP)
             function toggleActiveLayer() {
                 try {
-                    // Toggle the active layer
-                    activeLayer = activeLayer === 'psap' ? 'canada' : 'psap';
+                    // Cycle through the layers
+                    if (activeLayer === 'psap') {
+                        activeLayer = 'canada';
+                    } else if (activeLayer === 'canada') {
+                        activeLayer = 'statcan';
+                    } else if (activeLayer === 'statcan') {
+                        activeLayer = 'koordinates';
+                    } else {
+                        activeLayer = 'psap';
+                    }
                     console.log('Toggling active layer to:', activeLayer);
                     
-                    // Ensure both layers are visible but adjust opacity to show which is active
+                    // Adjust layer visibility and opacity based on active layer
                     if (psapLayer) {
                         psapLayer.visible = true;
-                        psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.5;
+                        psapLayer.opacity = activeLayer === 'psap' ? 1 : 0.3;
                         console.log('PSAP layer - visible:', psapLayer.visible, 'opacity:', psapLayer.opacity);
                     }
                     
                     if (canadaTownsLayer) {
                         canadaTownsLayer.visible = true;
-                        canadaTownsLayer.opacity = activeLayer === 'canada' ? 1 : 0.5;
+                        canadaTownsLayer.opacity = activeLayer === 'canada' ? 1 : 0.3;
                         console.log('Canada Towns layer - visible:', canadaTownsLayer.visible, 'opacity:', canadaTownsLayer.opacity);
+                    }
+                    
+                    if (statcanCSDLayer) {
+                        statcanCSDLayer.visible = true;
+                        statcanCSDLayer.opacity = activeLayer === 'statcan' ? 1 : 0.3;
+                        console.log('StatCan CSD layer - visible:', statcanCSDLayer.visible, 'opacity:', statcanCSDLayer.opacity);
+                    }
+                    
+                    if (koordinatesLayer) {
+                        koordinatesLayer.visible = activeLayer === 'koordinates';
+                        koordinatesLayer.opacity = activeLayer === 'koordinates' ? 1 : 0.3;
+                        console.log('Koordinates layer - visible:', koordinatesLayer.visible, 'opacity:', koordinatesLayer.opacity);
+                        
+                        // Load Koordinates data when switching to that layer
+                        if (activeLayer === 'koordinates') {
+                            loadKoordinatesDataInView();
+                        }
                     }
                     
                     // No need to re-initialize popups as both layers are now always visible
@@ -1396,8 +1954,12 @@
                     if (status) {
                         if (activeLayer === 'psap') {
                             status.textContent = 'PSAP layer active. Click on a PSAP to select it.';
-                        } else {
+                        } else if (activeLayer === 'canada') {
                             status.textContent = 'Canadian Towns layer active. Click on a town to select it.';
+                        } else if (activeLayer === 'statcan') {
+                            status.textContent = 'StatCan Census Subdivisions layer active. Click on a subdivision to select it.';
+                        } else if (activeLayer === 'koordinates') {
+                            status.textContent = 'Koordinates layer active. Click on a feature to select it.';
                         }
                     }
                     
@@ -1443,7 +2005,12 @@
                 
                 if (features.length === 0) {
                     const searchTerm = searchInput.value.trim();
-                    const layerName = activeLayer === 'psap' ? 'US PSAPs' : 'Canadian Towns';
+                    let layerName = 'current layer';
+                    if (activeLayer === 'psap') layerName = 'US PSAPs';
+                    else if (activeLayer === 'canada') layerName = 'Canadian Towns';
+                    else if (activeLayer === 'statcan') layerName = 'Statistics Canada';
+                    else if (activeLayer === 'koordinates') layerName = 'Koordinates';
+                    
                     searchResults.innerHTML = `
                         <div class="search-result-item">
                             No results found for "${searchTerm}" in ${layerName} layer - do you have the right layer selected in the top right?
@@ -1460,7 +2027,9 @@
                 // Group results by layer type
                 const resultsByLayer = {
                     psap: features.filter(f => f.layerType === 'psap' || f.layer?.id === 'psap-layer'),
-                    canada: features.filter(f => f.layerType === 'canada' || f.layer?.id === 'canada-towns')
+                    canada: features.filter(f => f.layerType === 'canada' || f.layer?.id === 'canada-towns'),
+                    statcan: features.filter(f => f.layerType === 'statcan'),
+                    koordinates: features.filter(f => f.layerType === 'koordinates')
                 };
                 
                 // Display PSAP results
@@ -1493,6 +2062,40 @@
                             searchResults.appendChild(item);
                         } else {
                             console.error('Failed to create search result item for Canada feature:', feature);
+                        }
+                    });
+                }
+                
+                // Display Statistics Canada results
+                if (resultsByLayer.statcan.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'search-result-header';
+                    header.textContent = `Statistics Canada (${resultsByLayer.statcan.length})`;
+                    searchResults.appendChild(header);
+                    
+                    resultsByLayer.statcan.forEach((feature, index) => {
+                        const item = createSearchResultItem(feature, 'statcan');
+                        if (item) {
+                            searchResults.appendChild(item);
+                        } else {
+                            console.error('Failed to create search result item for StatCan feature:', feature);
+                        }
+                    });
+                }
+                
+                // Display Koordinates results
+                if (resultsByLayer.koordinates.length > 0) {
+                    const header = document.createElement('div');
+                    header.className = 'search-result-header';
+                    header.textContent = `Koordinates (${resultsByLayer.koordinates.length})`;
+                    searchResults.appendChild(header);
+                    
+                    resultsByLayer.koordinates.forEach((feature, index) => {
+                        const item = createSearchResultItem(feature, 'koordinates');
+                        if (item) {
+                            searchResults.appendChild(item);
+                        } else {
+                            console.error('Failed to create search result item for Koordinates feature:', feature);
                         }
                     });
                 }
@@ -1572,11 +2175,18 @@
                         item.dataset.featureId = featureId;
                         item.featureData = feature;
                         
+                        // Get display type based on layer
+                        let displayType = 'Feature';
+                        if (layerType === 'psap') displayType = 'PSAP';
+                        else if (layerType === 'canada') displayType = 'Canadian Town';
+                        else if (layerType === 'statcan') displayType = 'StatCan CSD';
+                        else if (layerType === 'koordinates') displayType = 'Koordinates';
+                        
                         // Set the HTML content for the search result item
                         item.innerHTML = `
                             <div class="search-result-header">
                                 <span class="search-result-title">${displayName}</span>
-                                <span class="search-result-type">${layerType === 'psap' ? 'PSAP' : 'Canadian Town'}</span>
+                                <span class="search-result-type">${displayType}</span>
                             </div>
                             <div class="search-result-details">
                                 ${details || '<div class="no-details">No additional details available</div>'}
@@ -2168,6 +2778,15 @@
                 status.textContent = multiSelectMode ? 'Multi-select mode activated. Click on multiple features to select them.' : 'Multi-select mode deactivated. Click on a feature to select it.';
             });
             
+            // Koordinates load button functionality
+            const loadKoordinatesBtn = document.getElementById('loadKoordinatesBtn');
+            if (loadKoordinatesBtn) {
+                loadKoordinatesBtn.addEventListener('click', function() {
+                    status.textContent = 'Loading Koordinates data...';
+                    loadKoordinatesDataInView();
+                });
+            }
+            
             // Function to switch between PSAP and Canadian Towns layers
             // Now just changes visual focus but both layers remain selectable
             function switchActiveLayer() {
@@ -2270,7 +2889,7 @@
                 
                 // Perform hit test to see if user clicked on a feature
                 view.hitTest(screenPoint).then(function(response) {
-                    // Check both layers for features, not just the active one
+                    // Check all layers for features
                     // First check for PSAP features
                     const psapFeature = response.results.find(result => 
                         result.graphic && result.graphic.layer === psapLayer
@@ -2281,12 +2900,26 @@
                         result.graphic && result.graphic.layer === canadaTownsLayer
                     );
                     
-                    // First try the active layer, then fall back to the other layer
+                    // Check for Koordinates features
+                    const koordinatesFeature = response.results.find(result => 
+                        result.graphic && result.graphic.layer === koordinatesLayer
+                    );
+                    
+                    // Check for StatCan features
+                    const statcanFeature = response.results.find(result => 
+                        result.graphic && result.graphic.layer === statcanCSDLayer
+                    );
+                    
+                    // First try the active layer, then fall back to other layers
                     let clickedFeature = null;
                     if (activeLayer === 'psap') {
-                        clickedFeature = psapFeature || canadaFeature;
-                    } else {
-                        clickedFeature = canadaFeature || psapFeature;
+                        clickedFeature = psapFeature || canadaFeature || statcanFeature || koordinatesFeature;
+                    } else if (activeLayer === 'canada') {
+                        clickedFeature = canadaFeature || psapFeature || statcanFeature || koordinatesFeature;
+                    } else if (activeLayer === 'statcan') {
+                        clickedFeature = statcanFeature || psapFeature || canadaFeature || koordinatesFeature;
+                    } else if (activeLayer === 'koordinates') {
+                        clickedFeature = koordinatesFeature || psapFeature || canadaFeature || statcanFeature;
                     }
                     
                     if (clickedFeature) {
@@ -2391,6 +3024,11 @@
             view.whenLayerView(canadaTownsLayer).then(function(layerView) {
                 canadaTownsLayerView = layerView;
                 console.log("Canada Towns layer view created");
+            });
+            
+            view.whenLayerView(statcanCSDLayer).then(function(layerView) {
+                statcanCSDLayerView = layerView;
+                console.log("StatCan CSD layer view created");
             });
             
             // Area selection modal functionality
