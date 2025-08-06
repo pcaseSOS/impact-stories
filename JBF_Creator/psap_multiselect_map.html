@@ -656,6 +656,8 @@
 
     <script>
         require([
+            "esri/config",
+            "esri/identity/IdentityManager",
             "esri/Map",
             "esri/views/MapView",
             "esri/layers/FeatureLayer",
@@ -669,7 +671,33 @@
             "esri/geometry/projection",
             "esri/geometry/SpatialReference",
             "esri/widgets/Expand"
-        ], function(Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
+        ], function(esriConfig, IdentityManager, Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
+
+            // Configure ArcGIS to disable authentication prompts and allow anonymous access
+            esriConfig.request.interceptors.push({
+                urls: [
+                    "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/"
+                ],
+                before: function(params) {
+                    // Force anonymous access by not sending any authentication headers
+                    params.requestOptions = params.requestOptions || {};
+                    params.requestOptions.headers = params.requestOptions.headers || {};
+                    // Remove any potential auth headers
+                    delete params.requestOptions.headers.Authorization;
+                    delete params.requestOptions.headers['X-Esri-Authorization'];
+                }
+            });
+
+            // Disable the identity manager to prevent login prompts
+            esriConfig.request.useIdentity = false;
+            
+            // Explicitly disable IdentityManager
+            IdentityManager.destroyCredentials();
+            IdentityManager.checkSignInStatus = function() { return false; };
+            
+            // Additional configuration to prevent authentication prompts
+            esriConfig.request.timeout = 60000; // Set a reasonable timeout
+            esriConfig.request.httpsDomains.push("services3.arcgis.com"); // Trust the domain
 
             // Initialize variables
             let sketchGraphicsLayer;
@@ -728,6 +756,10 @@
                 url: "https://services3.arcgis.com/8lRAGVDTn4JslcF7/arcgis/rest/services/psap_2017/FeatureServer",
                 renderer: renderer,
                 outFields: ["*"],
+                // Force anonymous access
+                requestOptions: {
+                    useIdentity: false
+                },
                 // Set highlight options
                 highlightOptions: {
                     color: [255, 243, 0, 0.8], // Bright yellow
@@ -758,6 +790,10 @@
                 }),
                 outFields: ["*"],  // Get all fields for proper attribute handling
                 popupEnabled: false,  // Disable click popups for Canadian Towns
+                // Force anonymous access
+                requestOptions: {
+                    useIdentity: false
+                },
                 // No popupTemplate needed since popups are disabled
                 // We'll still show information via custom hover tooltips instead
                 // Set highlight options
