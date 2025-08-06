@@ -761,12 +761,12 @@
                 })
             });
 
-            // Create the feature layer - PSAP layer using a public service
+            // Create the feature layer - PSAP layer using NASA NCCS HIFLD service
             const psapLayer = new FeatureLayer({
-                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Census_Boundaries/FeatureServer/0",
+                url: "https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10",
                 renderer: renderer,
                 outFields: ["*"],
-                title: "US Census Boundaries (PSAP Alternative)",
+                title: "PSAP 911 Service Area Boundaries",
                 // This is a public service, no authentication needed
                 highlightOptions: {
                     color: [255, 243, 0, 0.8], // Bright yellow
@@ -1490,17 +1490,21 @@
                                     
                                     // Add layer information
                                     feature.layerType = 'psap';
-                                    feature.layerName = 'US Census Area';
+                                    feature.layerName = 'PSAP 911 Service Area';
                                     
                                     // Ensure we have a name attribute
-                                    if (!feature.attributes.name && feature.attributes.NAME) {
+                                    if (!feature.attributes.name && feature.attributes.PSAP_NAME) {
+                                        feature.attributes.name = feature.attributes.PSAP_NAME;
+                                    } else if (!feature.attributes.name && feature.attributes.NAME) {
                                         feature.attributes.name = feature.attributes.NAME;
-                                    } else if (!feature.attributes.name && feature.attributes.STATE_NAME) {
-                                        feature.attributes.name = feature.attributes.STATE_NAME;
-                                    } else if (!feature.attributes.name && feature.attributes.COUNTY_NAME) {
-                                        feature.attributes.name = feature.attributes.COUNTY_NAME;
+                                    } else if (!feature.attributes.name && feature.attributes.STATE) {
+                                        feature.attributes.name = feature.attributes.STATE;
+                                    } else if (!feature.attributes.name && feature.attributes.COUNTY) {
+                                        feature.attributes.name = feature.attributes.COUNTY;
+                                    } else if (!feature.attributes.name && feature.attributes.CITY) {
+                                        feature.attributes.name = feature.attributes.CITY;
                                     } else if (!feature.attributes.name) {
-                                        feature.attributes.name = 'Unnamed US Census Area';
+                                        feature.attributes.name = 'Unnamed PSAP';
                                     }
                                     
                                     return feature;
@@ -1794,7 +1798,7 @@
                     }
                     
                     const psapQuery = psapLayer.createQuery();
-                    psapQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(STATE_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(COUNTY_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
+                    psapQuery.where = `UPPER(NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(PSAP_NAME) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(STATE) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(COUNTY) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%') OR UPPER(CITY) LIKE UPPER('%${searchTerm.replace(/'/g, "''")}%')`;
                     psapQuery.outFields = ["*"];
                     psapQuery.returnGeometry = true;
                     
@@ -1873,7 +1877,7 @@
             function updateSearchPlaceholder() {
                 if (searchInput) {
                     if (activeLayer === 'psap') {
-                        searchInput.placeholder = 'Search for a PSAP...';
+                        searchInput.placeholder = 'Search for a PSAP 911 service area...';
                     } else if (activeLayer === 'canada') {
                         searchInput.placeholder = 'Search for a Canadian town...';
                     } else if (activeLayer === 'statcan') {
@@ -3104,8 +3108,8 @@
             
             // Wait for layer to load and zoom to extent
             psapLayer.when(function() {
-                console.log("US Census layer loaded successfully");
-                status.textContent = "US Census data loaded! Click to select boundaries or use Draw Polygon tool.";
+                console.log("PSAP layer loaded successfully");
+                status.textContent = "PSAP 911 service area boundaries loaded! Click to select boundaries or use Draw Polygon tool.";
 
                 // Zoom to continental US for better default view
                 view.goTo({
@@ -3122,8 +3126,8 @@
                 // Initialize UI
                 updateStatus();
             }).catch(function(error) {
-                console.error("Error loading US Census layer:", error);
-                status.textContent = 'Error loading US Census layer - using Statistics Canada data instead';
+                console.error("Error loading PSAP layer:", error);
+                status.textContent = 'Error loading PSAP layer - using Statistics Canada data instead';
                 
                 // Switch to StatCan layer as fallback
                 activeLayer = 'statcan';
