@@ -936,22 +936,66 @@
                             console.log(`✅ ${service.state}: Loaded ${data.features.length} features`);
                             
                             data.features.forEach(feature => {
-                                const graphic = new Graphic({
-                                    geometry: feature.geometry,
-                                    symbol: new SimpleFillSymbol({
-                                        color: [255, 243, 0, 0.3],
-                                        outline: new SimpleLineSymbol({
-                                            color: [255, 243, 0, 0.8],
-                                            width: 1
-                                        })
-                                    }),
-                                    attributes: {
-                                        ...feature.attributes,
-                                        state: service.state,
-                                        service_name: service.name
+                                try {
+                                    // Convert geometry to proper ArcGIS format
+                                    let geometry = feature.geometry;
+                                    
+                                    // If geometry is in GeoJSON format, convert it
+                                    if (geometry && geometry.type) {
+                                        // For polygons, ensure rings are properly formatted
+                                        if (geometry.type === 'polygon' && geometry.coordinates) {
+                                            geometry = {
+                                                type: 'polygon',
+                                                rings: geometry.coordinates
+                                            };
+                                        }
+                                        // For multipolygons, flatten to individual polygons
+                                        else if (geometry.type === 'multipolygon' && geometry.coordinates) {
+                                            geometry.coordinates.forEach(ring => {
+                                                const polygonGeometry = {
+                                                    type: 'polygon',
+                                                    rings: ring
+                                                };
+                                                const polygonGraphic = new Graphic({
+                                                    geometry: polygonGeometry,
+                                                    symbol: new SimpleFillSymbol({
+                                                        color: [255, 243, 0, 0.3],
+                                                        outline: new SimpleLineSymbol({
+                                                            color: [255, 243, 0, 0.8],
+                                                            width: 1
+                                                        })
+                                                    }),
+                                                    attributes: {
+                                                        ...feature.attributes,
+                                                        state: service.state,
+                                                        service_name: service.name
+                                                    }
+                                                });
+                                                psapLayer.add(polygonGraphic);
+                                            });
+                                            return; // Skip the main graphic creation for multipolygons
+                                        }
                                     }
-                                });
-                                psapLayer.add(graphic);
+                                    
+                                    const graphic = new Graphic({
+                                        geometry: geometry,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [255, 243, 0, 0.3],
+                                            outline: new SimpleLineSymbol({
+                                                color: [255, 243, 0, 0.8],
+                                                width: 1
+                                            })
+                                        }),
+                                        attributes: {
+                                            ...feature.attributes,
+                                            state: service.state,
+                                            service_name: service.name
+                                        }
+                                    });
+                                    psapLayer.add(graphic);
+                                } catch (geometryError) {
+                                    console.log(`⚠️ ${service.state}: Geometry error for feature - ${geometryError.message}`);
+                                }
                             });
                             
                             loadedStates.push(service.state);
