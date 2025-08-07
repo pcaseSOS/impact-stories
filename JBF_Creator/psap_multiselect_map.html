@@ -973,6 +973,7 @@
                                                     }
                                                 });
                                                 psapLayer.add(polygonGraphic);
+                                                console.log(`➕ Added multipolygon graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
                                             });
                                             return; // Skip the main graphic creation for multipolygons
                                         }
@@ -995,6 +996,7 @@
                                         }
                                     });
                                     psapLayer.add(graphic);
+                                    console.log(`➕ Added graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
                                 } catch (geometryError) {
                                     console.log(`⚠️ ${service.state}: Geometry error for feature - ${geometryError.message}`);
                                     // Try to create a simple point graphic as fallback
@@ -1017,6 +1019,7 @@
                                                 }
                                             });
                                             psapLayer.add(pointGraphic);
+                                            console.log(`➕ Added fallback point graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
                                         }
                                     } catch (fallbackError) {
                                         console.log(`⚠️ ${service.state}: Fallback graphic creation failed - ${fallbackError.message}`);
@@ -1037,7 +1040,16 @@
                 if (loadedStates.length > 0) {
                     console.log(`🎉 Successfully loaded PSAP data from ${loadedStates.length} states: ${loadedStates.join(', ')}`);
                     console.log(`📊 Total features loaded: ${totalFeatures}`);
+                    console.log(`🔍 PSAP Layer graphics count: ${psapLayer.graphics.length}`);
+                    console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
+                    console.log(`🎨 PSAP Layer opacity: ${psapLayer.opacity}`);
                     status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} states: ${loadedStates.join(', ')}`;
+                    
+                    // Force a refresh of the layer view
+                    if (psapLayerView) {
+                        console.log('🔄 Refreshing PSAP layer view...');
+                        psapLayerView.refresh();
+                    }
                 } else {
                     console.log('❌ No state PSAP services worked - using demo boundaries');
                     createDemoPSAPBoundaries();
