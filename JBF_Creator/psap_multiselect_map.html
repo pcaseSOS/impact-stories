@@ -2323,6 +2323,54 @@
                         });
                     }
                 }
+                
+                // Helper function to zoom to a layer's extent
+                function zoomToLayerExtent(layer) {
+                    if (!layer || !layer.graphics || layer.graphics.length === 0) {
+                        console.log('No graphics in layer to zoom to');
+                        return;
+                    }
+                    
+                    try {
+                        // Get all graphics from the layer
+                        const graphics = layer.graphics.toArray();
+                        if (graphics.length === 0) {
+                            console.log('No graphics found in layer');
+                            return;
+                        }
+                        
+                        // Calculate the combined extent of all graphics
+                        let combinedExtent = null;
+                        
+                        graphics.forEach(graphic => {
+                            if (graphic.geometry) {
+                                const graphicExtent = graphic.geometry.extent || 
+                                                   (graphic.geometry.getExtent ? graphic.geometry.getExtent() : null);
+                                
+                                if (graphicExtent) {
+                                    if (!combinedExtent) {
+                                        combinedExtent = graphicExtent.clone();
+                                    } else {
+                                        combinedExtent.union(graphicExtent);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        if (combinedExtent) {
+                            // Zoom to the combined extent with padding
+                            view.goTo({
+                                target: combinedExtent,
+                                padding: 50
+                            });
+                            console.log('Zoomed to layer extent');
+                        } else {
+                            console.log('Could not calculate layer extent');
+                        }
+                    } catch (error) {
+                        console.error('Error zooming to layer extent:', error);
+                    }
+                }
             }
             
             // Hide search results when clicking elsewhere
