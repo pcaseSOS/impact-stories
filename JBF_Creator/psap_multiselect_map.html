@@ -761,104 +761,35 @@
                 })
             });
 
-            // Create a simple graphics layer that loads data directly
-            const psapLayer = new GraphicsLayer({
+            // Try using FeatureLayer with NASA PSAP service directly
+            const psapLayer = new FeatureLayer({
+                url: "https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10",
                 title: "PSAP 911 Service Areas",
                 visible: true,
-                opacity: 1.0
+                opacity: 1.0,
+                renderer: new SimpleRenderer({
+                    symbol: new SimpleFillSymbol({
+                        color: [255, 243, 0, 0.3],
+                        outline: new SimpleLineSymbol({
+                            color: [255, 243, 0, 0.8],
+                            width: 1
+                        })
+                    })
+                }),
+                requestOptions: { useIdentity: false }
             });
             
-            // Load data directly from the NASA PSAP service with CORS proxy
-            async function loadPSAPData() {
-                try {
-                    console.log('Attempting to load NASA PSAP data...');
-                    
-                    // Try direct fetch first
-                    let response = await fetch('https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
-                    
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-                    
-                    const data = await response.json();
-                    console.log('NASA PSAP response:', data);
-                    
-                    if (data.features && data.features.length > 0) {
-                        data.features.forEach(feature => {
-                            const graphic = new Graphic({
-                                geometry: feature.geometry,
-                                symbol: new SimpleFillSymbol({
-                                    color: [255, 243, 0, 0.3],
-                                    outline: new SimpleLineSymbol({
-                                        color: [255, 243, 0, 0.8],
-                                        width: 1
-                                    })
-                                }),
-                                attributes: feature.attributes
-                            });
-                            psapLayer.add(graphic);
-                        });
-                        console.log(`Loaded ${data.features.length} PSAP features`);
-                        status.textContent = `Loaded ${data.features.length} PSAP 911 service areas! Click to select boundaries or use Draw Polygon tool.`;
-                    } else {
-                        throw new Error('No features found in NASA PSAP response');
-                    }
-                } catch (error) {
-                    console.error('Error loading NASA PSAP data:', error);
-                    status.textContent = 'NASA PSAP service blocked - trying US States fallback...';
-                    
-                    // Try using a CORS proxy for NASA PSAP service
-                    try {
-                        console.log('Trying NASA PSAP with CORS proxy...');
-                        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                        const nasaUrl = 'https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10/query?where=1%3D1&outFields=*&returnGeometry=true&f=json';
-                        const fallbackResponse = await fetch(proxyUrl + nasaUrl);
-                        
-                        if (!fallbackResponse.ok) {
-                            throw new Error(`HTTP ${fallbackResponse.status}: ${fallbackResponse.statusText}`);
-                        }
-                        
-                        const fallbackData = await fallbackResponse.json();
-                        console.log('NASA PSAP with proxy response:', fallbackData);
-                        
-                        if (fallbackData.error) {
-                            console.error('NASA PSAP proxy service error:', fallbackData.error);
-                            throw new Error(`NASA PSAP proxy service error: ${fallbackData.error.message || 'Unknown error'}`);
-                        }
-                        
-                        if (fallbackData.features && fallbackData.features.length > 0) {
-                            fallbackData.features.forEach(feature => {
-                                const graphic = new Graphic({
-                                    geometry: feature.geometry,
-                                    symbol: new SimpleFillSymbol({
-                                        color: [255, 243, 0, 0.3],
-                                        outline: new SimpleLineSymbol({
-                                            color: [255, 243, 0, 0.8],
-                                            width: 1
-                                        })
-                                    }),
-                                    attributes: feature.attributes
-                                });
-                                psapLayer.add(graphic);
-                            });
-                            console.log(`Loaded ${fallbackData.features.length} NASA PSAP features via proxy`);
-                            status.textContent = `Loaded ${fallbackData.features.length} PSAP 911 service areas via proxy! Click to select boundaries or use Draw Polygon tool.`;
-                        } else {
-                            throw new Error('No features found in NASA PSAP proxy response');
-                        }
-                    } catch (fallbackError) {
-                        console.error('Error loading NASA PSAP with proxy:', fallbackError);
-                        
-                        // Final fallback: Create demo PSAP boundaries
-                        console.log('Creating demo PSAP boundaries as final fallback...');
-                        createDemoPSAPBoundaries();
-                        status.textContent = 'Using demo PSAP boundaries - NASA service blocked by CORS';
-                    }
-                }
-            }
+            // Handle PSAP layer loading with fallback
+            psapLayer.when(() => {
+                console.log('NASA PSAP FeatureLayer loaded successfully!');
+                status.textContent = 'NASA PSAP 911 service areas loaded! Click to select boundaries or use Draw Polygon tool.';
+            }).catch((error) => {
+                console.error('Error loading NASA PSAP FeatureLayer:', error);
+                status.textContent = 'NASA PSAP service blocked - using demo boundaries';
+                createDemoPSAPBoundaries();
+            });
             
-            // Load the data
-            loadPSAPData();
+            // PSAP layer will load automatically via FeatureLayer
             
             // Create graphics layer for drawings
             const drawLayer = new GraphicsLayer({
