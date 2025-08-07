@@ -807,17 +807,24 @@
                     console.error('Error loading NASA PSAP data:', error);
                     status.textContent = 'NASA PSAP service blocked - trying US States fallback...';
                     
-                    // Try US States as fallback (this should work with GitHub Pages)
+                    // Try using a CORS proxy for NASA PSAP service
                     try {
-                        console.log('Trying US States fallback...');
-                        const fallbackResponse = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
+                        console.log('Trying NASA PSAP with CORS proxy...');
+                        const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                        const nasaUrl = 'https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10/query?where=1%3D1&outFields=*&returnGeometry=true&f=json';
+                        const fallbackResponse = await fetch(proxyUrl + nasaUrl);
                         
                         if (!fallbackResponse.ok) {
                             throw new Error(`HTTP ${fallbackResponse.status}: ${fallbackResponse.statusText}`);
                         }
                         
                         const fallbackData = await fallbackResponse.json();
-                        console.log('US States fallback response:', fallbackData);
+                        console.log('NASA PSAP with proxy response:', fallbackData);
+                        
+                        if (fallbackData.error) {
+                            console.error('NASA PSAP proxy service error:', fallbackData.error);
+                            throw new Error(`NASA PSAP proxy service error: ${fallbackData.error.message || 'Unknown error'}`);
+                        }
                         
                         if (fallbackData.features && fallbackData.features.length > 0) {
                             fallbackData.features.forEach(feature => {
@@ -834,14 +841,18 @@
                                 });
                                 psapLayer.add(graphic);
                             });
-                            console.log(`Loaded ${fallbackData.features.length} US States features as fallback`);
-                            status.textContent = `Loaded ${fallbackData.features.length} US States as PSAP fallback! Click to select boundaries or use Draw Polygon tool.`;
+                            console.log(`Loaded ${fallbackData.features.length} NASA PSAP features via proxy`);
+                            status.textContent = `Loaded ${fallbackData.features.length} PSAP 911 service areas via proxy! Click to select boundaries or use Draw Polygon tool.`;
                         } else {
-                            throw new Error('No features found in US States fallback');
+                            throw new Error('No features found in NASA PSAP proxy response');
                         }
                     } catch (fallbackError) {
-                        console.error('Error loading US States fallback:', fallbackError);
-                        status.textContent = 'All US data services blocked - using Canadian data only';
+                        console.error('Error loading NASA PSAP with proxy:', fallbackError);
+                        
+                        // Final fallback: Create demo PSAP boundaries
+                        console.log('Creating demo PSAP boundaries as final fallback...');
+                        createDemoPSAPBoundaries();
+                        status.textContent = 'Using demo PSAP boundaries - NASA service blocked by CORS';
                     }
                 }
             }
@@ -2391,6 +2402,80 @@
                         console.error('Error zooming to layer extent:', error);
                     }
                 }
+            }
+            
+            // Create demo PSAP boundaries as final fallback
+            function createDemoPSAPBoundaries() {
+                console.log('Creating demo PSAP boundaries...');
+                
+                // Create realistic PSAP boundary polygons
+                const demoPSAPs = [
+                    {
+                        geometry: {
+                            type: "polygon",
+                            rings: [[
+                                [-74.0, 40.7], [-73.9, 40.7], [-73.9, 40.8], [-74.0, 40.8], [-74.0, 40.7]
+                            ]]
+                        },
+                        attributes: {
+                            name: "New York City PSAP",
+                            psap_name: "NYC Emergency Services",
+                            state: "NY",
+                            county: "New York",
+                            city: "New York",
+                            telephone: "911"
+                        }
+                    },
+                    {
+                        geometry: {
+                            type: "polygon",
+                            rings: [[
+                                [-87.6, 41.8], [-87.5, 41.8], [-87.5, 41.9], [-87.6, 41.9], [-87.6, 41.8]
+                            ]]
+                        },
+                        attributes: {
+                            name: "Chicago PSAP",
+                            psap_name: "Chicago Emergency Services",
+                            state: "IL",
+                            county: "Cook",
+                            city: "Chicago",
+                            telephone: "911"
+                        }
+                    },
+                    {
+                        geometry: {
+                            type: "polygon",
+                            rings: [[
+                                [-118.3, 34.0], [-118.2, 34.0], [-118.2, 34.1], [-118.3, 34.1], [-118.3, 34.0]
+                            ]]
+                        },
+                        attributes: {
+                            name: "Los Angeles PSAP",
+                            psap_name: "LA Emergency Services",
+                            state: "CA",
+                            county: "Los Angeles",
+                            city: "Los Angeles",
+                            telephone: "911"
+                        }
+                    }
+                ];
+                
+                demoPSAPs.forEach((demoPSAP, index) => {
+                    const graphic = new Graphic({
+                        geometry: demoPSAP.geometry,
+                        symbol: new SimpleFillSymbol({
+                            color: [255, 243, 0, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [255, 243, 0, 0.8],
+                                width: 1
+                            })
+                        }),
+                        attributes: demoPSAP.attributes
+                    });
+                    psapLayer.add(graphic);
+                });
+                
+                console.log(`Created ${demoPSAPs.length} demo PSAP boundaries`);
             }
             
             // Hide search results when clicking elsewhere
