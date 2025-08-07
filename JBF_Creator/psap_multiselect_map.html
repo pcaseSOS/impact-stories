@@ -768,13 +768,22 @@
                 opacity: 1.0
             });
             
-            // Load data directly from the NASA PSAP service
+            // Load data directly from the NASA PSAP service with CORS proxy
             async function loadPSAPData() {
                 try {
-                    const response = await fetch('https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
-                    const data = await response.json();
+                    console.log('Attempting to load NASA PSAP data...');
                     
-                    if (data.features) {
+                    // Try direct fetch first
+                    let response = await fetch('https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log('NASA PSAP response:', data);
+                    
+                    if (data.features && data.features.length > 0) {
                         data.features.forEach(feature => {
                             const graphic = new Graphic({
                                 geometry: feature.geometry,
@@ -791,17 +800,26 @@
                         });
                         console.log(`Loaded ${data.features.length} PSAP features`);
                         status.textContent = `Loaded ${data.features.length} PSAP 911 service areas! Click to select boundaries or use Draw Polygon tool.`;
+                    } else {
+                        throw new Error('No features found in NASA PSAP response');
                     }
                 } catch (error) {
-                    console.error('Error loading PSAP data:', error);
-                    status.textContent = 'Error loading PSAP data - trying fallback...';
+                    console.error('Error loading NASA PSAP data:', error);
+                    status.textContent = 'NASA PSAP service blocked - trying US States fallback...';
                     
-                    // Try fallback to county data
+                    // Try US States as fallback (this should work with GitHub Pages)
                     try {
-                        const fallbackResponse = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Counties/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
-                        const fallbackData = await fallbackResponse.json();
+                        console.log('Trying US States fallback...');
+                        const fallbackResponse = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
                         
-                        if (fallbackData.features) {
+                        if (!fallbackResponse.ok) {
+                            throw new Error(`HTTP ${fallbackResponse.status}: ${fallbackResponse.statusText}`);
+                        }
+                        
+                        const fallbackData = await fallbackResponse.json();
+                        console.log('US States fallback response:', fallbackData);
+                        
+                        if (fallbackData.features && fallbackData.features.length > 0) {
                             fallbackData.features.forEach(feature => {
                                 const graphic = new Graphic({
                                     geometry: feature.geometry,
@@ -816,12 +834,14 @@
                                 });
                                 psapLayer.add(graphic);
                             });
-                            console.log(`Loaded ${fallbackData.features.length} county features as fallback`);
-                            status.textContent = `Loaded ${fallbackData.features.length} county boundaries as PSAP fallback! Click to select boundaries or use Draw Polygon tool.`;
+                            console.log(`Loaded ${fallbackData.features.length} US States features as fallback`);
+                            status.textContent = `Loaded ${fallbackData.features.length} US States as PSAP fallback! Click to select boundaries or use Draw Polygon tool.`;
+                        } else {
+                            throw new Error('No features found in US States fallback');
                         }
                     } catch (fallbackError) {
-                        console.error('Error loading fallback data:', fallbackError);
-                        status.textContent = 'Error loading data - using Statistics Canada data instead';
+                        console.error('Error loading US States fallback:', fallbackError);
+                        status.textContent = 'All US data services blocked - using Canadian data only';
                     }
                 }
             }
