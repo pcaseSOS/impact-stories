@@ -945,58 +945,77 @@
                                     if (geometry && geometry.type) {
                                         // For polygons, ensure rings are properly formatted
                                         if (geometry.type === 'polygon' && geometry.coordinates) {
-                                            geometry = {
-                                                type: 'polygon',
-                                                rings: geometry.coordinates
-                                            };
+                                            // Ensure coordinates are in the right format for ArcGIS
+                                            const rings = geometry.coordinates;
+                                            if (Array.isArray(rings) && rings.length > 0) {
+                                                geometry = {
+                                                    type: 'polygon',
+                                                    rings: rings
+                                                };
+                                            } else {
+                                                console.log(`⚠️ ${service.state}: Invalid polygon coordinates format`);
+                                                return; // Skip this feature
+                                            }
                                         }
                                         // For multipolygons, flatten to individual polygons
                                         else if (geometry.type === 'multipolygon' && geometry.coordinates) {
-                                            geometry.coordinates.forEach(ring => {
-                                                const polygonGeometry = {
-                                                    type: 'polygon',
-                                                    rings: ring
-                                                };
-                                                const polygonGraphic = new Graphic({
-                                                    geometry: polygonGeometry,
-                                                    symbol: new SimpleFillSymbol({
-                                                        color: [255, 243, 0, 0.3],
-                                                        outline: new SimpleLineSymbol({
-                                                            color: [255, 243, 0, 0.8],
-                                                            width: 1
-                                                        })
-                                                    }),
-                                                    attributes: {
-                                                        ...feature.attributes,
-                                                        state: service.state,
-                                                        service_name: service.name
-                                                    }
-                                                });
-                                                psapLayer.add(polygonGraphic);
-                                                console.log(`➕ Added multipolygon graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
+                                            geometry.coordinates.forEach((ring, index) => {
+                                                if (Array.isArray(ring) && ring.length > 0) {
+                                                    const polygonGeometry = {
+                                                        type: 'polygon',
+                                                        rings: ring
+                                                    };
+                                                    const polygonGraphic = new Graphic({
+                                                        geometry: polygonGeometry,
+                                                        symbol: new SimpleFillSymbol({
+                                                            color: [255, 243, 0, 0.3],
+                                                            outline: new SimpleLineSymbol({
+                                                                color: [255, 243, 0, 0.8],
+                                                                width: 1
+                                                            })
+                                                        }),
+                                                        attributes: {
+                                                            ...feature.attributes,
+                                                            state: service.state,
+                                                            service_name: service.name
+                                                        }
+                                                    });
+                                                    psapLayer.add(polygonGraphic);
+                                                    console.log(`➕ Added multipolygon graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
+                                                } else {
+                                                    console.log(`⚠️ ${service.state}: Invalid multipolygon ring format at index ${index}`);
+                                                }
                                             });
                                             return; // Skip the main graphic creation for multipolygons
                                         }
                                     }
                                     
                                     // Create the graphic with proper error handling
-                                    const graphic = new Graphic({
-                                        geometry: geometry,
-                                        symbol: new SimpleFillSymbol({
-                                            color: [255, 243, 0, 0.3],
-                                            outline: new SimpleLineSymbol({
-                                                color: [255, 243, 0, 0.8],
-                                                width: 1
-                                            })
-                                        }),
-                                        attributes: {
-                                            ...feature.attributes,
-                                            state: service.state,
-                                            service_name: service.name
-                                        }
-                                    });
-                                    psapLayer.add(graphic);
-                                    console.log(`➕ Added graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
+                                    // Validate geometry before creating graphic
+                                    if (geometry && geometry.type && (
+                                        (geometry.type === 'polygon' && geometry.rings && Array.isArray(geometry.rings)) ||
+                                        (geometry.type === 'point' && geometry.x !== undefined && geometry.y !== undefined)
+                                    )) {
+                                        const graphic = new Graphic({
+                                            geometry: geometry,
+                                            symbol: new SimpleFillSymbol({
+                                                color: [255, 243, 0, 0.3],
+                                                outline: new SimpleLineSymbol({
+                                                    color: [255, 243, 0, 0.8],
+                                                    width: 1
+                                                })
+                                            }),
+                                            attributes: {
+                                                ...feature.attributes,
+                                                state: service.state,
+                                                service_name: service.name
+                                            }
+                                        });
+                                        psapLayer.add(graphic);
+                                        console.log(`➕ Added graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
+                                    } else {
+                                        console.log(`⚠️ ${service.state}: Invalid geometry format - type: ${geometry?.type}, has rings: ${geometry?.rings ? 'yes' : 'no'}`);
+                                    }
                                 } catch (geometryError) {
                                     console.log(`⚠️ ${service.state}: Geometry error for feature - ${geometryError.message}`);
                                     // Try to create a simple point graphic as fallback
@@ -1048,7 +1067,16 @@
                     // Force a refresh of the layer view
                     if (psapLayerView) {
                         console.log('🔄 Refreshing PSAP layer view...');
-                        psapLayerView.refresh();
+                        try {
+                            // Try to refresh the layer view if the method exists
+                            if (psapLayerView.refresh) {
+                                psapLayerView.refresh();
+                            } else {
+                                console.log('⚠️ Layer view refresh method not available');
+                            }
+                        } catch (refreshError) {
+                            console.log('⚠️ Layer view refresh failed:', refreshError.message);
+                        }
                     }
                 } else {
                     console.log('❌ No state PSAP services worked - using demo boundaries');
