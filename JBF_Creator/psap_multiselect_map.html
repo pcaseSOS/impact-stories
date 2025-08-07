@@ -763,15 +763,15 @@
 
             // Create a simple graphics layer that loads data directly
             const psapLayer = new GraphicsLayer({
-                title: "US Counties",
+                title: "PSAP 911 Service Areas",
                 visible: true,
                 opacity: 1.0
             });
             
-            // Load data directly from the working URL
-            async function loadCountyData() {
+            // Load data directly from the NASA PSAP service
+            async function loadPSAPData() {
                 try {
-                    const response = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Counties/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
+                    const response = await fetch('https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
                     const data = await response.json();
                     
                     if (data.features) {
@@ -789,15 +789,45 @@
                             });
                             psapLayer.add(graphic);
                         });
-                        console.log(`Loaded ${data.features.length} county features`);
+                        console.log(`Loaded ${data.features.length} PSAP features`);
+                        status.textContent = `Loaded ${data.features.length} PSAP 911 service areas! Click to select boundaries or use Draw Polygon tool.`;
                     }
                 } catch (error) {
-                    console.error('Error loading county data:', error);
+                    console.error('Error loading PSAP data:', error);
+                    status.textContent = 'Error loading PSAP data - trying fallback...';
+                    
+                    // Try fallback to county data
+                    try {
+                        const fallbackResponse = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Counties/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
+                        const fallbackData = await fallbackResponse.json();
+                        
+                        if (fallbackData.features) {
+                            fallbackData.features.forEach(feature => {
+                                const graphic = new Graphic({
+                                    geometry: feature.geometry,
+                                    symbol: new SimpleFillSymbol({
+                                        color: [255, 243, 0, 0.3],
+                                        outline: new SimpleLineSymbol({
+                                            color: [255, 243, 0, 0.8],
+                                            width: 1
+                                        })
+                                    }),
+                                    attributes: feature.attributes
+                                });
+                                psapLayer.add(graphic);
+                            });
+                            console.log(`Loaded ${fallbackData.features.length} county features as fallback`);
+                            status.textContent = `Loaded ${fallbackData.features.length} county boundaries as PSAP fallback! Click to select boundaries or use Draw Polygon tool.`;
+                        }
+                    } catch (fallbackError) {
+                        console.error('Error loading fallback data:', fallbackError);
+                        status.textContent = 'Error loading data - using Statistics Canada data instead';
+                    }
                 }
             }
             
             // Load the data
-            loadCountyData();
+            loadPSAPData();
             
             // Create graphics layer for drawings
             const drawLayer = new GraphicsLayer({
@@ -3134,7 +3164,7 @@
             
             // Initialize the map with graphics layers
             console.log("Graphics layers created successfully");
-            status.textContent = "Loading county and province data...";
+            status.textContent = "Loading PSAP 911 service areas and province data...";
 
             // Zoom to a good default view
             view.goTo({
