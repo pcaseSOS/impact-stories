@@ -941,8 +941,13 @@
                                     // Convert geometry to proper ArcGIS format
                                     let geometry = feature.geometry;
                                     
+                                    // If geometry already has rings (ArcGIS format), use it as-is
+                                    if (geometry && geometry.rings && Array.isArray(geometry.rings)) {
+                                        // Geometry is already in ArcGIS format, no conversion needed
+                                        console.log(`✅ ${service.state}: Using existing ArcGIS geometry format`);
+                                    }
                                     // If geometry is in GeoJSON format, convert it
-                                    if (geometry && geometry.type) {
+                                    else if (geometry && geometry.type) {
                                         // For polygons, ensure rings are properly formatted
                                         if (geometry.type === 'polygon' && geometry.coordinates) {
                                             // Ensure coordinates are in the right format for ArcGIS
@@ -992,7 +997,17 @@
                                     
                                     // Create the graphic with proper error handling
                                     // Validate geometry before creating graphic
-                                    if (geometry && geometry.type && (
+                                    // Debug the actual geometry structure
+                                    console.log(`🔍 ${service.state}: Geometry structure:`, {
+                                        hasGeometry: !!geometry,
+                                        type: geometry?.type,
+                                        hasRings: !!geometry?.rings,
+                                        ringsType: Array.isArray(geometry?.rings) ? 'array' : typeof geometry?.rings,
+                                        ringsLength: geometry?.rings?.length
+                                    });
+                                    
+                                    if (geometry && (
+                                        (geometry.rings && Array.isArray(geometry.rings)) ||
                                         (geometry.type === 'polygon' && geometry.rings && Array.isArray(geometry.rings)) ||
                                         (geometry.type === 'point' && geometry.x !== undefined && geometry.y !== undefined)
                                     )) {
@@ -1014,7 +1029,7 @@
                                         psapLayer.add(graphic);
                                         console.log(`➕ Added graphic to PSAP layer. Total graphics: ${psapLayer.graphics.length}`);
                                     } else {
-                                        console.log(`⚠️ ${service.state}: Invalid geometry format - type: ${geometry?.type}, has rings: ${geometry?.rings ? 'yes' : 'no'}`);
+                                        console.log(`⚠️ ${service.state}: Invalid geometry format - type: ${geometry?.type}, has rings: ${geometry?.rings ? 'yes' : 'no'}, rings array: ${Array.isArray(geometry?.rings) ? 'yes' : 'no'}`);
                                     }
                                 } catch (geometryError) {
                                     console.log(`⚠️ ${service.state}: Geometry error for feature - ${geometryError.message}`);
