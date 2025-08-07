@@ -761,27 +761,44 @@
                 })
             });
 
-            // Create the feature layer using a truly public service
-            const psapLayer = new FeatureLayer({
-                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States/FeatureServer/0",
-                renderer: renderer,
-                outFields: ["*"],
-                title: "US States",
+            // Create a simple graphics layer that loads data directly
+            const psapLayer = new GraphicsLayer({
+                title: "US Counties",
                 visible: true,
-                opacity: 1.0,
-                highlightOptions: {
-                    color: [255, 243, 0, 0.8], // Bright yellow
-                    fillOpacity: 0.8,
-                    haloColor: [0, 94, 255], // Blue halo
-                    haloOpacity: 1.0,
-                    haloSize: 2
-                }
+                opacity: 1.0
             });
             
-
+            // Load data directly from the working URL
+            async function loadCountyData() {
+                try {
+                    const response = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Counties/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
+                    const data = await response.json();
+                    
+                    if (data.features) {
+                        data.features.forEach(feature => {
+                            const graphic = new Graphic({
+                                geometry: feature.geometry,
+                                symbol: new SimpleFillSymbol({
+                                    color: [255, 243, 0, 0.3],
+                                    outline: new SimpleLineSymbol({
+                                        color: [255, 243, 0, 0.8],
+                                        width: 1
+                                    })
+                                }),
+                                attributes: feature.attributes
+                            });
+                            psapLayer.add(graphic);
+                        });
+                        console.log(`Loaded ${data.features.length} county features`);
+                    }
+                } catch (error) {
+                    console.error('Error loading county data:', error);
+                }
+            }
             
-
-
+            // Load the data
+            loadCountyData();
+            
             // Create graphics layer for drawings
             const drawLayer = new GraphicsLayer({
                 title: "User-Drawn Polygons"
@@ -793,31 +810,43 @@
                 visible: true
             });
             
-            // Create the Canadian layer using a public service
-            const canadaTownsLayer = new FeatureLayer({
-                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Canada_Provinces/FeatureServer/0",
+            // Create a simple graphics layer for Canadian provinces
+            const canadaTownsLayer = new GraphicsLayer({
                 title: "Canadian Provinces",
-                renderer: new SimpleRenderer({
-                    symbol: new SimpleFillSymbol({
-                        color: [51, 51, 204, 0.3], // Blue with transparency
-                        outline: new SimpleLineSymbol({
-                            color: [51, 51, 204, 0.8], // Dark blue outline
-                            width: 1
-                        })
-                    })
-                }),
-                outFields: ["*"],
-                popupEnabled: false,
-                requestOptions: {
-                    useIdentity: false
-                },
-                highlightOptions: {
-                    color: [0, 102, 255, 0.8], // Blue highlight
-                    fillOpacity: 0.7,
-                    haloColor: [0, 102, 255],
-                    haloOpacity: 0.7
-                }
+                visible: true,
+                opacity: 1.0
             });
+            
+            // Load Canadian data directly from the working URL
+            async function loadCanadianData() {
+                try {
+                    const response = await fetch('https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/Canada_Provinces/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json');
+                    const data = await response.json();
+                    
+                    if (data.features) {
+                        data.features.forEach(feature => {
+                            const graphic = new Graphic({
+                                geometry: feature.geometry,
+                                symbol: new SimpleFillSymbol({
+                                    color: [51, 51, 204, 0.3],
+                                    outline: new SimpleLineSymbol({
+                                        color: [51, 51, 204, 0.8],
+                                        width: 1
+                                    })
+                                }),
+                                attributes: feature.attributes
+                            });
+                            canadaTownsLayer.add(graphic);
+                        });
+                        console.log(`Loaded ${data.features.length} Canadian province features`);
+                    }
+                } catch (error) {
+                    console.error('Error loading Canadian data:', error);
+                }
+            }
+            
+            // Load the data
+            loadCanadianData();
             
             // Create the Statistics Canada Census Subdivisions (CSD) layer
             const statcanCSDLayer = new FeatureLayer({
@@ -3103,43 +3132,24 @@
                 selectArea('other');
             });
             
-            // Wait for layer to load and zoom to extent
-            psapLayer.when(function() {
-                console.log("PSAP layer loaded successfully");
-                console.log("PSAP layer URL:", psapLayer.url);
-                console.log("PSAP layer visible:", psapLayer.visible);
-                console.log("PSAP layer opacity:", psapLayer.opacity);
-                status.textContent = "US States loaded! Click to select boundaries or use Draw Polygon tool.";
+            // Initialize the map with graphics layers
+            console.log("Graphics layers created successfully");
+            status.textContent = "Loading county and province data...";
 
-                // Zoom to continental US for better default view
-                view.goTo({
-                    target: {
-                        xmin: -125.0,
-                        ymin: 24.0,
-                        xmax: -66.0,
-                        ymax: 49.0,
-                        spatialReference: { wkid: 4326 }
-                    },
-                    padding: { left: 20, right: 20, top: 20, bottom: 20 }
-                });
-
-                // Initialize UI
-                updateStatus();
-            }).catch(function(error) {
-                console.error("Error loading PSAP layer:", error);
-                console.error("Error details:", error.message);
-                console.error("Error stack:", error.stack);
-                status.textContent = 'Error loading PSAP layer - using Statistics Canada data instead';
-                
-                // Switch to StatCan layer as fallback
-                activeLayer = 'statcan';
-                psapLayer.visible = false;
-                statcanCSDLayer.visible = true;
-                statcanCSDLayer.opacity = 1.0;
-                
-                updateLayerSwitchText();
-                updateStatus();
+            // Zoom to a good default view
+            view.goTo({
+                target: {
+                    xmin: -125.0,
+                    ymin: 24.0,
+                    xmax: -66.0,
+                    ymax: 60.0,
+                    spatialReference: { wkid: 4326 }
+                },
+                padding: { left: 20, right: 20, top: 20, bottom: 20 }
             });
+
+            // Initialize UI
+            updateStatus();
         });
     </script>
 </body>
