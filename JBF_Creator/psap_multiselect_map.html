@@ -768,50 +768,74 @@
                 opacity: 1.0
             });
             
-            // Load PSAP data via local proxy
-            async function loadPSAPViaProxy() {
-                try {
-                    console.log('Loading PSAP data via local proxy...');
-                    
-                    // Try local proxy first
-                    const proxyResponse = await fetch('http://localhost:3000/nasa-psap');
-                    
-                    if (!proxyResponse.ok) {
-                        throw new Error(`Proxy HTTP ${proxyResponse.status}: ${proxyResponse.statusText}`);
-                    }
-                    
-                    const data = await proxyResponse.json();
-                    console.log('PSAP data from proxy:', data);
-                    
-                    if (data.features && data.features.length > 0) {
-                        data.features.forEach(feature => {
-                            const graphic = new Graphic({
-                                geometry: feature.geometry,
-                                symbol: new SimpleFillSymbol({
-                                    color: [255, 243, 0, 0.3],
-                                    outline: new SimpleLineSymbol({
-                                        color: [255, 243, 0, 0.8],
-                                        width: 1
-                                    })
-                                }),
-                                attributes: feature.attributes
+            // Load PSAP data from multiple state services
+            async function loadStatePSAPData() {
+                console.log('Attempting to load PSAP data from multiple state services...');
+                status.textContent = 'Loading PSAP data from state services...';
+                
+                let loadedStates = [];
+                let totalFeatures = 0;
+                
+                // Try each state service
+                for (const service of statePSAPServices) {
+                    try {
+                        console.log(`Trying ${service.name} (${service.state})...`);
+                        
+                        const queryUrl = `${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json`;
+                        const response = await fetch(queryUrl);
+                        
+                        if (!response.ok) {
+                            console.log(`❌ ${service.state}: HTTP ${response.status} - Skipping`);
+                            continue;
+                        }
+                        
+                        const data = await response.json();
+                        
+                        if (data.features && data.features.length > 0) {
+                            console.log(`✅ ${service.state}: Loaded ${data.features.length} features`);
+                            
+                            data.features.forEach(feature => {
+                                const graphic = new Graphic({
+                                    geometry: feature.geometry,
+                                    symbol: new SimpleFillSymbol({
+                                        color: [255, 243, 0, 0.3],
+                                        outline: new SimpleLineSymbol({
+                                            color: [255, 243, 0, 0.8],
+                                            width: 1
+                                        })
+                                    }),
+                                    attributes: {
+                                        ...feature.attributes,
+                                        state: service.state,
+                                        service_name: service.name
+                                    }
+                                });
+                                psapLayer.add(graphic);
                             });
-                            psapLayer.add(graphic);
-                        });
-                        console.log(`Loaded ${data.features.length} real PSAP features via proxy`);
-                        status.textContent = `Loaded ${data.features.length} real PSAP 911 service areas! Click to select boundaries or use Draw Polygon tool.`;
-                    } else {
-                        throw new Error('No features found in proxy response');
+                            
+                            loadedStates.push(service.state);
+                            totalFeatures += data.features.length;
+                        } else {
+                            console.log(`❌ ${service.state}: No features found`);
+                        }
+                    } catch (error) {
+                        console.log(`❌ ${service.state}: Error - ${error.message}`);
                     }
-                } catch (error) {
-                    console.error('Error loading PSAP via proxy:', error);
-                    console.log('Proxy not available - using demo boundaries');
+                }
+                
+                if (loadedStates.length > 0) {
+                    console.log(`🎉 Successfully loaded PSAP data from ${loadedStates.length} states: ${loadedStates.join(', ')}`);
+                    console.log(`📊 Total features loaded: ${totalFeatures}`);
+                    status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} states: ${loadedStates.join(', ')}`;
+                } else {
+                    console.log('❌ No state PSAP services worked - using demo boundaries');
                     createDemoPSAPBoundaries();
+                    status.textContent = 'No state PSAP services available - using demo boundaries';
                 }
             }
             
             // Load the PSAP data
-            loadPSAPViaProxy();
+            loadStatePSAPData();
             
             // PSAP layer will load via proxy or fallback to demo
             
