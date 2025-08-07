@@ -768,6 +768,145 @@
                 opacity: 1.0
             });
             
+            // State PSAP services to try (no authentication required)
+            const statePSAPServices = [
+                {
+                    name: "Alabama PSAP Centers",
+                    url: "https://services2.arcgis.com/Ao3oYLThb9Xbvgpw/arcgis/rest/services/Alabama_911_Centers/FeatureServer/1",
+                    state: "AL"
+                },
+                {
+                    name: "Arizona PSAP Boundaries",
+                    url: "https://server.azgeo.az.gov/arcgis/rest/services/az911/Arizona_PSAP_Boundary/FeatureServer/1",
+                    state: "AZ"
+                },
+                {
+                    name: "Arkansas PSAP Boundaries",
+                    url: "https://gis.arkansas.gov/arcgis/rest/services/FEATURESERVICES/Boundaries/FeatureServer/28",
+                    state: "AR"
+                },
+                {
+                    name: "Colorado PSAP Review",
+                    url: "https://services3.arcgis.com/DgjqnJA1rgO92Soi/arcgis/rest/services/Colorado_PSAP_Review/FeatureServer/1",
+                    state: "CO"
+                },
+                {
+                    name: "Georgia PSAP Boundaries",
+                    url: "https://services7.arcgis.com/Za9Nk6CPIPbvR1t7/arcgis/rest/services/Georgia_PSAP_Boundaries/FeatureServer/0",
+                    state: "GA"
+                },
+                {
+                    name: "Illinois PSAPs and DIGBs",
+                    url: "https://services1.arcgis.com/CNPdEkvnGl65jCX8/ArcGIS/rest/services/PSAPs_and_DIGBs_for_planning_purposes/FeatureServer/1",
+                    state: "IL"
+                },
+                {
+                    name: "Kansas ESB",
+                    url: "https://services6.arcgis.com/7XhimSpf8B7lHIMy/arcgis/rest/services/Kansas_ESB/FeatureServer/0",
+                    state: "KS"
+                },
+                {
+                    name: "Kentucky PSAP Boundaries",
+                    url: "https://services3.arcgis.com/ghsX9CKghMvyYjBU/arcgis/rest/services/Ky_911_PSAP_Boundaries_gdb/FeatureServer/0",
+                    state: "KY"
+                },
+                {
+                    name: "Louisiana PSAP Service Areas",
+                    url: "https://services1.arcgis.com/fXHQyq63u0UsTeSM/arcgis/rest/services/LA_PSAP_SERVICE_AREA_BOUNDARIES/FeatureServer/0",
+                    state: "LA"
+                },
+                {
+                    name: "Michigan PSAP Boundaries",
+                    url: "https://gisagocss.state.mi.us/arcgis/rest/services/OpenData/boundaries/MapServer/8",
+                    state: "MI"
+                },
+                {
+                    name: "Minnesota Emergency Service Zones",
+                    url: "https://services.arcgis.com/9OIuDHbyhmH91RfZ/arcgis/rest/services/Minnesota_Emergency_Service_and_Law_Enforcement_Zones_-_(New_View_Layer)_updated/FeatureServer/0",
+                    state: "MN"
+                },
+                {
+                    name: "Mississippi PSAP Service Areas",
+                    url: "https://gis.mississippi.edu/server/rest/services/Administrative/MS_911PSAPServAreas_2009/MapServer/0",
+                    state: "MS"
+                },
+                {
+                    name: "Missouri PSAP Boundaries",
+                    url: "https://services9.arcgis.com/YNsLkqewm6stuiL9/arcgis/rest/services/PSAP_Boundaries_WFL1/FeatureServer/0",
+                    state: "MO"
+                },
+                {
+                    name: "Montana 911 PSAP Jurisdictions",
+                    url: "https://services.arcgis.com/qnjIrwR8z5Izc0ij/arcgis/rest/services/Montana_9_1_1_PSAP_Jurisdictions/FeatureServer/0",
+                    state: "MT"
+                },
+                {
+                    name: "Nebraska PSAP Boundaries",
+                    url: "https://gis.ne.gov/Enterprise/rest/services/Public_Safety_Answering_Point_Boundaries/FeatureServer/0",
+                    state: "NE"
+                },
+                {
+                    name: "Nevada PSAP Boundaries",
+                    url: "https://services3.arcgis.com/5GeA0r0IN0Q5uQUC/arcgis/rest/services/PSAP_boundaries/FeatureServer/1",
+                    state: "NV"
+                },
+                {
+                    name: "North Carolina PSAPs",
+                    url: "https://services5.arcgis.com/mSDBiLWaIfH92NqI/arcgis/rest/services/NC911_PSAPs/FeatureServer/0",
+                    state: "NC"
+                },
+                {
+                    name: "North Dakota PSAP Boundaries",
+                    url: "https://services8.arcgis.com/gHHsN1i8OISt9wMD/arcgis/rest/services/PSAP_BOUNDARIES/FeatureServer/0",
+                    state: "ND"
+                },
+                {
+                    name: "South Carolina ESINet",
+                    url: "https://services9.arcgis.com/RvqSyw3diI7dTKo5/arcgis/rest/services/SC_ESINet/FeatureServer/0",
+                    state: "SC"
+                },
+                {
+                    name: "South Dakota PSAP Boundaries",
+                    url: "https://services.arcgis.com/mq0BGE5kHpm8mHFz/arcgis/rest/services/SD_PSAP_Boundaries/FeatureServer/0",
+                    state: "SD"
+                },
+                {
+                    name: "Tennessee Emergency Districts",
+                    url: "https://services7.arcgis.com/aheAxJpwjYPDjSuN/arcgis/rest/services/TN_Emergency_Districts_Org/FeatureServer/3",
+                    state: "TN"
+                },
+                {
+                    name: "Texas 911 Control Points",
+                    url: "https://services.arcgis.com/8vL8ZFWfQxhb4uIP/arcgis/rest/services/Texas_911_Control_Points_WFL1/FeatureServer/3",
+                    state: "TX"
+                },
+                {
+                    name: "Utah PSAP Boundaries",
+                    url: "https://services1.arcgis.com/99lidPhWCzftIe9K/arcgis/rest/services/UtahPSAP_Boundaries/FeatureServer/0",
+                    state: "UT"
+                },
+                {
+                    name: "Vermont Emergency Service Zones",
+                    url: "https://services1.arcgis.com/BkFxaEFNwHqX3tAw/arcgis/rest/services/FS_VCGI_OPENDATA_Emergency_ESZ_poly_SP_v1/FeatureServer/0",
+                    state: "VT"
+                },
+                {
+                    name: "Virginia PSAP Polygon",
+                    url: "https://vginmaps.vdem.virginia.gov/arcgis/rest/services/NG911/NG911_VA_StatePlaneSouth_NAD83_PSAP_Polygon/FeatureServer/0",
+                    state: "VA"
+                },
+                {
+                    name: "Wisconsin PSAP Grants",
+                    url: "https://services.arcgis.com/mq0BGE5kHpm8mHFz/arcgis/rest/services/WIPSAPGrants/FeatureServer/0",
+                    state: "WI"
+                },
+                {
+                    name: "Wyoming PSAP Boundaries",
+                    url: "https://services.arcgis.com/jsIt88o09Q0r1j8h/arcgis/rest/services/Public_Safety_Answering_Points_(PSAP)_Boundaries2/FeatureServer/0",
+                    state: "WY"
+                }
+            ];
+            
             // Load PSAP data from multiple state services
             async function loadStatePSAPData() {
                 console.log('Attempting to load PSAP data from multiple state services...');
