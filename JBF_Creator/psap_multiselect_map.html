@@ -761,35 +761,59 @@
                 })
             });
 
-            // Try using FeatureLayer with NASA PSAP service directly
-            const psapLayer = new FeatureLayer({
-                url: "https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10",
+            // Create a graphics layer for PSAP data that will be loaded via proxy
+            const psapLayer = new GraphicsLayer({
                 title: "PSAP 911 Service Areas",
                 visible: true,
-                opacity: 1.0,
-                renderer: new SimpleRenderer({
-                    symbol: new SimpleFillSymbol({
-                        color: [255, 243, 0, 0.3],
-                        outline: new SimpleLineSymbol({
-                            color: [255, 243, 0, 0.8],
-                            width: 1
-                        })
-                    })
-                }),
-                requestOptions: { useIdentity: false }
+                opacity: 1.0
             });
             
-            // Handle PSAP layer loading with fallback
-            psapLayer.when(() => {
-                console.log('NASA PSAP FeatureLayer loaded successfully!');
-                status.textContent = 'NASA PSAP 911 service areas loaded! Click to select boundaries or use Draw Polygon tool.';
-            }).catch((error) => {
-                console.error('Error loading NASA PSAP FeatureLayer:', error);
-                status.textContent = 'NASA PSAP service blocked - using demo boundaries';
-                createDemoPSAPBoundaries();
-            });
+            // Load PSAP data via local proxy
+            async function loadPSAPViaProxy() {
+                try {
+                    console.log('Loading PSAP data via local proxy...');
+                    
+                    // Try local proxy first
+                    const proxyResponse = await fetch('http://localhost:3000/nasa-psap');
+                    
+                    if (!proxyResponse.ok) {
+                        throw new Error(`Proxy HTTP ${proxyResponse.status}: ${proxyResponse.statusText}`);
+                    }
+                    
+                    const data = await proxyResponse.json();
+                    console.log('PSAP data from proxy:', data);
+                    
+                    if (data.features && data.features.length > 0) {
+                        data.features.forEach(feature => {
+                            const graphic = new Graphic({
+                                geometry: feature.geometry,
+                                symbol: new SimpleFillSymbol({
+                                    color: [255, 243, 0, 0.3],
+                                    outline: new SimpleLineSymbol({
+                                        color: [255, 243, 0, 0.8],
+                                        width: 1
+                                    })
+                                }),
+                                attributes: feature.attributes
+                            });
+                            psapLayer.add(graphic);
+                        });
+                        console.log(`Loaded ${data.features.length} real PSAP features via proxy`);
+                        status.textContent = `Loaded ${data.features.length} real PSAP 911 service areas! Click to select boundaries or use Draw Polygon tool.`;
+                    } else {
+                        throw new Error('No features found in proxy response');
+                    }
+                } catch (error) {
+                    console.error('Error loading PSAP via proxy:', error);
+                    console.log('Proxy not available - using demo boundaries');
+                    createDemoPSAPBoundaries();
+                }
+            }
             
-            // PSAP layer will load automatically via FeatureLayer
+            // Load the PSAP data
+            loadPSAPViaProxy();
+            
+            // PSAP layer will load via proxy or fallback to demo
             
             // Create graphics layer for drawings
             const drawLayer = new GraphicsLayer({
