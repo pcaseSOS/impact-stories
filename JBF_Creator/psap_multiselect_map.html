@@ -664,6 +664,7 @@
             "esri/layers/FeatureLayer",
             "esri/symbols/SimpleFillSymbol",
             "esri/symbols/SimpleLineSymbol",
+            "esri/symbols/SimpleMarkerSymbol",
             "esri/renderers/SimpleRenderer",
             "esri/Graphic",
             "esri/geometry/geometryEngine",
@@ -672,7 +673,7 @@
             "esri/geometry/projection",
             "esri/geometry/SpatialReference",
             "esri/widgets/Expand"
-        ], function(esriConfig, IdentityManager, Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
+        ], function(esriConfig, IdentityManager, Map, MapView, FeatureLayer, SimpleFillSymbol, SimpleLineSymbol, SimpleMarkerSymbol, SimpleRenderer, Graphic, geometryEngine, Sketch, GraphicsLayer, projection, SpatialReference, Expand) {
 
             // Configure ArcGIS to disable authentication prompts and allow anonymous access
             esriConfig.request.interceptors.push({
@@ -977,6 +978,7 @@
                                         }
                                     }
                                     
+                                    // Create the graphic with proper error handling
                                     const graphic = new Graphic({
                                         geometry: geometry,
                                         symbol: new SimpleFillSymbol({
@@ -995,6 +997,30 @@
                                     psapLayer.add(graphic);
                                 } catch (geometryError) {
                                     console.log(`⚠️ ${service.state}: Geometry error for feature - ${geometryError.message}`);
+                                    // Try to create a simple point graphic as fallback
+                                    try {
+                                        if (feature.geometry && feature.geometry.x && feature.geometry.y) {
+                                            const pointGraphic = new Graphic({
+                                                geometry: {
+                                                    type: 'point',
+                                                    x: feature.geometry.x,
+                                                    y: feature.geometry.y
+                                                },
+                                                symbol: new SimpleMarkerSymbol({
+                                                    color: [255, 243, 0, 0.8],
+                                                    size: 6
+                                                }),
+                                                attributes: {
+                                                    ...feature.attributes,
+                                                    state: service.state,
+                                                    service_name: service.name
+                                                }
+                                            });
+                                            psapLayer.add(pointGraphic);
+                                        }
+                                    } catch (fallbackError) {
+                                        console.log(`⚠️ ${service.state}: Fallback graphic creation failed - ${fallbackError.message}`);
+                                    }
                                 }
                             });
                             
