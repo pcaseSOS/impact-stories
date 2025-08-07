@@ -2339,6 +2339,16 @@
             function createDemoPSAPBoundaries() {
                 console.log('Creating demo PSAP boundaries...');
                 
+                // Since we're using FeatureLayer, we need to create a new GraphicsLayer for demo data
+                const demoPSAPLayer = new GraphicsLayer({
+                    title: "Demo PSAP Boundaries",
+                    visible: true,
+                    opacity: 1.0
+                });
+                
+                // Add the demo layer to the map
+                map.add(demoPSAPLayer);
+                
                 // Create realistic PSAP boundary polygons
                 const demoPSAPs = [
                     {
@@ -2403,7 +2413,7 @@
                         }),
                         attributes: demoPSAP.attributes
                     });
-                    psapLayer.add(graphic);
+                    demoPSAPLayer.add(graphic);
                 });
                 
                 console.log(`Created ${demoPSAPs.length} demo PSAP boundaries`);
