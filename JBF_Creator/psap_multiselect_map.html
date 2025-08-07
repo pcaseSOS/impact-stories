@@ -774,6 +774,11 @@
             // State PSAP services to try (no authentication required)
             const statePSAPServices = [
                 {
+                    name: "NASA HIFLD PSAP Boundaries",
+                    url: "https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10",
+                    state: "NASA"
+                },
+                {
                     name: "Alabama PSAP Centers",
                     url: "https://services2.arcgis.com/Ao3oYLThb9Xbvgpw/arcgis/rest/services/Alabama_911_Centers/FeatureServer/1",
                     state: "AL"
@@ -1078,12 +1083,12 @@
                 }
                 
                 if (loadedStates.length > 0) {
-                    console.log(`🎉 Successfully loaded PSAP data from ${loadedStates.length} states: ${loadedStates.join(', ')}`);
+                    console.log(`🎉 Successfully loaded PSAP data from ${loadedStates.length} sources: ${loadedStates.join(', ')}`);
                     console.log(`📊 Total features loaded: ${totalFeatures}`);
                     console.log(`🔍 PSAP Layer graphics count: ${psapLayer.graphics.length}`);
                     console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
                     console.log(`🎨 PSAP Layer opacity: ${psapLayer.opacity}`);
-                    status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} states: ${loadedStates.join(', ')}`;
+                    status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} sources: ${loadedStates.join(', ')}`;
                     
                     // Force a refresh of the layer view
                     if (psapLayerView) {
