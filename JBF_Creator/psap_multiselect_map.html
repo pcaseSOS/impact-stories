@@ -1003,7 +1003,8 @@
                                         type: geometry?.type,
                                         hasRings: !!geometry?.rings,
                                         ringsType: Array.isArray(geometry?.rings) ? 'array' : typeof geometry?.rings,
-                                        ringsLength: geometry?.rings?.length
+                                        ringsLength: geometry?.rings?.length,
+                                        sampleRings: geometry?.rings?.[0]?.slice(0, 2) // Show first 2 coordinates
                                     });
                                     
                                     if (geometry && (
@@ -1011,6 +1012,11 @@
                                         (geometry.type === 'polygon' && geometry.rings && Array.isArray(geometry.rings)) ||
                                         (geometry.type === 'point' && geometry.x !== undefined && geometry.y !== undefined)
                                     )) {
+                                        // Add type if missing (ArcGIS format)
+                                        if (geometry.rings && !geometry.type) {
+                                            geometry.type = 'polygon';
+                                            console.log(`🔧 ${service.state}: Added missing type 'polygon' to geometry`);
+                                        }
                                         const graphic = new Graphic({
                                             geometry: geometry,
                                             symbol: new SimpleFillSymbol({
