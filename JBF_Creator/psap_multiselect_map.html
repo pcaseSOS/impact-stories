@@ -771,33 +771,22 @@
             
 
             
-            // State PSAP services to try (no authentication required)
-            const statePSAPServices = [
-                {
-                    name: "Mississippi PSAP Service Areas",
-                    url: "https://gis.mississippi.edu/server/rest/services/Administrative/MS_911PSAPServAreas_2009/MapServer/0",
-                    state: "MS"
-                },
-                {
-                    name: "California PSAP v2",
-                    url: "https://services2.arcgis.com/VofPZYDe2pLxSP5G/arcgis/rest/services/psps_v2/FeatureServer/0",
-                    state: "CA"
-                },
+            // SIMPLIFIED: Only 2 fastest, most reliable PSAP services
+            const fastPSAPServices = [
                 {
                     name: "Alabama PSAP Centers",
                     url: "https://services2.arcgis.com/Ao3oYLThb9Xbvgpw/arcgis/rest/services/Alabama_911_Centers/FeatureServer/1",
                     state: "AL"
                 },
                 {
-                    name: "NASA HIFLD PSAP Boundaries",
-                    url: "https://maps.nccs.nasa.gov/mapping/rest/services/hifld_open/emergency_services/MapServer/10",
-                    state: "NASA"
-                },
-                {
-                    name: "Arizona PSAP Boundaries",
+                    name: "Arizona PSAP Boundaries", 
                     url: "https://server.azgeo.az.gov/arcgis/rest/services/az911/Arizona_PSAP_Boundary/FeatureServer/1",
                     state: "AZ"
-                },
+                }
+            ];
+
+            // DEPRECATED: Old slow service array (kept for reference)
+            const statePSAPServices = [
                 {
                     name: "Arkansas PSAP Boundaries",
                     url: "https://gis.arkansas.gov/arcgis/rest/services/FEATURESERVICES/Boundaries/FeatureServer/28",
@@ -925,7 +914,124 @@
                 }
             ];
             
-            // Load PSAP data from multiple state services
+            // FAST: Load only 2 reliable PSAP services in parallel
+            async function loadFastPSAPData() {
+                console.log('🚀 Loading PSAP data from 2 fast services in parallel...');
+                status.textContent = 'Loading PSAP data quickly...';
+                
+                const startTime = Date.now();
+                let totalFeatures = 0;
+                let loadedStates = [];
+                
+                try {
+                    // Load both services in parallel with 8-second timeout
+                    const loadPromises = fastPSAPServices.map(async (service) => {
+                        try {
+                            console.log(`⚡ Starting ${service.state}...`);
+                            
+                            const controller = new AbortController();
+                            const timeoutId = setTimeout(() => controller.abort(), 8000);
+                            
+                            const response = await fetch(`${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json`, {
+                                signal: controller.signal
+                            });
+                            clearTimeout(timeoutId);
+                            
+                            if (!response.ok) {
+                                console.log(`❌ ${service.state}: HTTP ${response.status}`);
+                                return null;
+                            }
+                            
+                            const data = await response.json();
+                            if (!data.features?.length) {
+                                console.log(`❌ ${service.state}: No features`);
+                                return null;
+                            }
+                            
+                            console.log(`✅ ${service.state}: Loaded ${data.features.length} features`);
+                            return { service, data };
+                            
+                        } catch (error) {
+                            console.log(`❌ ${service.state}: ${error.name === 'AbortError' ? 'Timeout' : error.message}`);
+                            return null;
+                        }
+                    });
+                    
+                    // Wait for all (should be fast)
+                    const results = await Promise.allSettled(loadPromises);
+                    
+                    // Process successful results
+                    results.forEach(result => {
+                        if (result.status === 'fulfilled' && result.value) {
+                            const { service, data } = result.value;
+                            
+                            data.features.forEach(feature => {
+                                try {
+                                    let geometry = feature.geometry;
+                                    
+                                    // Add missing type for ArcGIS geometries
+                                    if (geometry?.rings && !geometry.type) {
+                                        geometry.type = 'polygon';
+                                    }
+                                    
+                                    if (geometry?.rings?.length) {
+                                        const graphic = new Graphic({
+                                            geometry: geometry,
+                                            symbol: new SimpleFillSymbol({
+                                                color: [255, 243, 0, 0.3],
+                                                outline: new SimpleLineSymbol({
+                                                    color: [255, 243, 0, 0.8],
+                                                    width: 1
+                                                })
+                                            }),
+                                            attributes: {
+                                                ...feature.attributes,
+                                                state: service.state,
+                                                service_name: service.name
+                                            }
+                                        });
+                                        psapLayer.add(graphic);
+                                        totalFeatures++;
+                                    }
+                                } catch (geoError) {
+                                    console.log(`⚠️ ${service.state}: Geometry error`);
+                                }
+                            });
+                            
+                            loadedStates.push(service.state);
+                        }
+                    });
+                    
+                    const loadTime = Date.now() - startTime;
+                    console.log(`🎉 Fast loading complete! ${totalFeatures} features from ${loadedStates.join(', ')} in ${loadTime}ms`);
+                    
+                    if (totalFeatures > 0) {
+                        status.textContent = `Loaded ${totalFeatures} PSAP features quickly (${loadTime}ms)`;
+                        
+                        // Auto-zoom to data
+                        setTimeout(() => {
+                            try {
+                                if (psapLayer.graphics.length > 0) {
+                                    zoomToLayerExtent(psapLayer);
+                                }
+                            } catch (e) {
+                                console.log('Auto-zoom failed:', e.message);
+                            }
+                        }, 500);
+                    } else {
+                        console.log('❌ Fast loading failed - falling back to demo');
+                        createDemoPSAPBoundaries();
+                        status.textContent = 'Using demo PSAP boundaries';
+                    }
+                    
+                } catch (error) {
+                    console.error('Fast PSAP loading failed:', error);
+                    createDemoPSAPBoundaries();
+                    status.textContent = 'Error loading PSAP data - using demo';
+                }
+            }
+            
+            // LEGACY: Original slow loading function (now unused)
             async function loadStatePSAPData() {
                 console.log('Attempting to load PSAP data from multiple state services...');
                 status.textContent = 'Loading PSAP data from state services...';
@@ -1161,7 +1267,7 @@
             }
             
             // Load the PSAP data
-            loadStatePSAPData();
+            loadFastPSAPData();
             
             // PSAP layer will load via proxy or fallback to demo
             
