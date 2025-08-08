@@ -1088,6 +1088,33 @@
                     console.log(`🔍 PSAP Layer graphics count: ${psapLayer.graphics.length}`);
                     console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
                     console.log(`🎨 PSAP Layer opacity: ${psapLayer.opacity}`);
+                    console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
+                    console.log(`📊 Total graphics in PSAP layer: ${psapLayer.graphics.length}`);
+                    
+                    // Calculate and log the extent of all graphics
+                    if (psapLayer.graphics.length > 0) {
+                        try {
+                            const allGraphics = psapLayer.graphics.toArray();
+                            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                            
+                            allGraphics.forEach(graphic => {
+                                if (graphic.geometry && graphic.geometry.extent) {
+                                    const ext = graphic.geometry.extent;
+                                    minX = Math.min(minX, ext.xmin);
+                                    minY = Math.min(minY, ext.ymin);
+                                    maxX = Math.max(maxX, ext.xmax);
+                                    maxY = Math.max(maxY, ext.ymax);
+                                }
+                            });
+                            
+                            if (minX !== Infinity) {
+                                console.log(`📍 PSAP Data Extent: X: ${minX.toFixed(2)} to ${maxX.toFixed(2)}, Y: ${minY.toFixed(2)} to ${maxY.toFixed(2)}`);
+                            }
+                        } catch (extentError) {
+                            console.log('⚠️ Could not calculate extent:', extentError.message);
+                        }
+                    }
+                    
                     status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} sources: ${loadedStates.join(', ')}`;
                     
                     // Force a refresh of the layer view
@@ -1103,6 +1130,18 @@
                         } catch (refreshError) {
                             console.log('⚠️ Layer view refresh failed:', refreshError.message);
                         }
+                    }
+                    
+                    // Try to zoom to Alabama specifically if it's the first state loaded
+                    if (loadedStates.includes('AL') && loadedStates.length === 1) {
+                        console.log('🎯 Attempting to zoom to Alabama PSAP data...');
+                        setTimeout(() => {
+                            try {
+                                zoomToLayerExtent(psapLayer);
+                            } catch (zoomError) {
+                                console.log('⚠️ Zoom to Alabama failed:', zoomError.message);
+                            }
+                        }, 1000);
                     }
                 } else {
                     console.log('❌ No state PSAP services worked - using demo boundaries');
