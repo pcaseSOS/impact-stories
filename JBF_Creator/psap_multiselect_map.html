@@ -917,6 +917,13 @@
             // FAST: Load only 2 reliable PSAP services in parallel
             async function loadFastPSAPData() {
                 console.log('🚀 Loading PSAP data from 2 fast services in parallel...');
+                console.log('📊 fastPSAPServices array:', fastPSAPServices);
+                
+                if (!status) {
+                    console.error('❌ status element not found');
+                    return;
+                }
+                
                 status.textContent = 'Loading PSAP data quickly...';
                 
                 const startTime = Date.now();
@@ -1267,7 +1274,13 @@
             }
             
             // Load the PSAP data
-            loadFastPSAPData();
+            // Use the fast loading function
+            try {
+                loadFastPSAPData();
+            } catch (error) {
+                console.error('Fast loading failed, falling back to original:', error);
+                loadStatePSAPData();
+            }
             
             // PSAP layer will load via proxy or fallback to demo
             
