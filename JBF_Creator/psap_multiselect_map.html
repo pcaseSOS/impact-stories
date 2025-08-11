@@ -1417,7 +1417,7 @@
                 return geometry;
             }
             
-            // SIMPLE: Load working PSAP services with proper coordinate handling
+                        // SIMPLE: Load working PSAP services with proper coordinate handling
             async function loadProductionPSAPDataWithConversionV5() {
                 console.log('🚀 SIMPLE: Loading 13 verified working PSAP services...');
                 status.textContent = 'Loading verified PSAP services...';
@@ -1447,83 +1447,122 @@
                 try {
                     // Load services sequentially to avoid overwhelming servers
                     for (const service of workingPSAPServices) {
-                    try {
-                        console.log(`⚡ Loading ${service.state}...`);
-                        
-                        const queryUrl = `${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=100`;
-                        const response = await fetch(queryUrl);
-                        
-                        if (!response.ok) {
-                            console.log(`❌ ${service.state}: HTTP ${response.status}`);
-                            continue;
-                        }
-                        
-                        const data = await response.json();
-                        
-                        if (!data.features || data.features.length === 0) {
-                            console.log(`❌ ${service.state}: No features found`);
-                            continue;
-                        }
-
-                        let featureCount = 0;
-                        
-                        data.features.forEach(feature => {
-                            try {
-                                if (feature.geometry && feature.geometry.rings) {
-                                    // Convert coordinates if needed
-                                    let rings = feature.geometry.rings;
-                                    if (service.wkid === 4326) {
-                                        rings = convertCoordinates(rings, 4326);
-                                    }
-                                    
-                                    // Create polygon geometry
-                                    const polygon = new Polygon({
-                                        rings: rings,
-                                        spatialReference: { wkid: 3857 }
-                                    });
-                                    
-                                    // Create graphic
-                                    const graphic = new Graphic({
-                                        geometry: polygon,
-                                        symbol: new SimpleFillSymbol({
-                                            color: [255, 243, 0, 0.3],
-                                            outline: new SimpleLineSymbol({
-                                                color: [255, 243, 0, 0.8],
-                                                width: 1
-                                            })
-                                        }),
-                                        attributes: {
-                                            ...feature.attributes,
-                                            state: service.state,
-                                            service_name: service.name
-                                        }
-                                    });
-                                    
-                                    psapLayer.add(graphic);
-                                    featureCount++;
-                                }
-                            } catch (geoError) {
-                                console.error(`Geometry error in ${service.state}:`, geoError);
+                        try {
+                            console.log(`⚡ Loading ${service.state}...`);
+                            
+                            const queryUrl = `${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=100`;
+                            const response = await fetch(queryUrl);
+                            
+                            if (!response.ok) {
+                                console.log(`❌ ${service.state}: HTTP ${response.status}`);
+                                continue;
                             }
-                        });
-                        
-                        console.log(`✅ ${service.state}: Loaded ${featureCount} features`);
-                        totalFeatures += featureCount;
-                        loadedStates.push(service.state);
-                        
-                        // Small delay between requests
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                        
-                    } catch (error) {
-                        console.log(`❌ ${service.state}: ${error.message}`);
-                    }
+                            
+                            const data = await response.json();
+                            
+                            if (!data.features || data.features.length === 0) {
+                                console.log(`❌ ${service.state}: No features found`);
+                                continue;
+                            }
+
+                            let featureCount = 0;
+                            
+                            data.features.forEach(feature => {
+                                try {
+                                    if (feature.geometry && feature.geometry.rings) {
+                                        // Convert coordinates if needed
+                                        let rings = feature.geometry.rings;
+                                        if (service.wkid === 4326) {
+                                            rings = convertCoordinates(rings, 4326);
+                                        }
+                                        
+                                        // Create polygon geometry
+                                        const polygon = new Polygon({
+                                            rings: rings,
+                                            spatialReference: { wkid: 3857 }
+                                        });
+                                        
+                                        // Create graphic
+                                        const graphic = new Graphic({
+                                            geometry: polygon,
+                                            symbol: new SimpleFillSymbol({
+                                                color: [255, 243, 0, 0.3],
+                                                outline: new SimpleLineSymbol({
+                                                    color: [255, 243, 0, 0.8],
+                                                    width: 1
+                                                })
+                                            }),
+                                            attributes: {
+                                                ...feature.attributes,
+                                                state: service.state,
+                                                service_name: service.name
+                                            }
+                                        });
+                                        
+                                        psapLayer.add(graphic);
+                                        featureCount++;
+                                    }
+                                } catch (geoError) {
+                                    console.error(`Geometry error in ${service.state}:`, geoError);
                                 }
+                            });
+                            
+                            console.log(`✅ ${service.state}: Loaded ${featureCount} features`);
+                            totalFeatures += featureCount;
+                            loadedStates.push(service.state);
+                            
+                            // Small delay between requests
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                            
+                        } catch (error) {
+                            console.log(`❌ ${service.state}: ${error.message}`);
+                        }
+                    }
+                    
+                    const loadTime = Date.now() - startTime;
+                    console.log(`🎉 SIMPLE: Loaded ${totalFeatures} features from ${loadedStates.join(', ')} in ${loadTime}ms`);
+                    console.log(`📊 Total graphics in PSAP layer: ${psapLayer.graphics.length}`);
+                    console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
+                    console.log(`🎨 PSAP Layer opacity: ${psapLayer.opacity}`);
+                    
+                    if (totalFeatures > 0) {
+                        status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} states (${loadTime}ms)`;
+                        
+                        // Ensure layer is visible
+                        psapLayer.visible = true;
+                        psapLayer.opacity = 0.7;
+                        console.log('✅ Set PSAP layer visible and opacity');
+                        
+                        // Force layer refresh
+                        if (psapLayerView && psapLayerView.refresh) {
+                            psapLayerView.refresh();
+                            console.log('🔄 Refreshed PSAP layer view');
+                        }
+                        
+                        // Auto-zoom to data
+                        setTimeout(() => {
+                            try {
+                                if (psapLayer.graphics.length > 0) {
+                                    console.log(`🗺️ Auto-zooming to ${psapLayer.graphics.length} graphics...`);
+                                    view.goTo(psapLayer.graphics.toArray(), { padding: 50 });
+                                    console.log('🗺️ Auto-zoomed to PSAP data');
+                                }
+                            } catch (e) {
+                                console.log('Auto-zoom failed:', e.message);
+                                // Fallback zoom to US
+                                view.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
+                            }
+                        }, 1000);
+                    } else {
+                        console.log('❌ Simple loading failed - falling back to testing');
+                        await testAllPSAPServices();
+                    }
+                    
                 } catch (error) {
-                    console.error('Production PSAP loading failed:', error);
+                    console.error('Simple PSAP loading failed:', error);
                     await testAllPSAPServices();
                 }
-                
-                const loadTime = Date.now() - startTime;
+            }
                     console.log(`🎉 PRODUCTION: Loaded ${totalFeatures} features from ${loadedStates.join(', ')} in ${loadTime}ms`);
                     console.log(`📊 Total graphics in PSAP layer: ${psapLayer.graphics.length}`);
                     console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
