@@ -1412,7 +1412,7 @@
             }
             
             // PRODUCTION: Fast loading of verified working services with coordinate conversion
-            async function loadProductionPSAPDataWithConversion() {
+            async function loadProductionPSAPDataWithConversionV2() {
                 console.log('🚀 PRODUCTION: Loading 12 verified working PSAP services...');
                 status.textContent = 'Loading verified PSAP services...';
                 
@@ -1942,7 +1942,7 @@
             // Load the PSAP data
             // Use fast production loading with verified working services
             try {
-                loadProductionPSAPDataWithConversion();
+                loadProductionPSAPDataWithConversionV2();
             } catch (error) {
                 console.error('Production loading failed, falling back to testing:', error);
                 testAllPSAPServices();
