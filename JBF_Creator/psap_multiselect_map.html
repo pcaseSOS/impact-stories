@@ -1526,17 +1526,17 @@
                                             spatialReference: { wkid: 3857 }
                                         };
                                         console.log('🗺️ Extent:', extent);
-                                        mapView.goTo(extent, { padding: 50 });
+                                        view.goTo(extent, { padding: 50 });
                                         console.log('🗺️ Auto-zoomed to PSAP data extent');
                                     } else {
                                         console.log('⚠️ No valid extents found - zooming to US');
-                                        mapView.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
+                                        view.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
                                     }
                                 }
                             } catch (e) {
                                 console.log('Auto-zoom failed:', e.message);
                                 // Fallback zoom to US
-                                mapView.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
+                                view.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
                             }
                         }, 1000);
                     } else {
