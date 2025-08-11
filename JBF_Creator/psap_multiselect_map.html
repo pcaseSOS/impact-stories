@@ -771,19 +771,164 @@
             
 
             
-            // SIMPLIFIED: Only 2 fastest, most reliable PSAP services
-            const fastPSAPServices = [
+            // COMPREHENSIVE TESTING: All PSAP services for systematic testing
+            const allPSAPServices = [
+                // KNOWN WORKING
                 {
                     name: "Alabama PSAP Centers",
                     url: "https://services2.arcgis.com/Ao3oYLThb9Xbvgpw/arcgis/rest/services/Alabama_911_Centers/FeatureServer/1",
-                    state: "AL"
+                    state: "AL",
+                    expected: "WORKING"
                 },
                 {
                     name: "Arizona PSAP Boundaries", 
                     url: "https://server.azgeo.az.gov/arcgis/rest/services/az911/Arizona_PSAP_Boundary/FeatureServer/1",
-                    state: "AZ"
+                    state: "AZ",
+                    expected: "WORKING"
+                },
+                // TO TEST
+                {
+                    name: "Arkansas PSAP Boundaries",
+                    url: "https://gis.arkansas.gov/arcgis/rest/services/FEATURESERVICES/Boundaries/FeatureServer/28",
+                    state: "AR",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Colorado PSAP Review",
+                    url: "https://services3.arcgis.com/DgjqnJA1rgO92Soi/arcgis/rest/services/Colorado_PSAP_Review/FeatureServer/1",
+                    state: "CO",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Georgia PSAP Boundaries",
+                    url: "https://services7.arcgis.com/Za9Nk6CPIPbvR1t7/arcgis/rest/services/Georgia_PSAP_Boundaries/FeatureServer/0",
+                    state: "GA",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Illinois PSAPs and DIGBs",
+                    url: "https://services1.arcgis.com/CNPdEkvnGl65jCX8/ArcGIS/rest/services/PSAPs_and_DIGBs_for_planning_purposes/FeatureServer/1",
+                    state: "IL",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Kansas ESB",
+                    url: "https://services6.arcgis.com/7XhimSpf8B7lHIMy/arcgis/rest/services/Kansas_ESB/FeatureServer/0",
+                    state: "KS",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Kentucky PSAP Boundaries",
+                    url: "https://services3.arcgis.com/ghsX9CKghMvyYjBU/arcgis/rest/services/Ky_911_PSAP_Boundaries_gdb/FeatureServer/0",
+                    state: "KY",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Louisiana PSAP Service Areas",
+                    url: "https://services1.arcgis.com/fXHQyq63u0UsTeSM/arcgis/rest/services/LA_PSAP_SERVICE_AREA_BOUNDARIES/FeatureServer/0",
+                    state: "LA",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Michigan PSAP Boundaries",
+                    url: "https://gisagocss.state.mi.us/arcgis/rest/services/OpenData/boundaries/MapServer/8",
+                    state: "MI",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Minnesota Emergency Service Zones",
+                    url: "https://services.arcgis.com/9OIuDHbyhmH91RfZ/arcgis/rest/services/Minnesota_Emergency_Service_and_Law_Enforcement_Zones_-_(New_View_Layer)_updated/FeatureServer/0",
+                    state: "MN",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Mississippi PSAP Service Areas",
+                    url: "https://gis.mississippi.edu/server/rest/services/Administrative/MS_911PSAPServAreas_2009/MapServer/0",
+                    state: "MS",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Missouri PSAP Boundaries",
+                    url: "https://services9.arcgis.com/YNsLkqewm6stuiL9/arcgis/rest/services/PSAP_Boundaries_WFL1/FeatureServer/0",
+                    state: "MO",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Montana 911 PSAP Jurisdictions",
+                    url: "https://services.arcgis.com/qnjIrwR8z5Izc0ij/arcgis/rest/services/Montana_9_1_1_PSAP_Jurisdictions/FeatureServer/0",
+                    state: "MT",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Nebraska PSAP Boundaries",
+                    url: "https://gis.ne.gov/Enterprise/rest/services/Public_Safety_Answering_Point_Boundaries/FeatureServer/0",
+                    state: "NE",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Nevada PSAP Boundaries",
+                    url: "https://services3.arcgis.com/5GeA0r0IN0Q5uQUC/arcgis/rest/services/PSAP_boundaries/FeatureServer/1",
+                    state: "NV",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "North Carolina PSAPs",
+                    url: "https://services5.arcgis.com/mSDBiLWaIfH92NqI/arcgis/rest/services/NC911_PSAPs/FeatureServer/0",
+                    state: "NC",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "North Dakota PSAP Boundaries",
+                    url: "https://services8.arcgis.com/gHHsN1i8OISt9wMD/arcgis/rest/services/PSAP_BOUNDARIES/FeatureServer/0",
+                    state: "ND",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "South Carolina ESINet",
+                    url: "https://services9.arcgis.com/RvqSyw3diI7dTKo5/arcgis/rest/services/SC_ESINet/FeatureServer/0",
+                    state: "SC",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "South Dakota PSAP Service Areas",
+                    url: "https://services1.arcgis.com/p8X5J3QcVNXr7lJO/arcgis/rest/services/Public_Safety_Answering_Points_PSAP_/FeatureServer/0",
+                    state: "SD",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Texas A&M Emergency Communication Boundaries",
+                    url: "https://services.gis.txdot.gov/public/rest/services/TPP/TxDOT_TTP_Emergency_Communication_Boundaries/MapServer/0",
+                    state: "TX",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Vermont PSAP Service Areas",
+                    url: "https://maps.vermont.gov/arcgis/rest/services/EGC_services/OPENDATA_VCGI_E911_SP_NOCACHE_v2/MapServer/102",
+                    state: "VT",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Virginia PSAP Primary Service Area",
+                    url: "https://vgin.vdem.virginia.gov/arcgis/rest/services/PSAP_Primary_Service_Area/FeatureServer/0",
+                    state: "VA",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "West Virginia PSAP Service Areas",
+                    url: "https://services1.arcgis.com/rEf4Uw7S95MQIN7A/arcgis/rest/services/Public_Safety_Answering_Points_2020/FeatureServer/0",
+                    state: "WV",
+                    expected: "UNKNOWN"
+                },
+                {
+                    name: "Wisconsin Public Safety Answering Points",
+                    url: "https://data-wi-dnr.opendata.arcgis.com/datasets/wisconsin-public-safety-answering-points/FeatureServer/0",
+                    state: "WI",
+                    expected: "UNKNOWN"
                 }
             ];
+
+            // For production use, only the known working services
+            const fastPSAPServices = allPSAPServices.filter(service => service.expected === "WORKING");
 
             // DEPRECATED: Old slow service array (kept for reference)
             const statePSAPServices = [
@@ -914,17 +1059,258 @@
                 }
             ];
             
-            // FAST: Load only 2 reliable PSAP services in parallel
-            async function loadFastPSAPData() {
-                console.log('🚀 Loading PSAP data from 2 fast services in parallel...');
-                console.log('📊 fastPSAPServices array:', fastPSAPServices);
+            // COMPREHENSIVE TESTING: Test all PSAP services and generate report
+            async function testAllPSAPServices() {
+                console.log('🧪 COMPREHENSIVE PSAP SERVICE TESTING STARTING...');
+                console.log('📋 Testing', allPSAPServices.length, 'PSAP services...');
                 
                 if (!status) {
                     console.error('❌ status element not found');
                     return;
                 }
                 
-                status.textContent = 'Loading PSAP data quickly...';
+                status.textContent = '🧪 Testing all PSAP services...';
+                
+                const testResults = [];
+                const startTime = Date.now();
+                
+                // Test each service with timeout
+                for (let i = 0; i < allPSAPServices.length; i++) {
+                    const service = allPSAPServices[i];
+                    const testStart = Date.now();
+                    
+                    console.log(`\n🔍 [${i+1}/${allPSAPServices.length}] Testing ${service.state}: ${service.name}`);
+                    status.textContent = `Testing ${service.state} (${i+1}/${allPSAPServices.length})...`;
+                    
+                    try {
+                        // Test with 5-second timeout
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 5000);
+                        
+                        const response = await fetch(`${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json`, {
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        const responseTime = Date.now() - testStart;
+                        
+                        if (!response.ok) {
+                            const result = {
+                                state: service.state,
+                                name: service.name,
+                                url: service.url,
+                                status: 'FAILED',
+                                httpStatus: response.status,
+                                responseTime: responseTime,
+                                error: `HTTP ${response.status}`,
+                                features: 0
+                            };
+                            testResults.push(result);
+                            console.log(`❌ ${service.state}: HTTP ${response.status} (${responseTime}ms)`);
+                            continue;
+                        }
+                        
+                        const data = await response.json();
+                        const totalTime = Date.now() - testStart;
+                        
+                        if (!data.features || data.features.length === 0) {
+                            const result = {
+                                state: service.state,
+                                name: service.name,
+                                url: service.url,
+                                status: 'FAILED',
+                                httpStatus: 200,
+                                responseTime: responseTime,
+                                error: 'No features returned',
+                                features: 0
+                            };
+                            testResults.push(result);
+                            console.log(`❌ ${service.state}: No features (${totalTime}ms)`);
+                            continue;
+                        }
+                        
+                        // Test geometry processing
+                        let geometryErrors = 0;
+                        let validFeatures = 0;
+                        
+                        data.features.forEach(feature => {
+                            try {
+                                let geometry = feature.geometry;
+                                if (geometry?.rings && !geometry.type) {
+                                    geometry.type = 'polygon';
+                                }
+                                if (geometry?.rings?.length) {
+                                    validFeatures++;
+                                } else {
+                                    geometryErrors++;
+                                }
+                            } catch (e) {
+                                geometryErrors++;
+                            }
+                        });
+                        
+                        const result = {
+                            state: service.state,
+                            name: service.name,
+                            url: service.url,
+                            status: 'WORKING',
+                            httpStatus: 200,
+                            responseTime: responseTime,
+                            totalTime: totalTime,
+                            error: null,
+                            features: data.features.length,
+                            validFeatures: validFeatures,
+                            geometryErrors: geometryErrors
+                        };
+                        
+                        testResults.push(result);
+                        console.log(`✅ ${service.state}: ${data.features.length} features, ${validFeatures} valid (${totalTime}ms)`);
+                        
+                    } catch (error) {
+                        const totalTime = Date.now() - testStart;
+                        const result = {
+                            state: service.state,
+                            name: service.name,
+                            url: service.url,
+                            status: 'FAILED',
+                            httpStatus: null,
+                            responseTime: totalTime,
+                            error: error.name === 'AbortError' ? 'Timeout' : error.message,
+                            features: 0
+                        };
+                        testResults.push(result);
+                        console.log(`❌ ${service.state}: ${error.name === 'AbortError' ? 'Timeout' : error.message} (${totalTime}ms)`);
+                    }
+                    
+                    // Small delay between tests to be nice to servers
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+                
+                const totalTime = Date.now() - startTime;
+                
+                // Generate comprehensive report
+                console.log('\n📊 COMPREHENSIVE PSAP SERVICE TEST RESULTS');
+                console.log('=' .repeat(80));
+                console.log(`Total time: ${totalTime}ms`);
+                console.log(`Services tested: ${testResults.length}`);
+                
+                const working = testResults.filter(r => r.status === 'WORKING');
+                const failed = testResults.filter(r => r.status === 'FAILED');
+                
+                console.log(`✅ Working: ${working.length}`);
+                console.log(`❌ Failed: ${failed.length}`);
+                
+                console.log('\n✅ WORKING SERVICES:');
+                working.forEach(result => {
+                    console.log(`  ${result.state}: ${result.name} - ${result.features} features (${result.responseTime}ms)`);
+                });
+                
+                console.log('\n❌ FAILED SERVICES:');
+                failed.forEach(result => {
+                    console.log(`  ${result.state}: ${result.name} - ${result.error} (${result.responseTime}ms)`);
+                });
+                
+                // Generate copy-paste ready results
+                console.log('\n📋 COPY-PASTE READY RESULTS:');
+                console.log('WORKING SERVICES:');
+                working.forEach(result => {
+                    console.log(`{
+    name: "${result.name}",
+    url: "${result.url}",
+    state: "${result.state}",
+    expected: "WORKING"
+},`);
+                });
+                
+                console.log('\nFAILED SERVICES:');
+                failed.forEach(result => {
+                    console.log(`${result.state}: ${result.error}`);
+                });
+                
+                status.textContent = `Testing complete! ${working.length} working, ${failed.length} failed (${totalTime}ms)`;
+                
+                // Load working services if any found
+                if (working.length > 0) {
+                    console.log('\n🚀 Loading working services...');
+                    await loadWorkingServices(working);
+                } else {
+                    console.log('\n❌ No working services found - using demo data');
+                    createDemoPSAPBoundaries();
+                    status.textContent = 'No working PSAP services - using demo boundaries';
+                }
+            }
+            
+            // Load only the working services
+            async function loadWorkingServices(workingResults) {
+                console.log('🚀 Loading', workingResults.length, 'working PSAP services...');
+                status.textContent = `Loading ${workingResults.length} working PSAP services...`;
+                
+                let totalFeatures = 0;
+                let loadedStates = [];
+                
+                for (const result of workingResults) {
+                    try {
+                        console.log(`📥 Loading ${result.state}...`);
+                        
+                        const response = await fetch(`${result.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json`);
+                        const data = await response.json();
+                        
+                        data.features.forEach(feature => {
+                            try {
+                                let geometry = feature.geometry;
+                                if (geometry?.rings && !geometry.type) {
+                                    geometry.type = 'polygon';
+                                }
+                                
+                                if (geometry?.rings?.length) {
+                                    const graphic = new Graphic({
+                                        geometry: geometry,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [255, 243, 0, 0.3],
+                                            outline: new SimpleLineSymbol({
+                                                color: [255, 243, 0, 0.8],
+                                                width: 1
+                                            })
+                                        }),
+                                        attributes: {
+                                            ...feature.attributes,
+                                            state: result.state,
+                                            service_name: result.name
+                                        }
+                                    });
+                                    psapLayer.add(graphic);
+                                    totalFeatures++;
+                                }
+                            } catch (geoError) {
+                                console.log(`⚠️ ${result.state}: Geometry error`);
+                            }
+                        });
+                        
+                        loadedStates.push(result.state);
+                        console.log(`✅ ${result.state}: Added ${data.features.length} features`);
+                        
+                    } catch (error) {
+                        console.log(`❌ ${result.state}: Loading failed - ${error.message}`);
+                    }
+                }
+                
+                console.log(`🎉 Loaded ${totalFeatures} total features from ${loadedStates.join(', ')}`);
+                status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.join(', ')}`;
+                
+                // Auto-zoom to data
+                setTimeout(() => {
+                    try {
+                        if (psapLayer.graphics.length > 0) {
+                            zoomToLayerExtent(psapLayer);
+                        }
+                    } catch (e) {
+                        console.log('Auto-zoom failed:', e.message);
+                    }
+                }, 500);
+            }
+            
+            // FAST: Load only 2 reliable PSAP services in parallel (legacy)
+            async function loadFastPSAPData() {
                 
                 const startTime = Date.now();
                 let totalFeatures = 0;
@@ -1274,11 +1660,11 @@
             }
             
             // Load the PSAP data
-            // Use the fast loading function
+            // Use comprehensive testing to find working services
             try {
-                loadFastPSAPData();
+                testAllPSAPServices();
             } catch (error) {
-                console.error('Fast loading failed, falling back to original:', error);
+                console.error('Comprehensive testing failed, falling back to original:', error);
                 loadStatePSAPData();
             }
             
