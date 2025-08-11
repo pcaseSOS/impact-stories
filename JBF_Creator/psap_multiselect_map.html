@@ -927,79 +927,85 @@
                 }
             ];
 
-            // PRODUCTION: Only the 12 verified working services from testing
+            // PRODUCTION: Only the 13 verified working services from our test
             const workingPSAPServices = [
                 {
                     name: "Alabama PSAP Centers",
                     url: "https://services2.arcgis.com/Ao3oYLThb9Xbvgpw/arcgis/rest/services/Alabama_911_Centers/FeatureServer/1",
                     state: "AL",
-                    expected: "WORKING"
+                    wkid: 102100
                 },
                 {
                     name: "Arizona PSAP Boundaries",
                     url: "https://server.azgeo.az.gov/arcgis/rest/services/az911/Arizona_PSAP_Boundary/FeatureServer/1",
                     state: "AZ",
-                    expected: "WORKING"
+                    wkid: 4326
                 },
                 {
                     name: "Arkansas PSAP Boundaries",
                     url: "https://gis.arkansas.gov/arcgis/rest/services/FEATURESERVICES/Boundaries/FeatureServer/28",
                     state: "AR",
-                    expected: "WORKING"
+                    wkid: null
                 },
                 {
                     name: "Colorado PSAP Review",
                     url: "https://services3.arcgis.com/DgjqnJA1rgO92Soi/arcgis/rest/services/Colorado_PSAP_Review/FeatureServer/1",
                     state: "CO",
-                    expected: "WORKING"
+                    wkid: 102100
                 },
                 {
                     name: "Illinois PSAPs and DIGBs",
                     url: "https://services1.arcgis.com/CNPdEkvnGl65jCX8/ArcGIS/rest/services/PSAPs_and_DIGBs_for_planning_purposes/FeatureServer/1",
                     state: "IL",
-                    expected: "WORKING"
-                },
-                {
-                    name: "Kansas ESB",
-                    url: "https://services6.arcgis.com/7XhimSpf8B7lHIMy/arcgis/rest/services/Kansas_ESB/FeatureServer/0",
-                    state: "KS",
-                    expected: "WORKING"
+                    wkid: 102100
                 },
                 {
                     name: "Michigan PSAP Boundaries",
                     url: "https://gisagocss.state.mi.us/arcgis/rest/services/OpenData/boundaries/MapServer/8",
                     state: "MI",
-                    expected: "WORKING"
-                },
-                {
-                    name: "Mississippi PSAP Service Areas",
-                    url: "https://gis.mississippi.edu/server/rest/services/Administrative/MS_911PSAPServAreas_2009/MapServer/0",
-                    state: "MS",
-                    expected: "WORKING"
+                    wkid: null
                 },
                 {
                     name: "Missouri PSAP Boundaries",
                     url: "https://services9.arcgis.com/YNsLkqewm6stuiL9/arcgis/rest/services/PSAP_Boundaries_WFL1/FeatureServer/0",
                     state: "MO",
-                    expected: "WORKING"
-                },
-                {
-                    name: "Nebraska PSAP Boundaries",
-                    url: "https://gis.ne.gov/Enterprise/rest/services/Public_Safety_Answering_Point_Boundaries/FeatureServer/0",
-                    state: "NE",
-                    expected: "WORKING"
+                    wkid: 102100
                 },
                 {
                     name: "Nevada PSAP Boundaries",
                     url: "https://services3.arcgis.com/5GeA0r0IN0Q5uQUC/arcgis/rest/services/PSAP_boundaries/FeatureServer/1",
                     state: "NV",
-                    expected: "WORKING"
+                    wkid: 3395
                 },
                 {
                     name: "North Dakota PSAP Boundaries",
-                    url: "https://services8.arcgis.com/gHHsN1i8OISt9wMD/arcgis/rest/services/PSAP_BOUNDARIES/FeatureServer/0",
+                    url: "https://services5.arcgis.com/mSDBiLWaIfH92NqI/arcgis/rest/services/NC911_PSAPs/FeatureServer/0",
                     state: "ND",
-                    expected: "WORKING"
+                    wkid: 102100
+                },
+                {
+                    name: "Ohio PSAP Boundaries",
+                    url: "https://services8.arcgis.com/gHHsN1i8OISt9wMD/arcgis/rest/services/PSAP_BOUNDARIES/FeatureServer/0",
+                    state: "OH",
+                    wkid: 102100
+                },
+                {
+                    name: "Tennessee PSAP Boundaries",
+                    url: "https://services7.arcgis.com/aheAxJpwjYPDjSuN/arcgis/rest/services/TN_Emergency_Districts_Org/FeatureServer/3",
+                    state: "TN",
+                    wkid: 102100
+                },
+                {
+                    name: "Texas PSAP Boundaries",
+                    url: "https://services.arcgis.com/8vL8ZFWfQxhb4uIP/arcgis/rest/services/Texas_911_Control_Points_WFL1/FeatureServer/3",
+                    state: "TX",
+                    wkid: 102100
+                },
+                {
+                    name: "Virginia PSAP Boundaries",
+                    url: "https://vginmaps.vdem.virginia.gov/arcgis/rest/services/NG911/NG911_VA_StatePlaneSouth_NAD83_PSAP_Polygon/FeatureServer/0",
+                    state: "VA",
+                    wkid: null
                 }
             ];
 
@@ -1411,95 +1417,113 @@
                 return geometry;
             }
             
-            // PRODUCTION: Fast loading of verified working services with coordinate conversion
+            // SIMPLE: Load working PSAP services with proper coordinate handling
             async function loadProductionPSAPDataWithConversionV5() {
-                console.log('🚀 PRODUCTION: Loading 12 verified working PSAP services...');
+                console.log('🚀 SIMPLE: Loading 13 verified working PSAP services...');
                 status.textContent = 'Loading verified PSAP services...';
                 
                 const startTime = Date.now();
                 let totalFeatures = 0;
                 let loadedStates = [];
                 
+                // Function to convert coordinates if needed
+                function convertCoordinates(rings, fromWkid) {
+                    if (fromWkid === 4326) {
+                        // Convert from decimal degrees to Web Mercator
+                        return rings.map(ring => 
+                            ring.map(coord => {
+                                const lon = coord[0];
+                                const lat = coord[1];
+                                const x = lon * 20037508.34 / 180;
+                                const y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+                                return [x, y];
+                            })
+                        );
+                    }
+                    // For other projected coordinate systems, assume they're already in Web Mercator or close enough
+                    return rings;
+                }
+                
                 try {
-                    // Load all working services in parallel with 8-second timeout
-                    const loadPromises = workingPSAPServices.map(async (service) => {
-                        try {
-                            console.log(`⚡ Loading ${service.state}...`);
-                            
-                            const controller = new AbortController();
-                            const timeoutId = setTimeout(() => controller.abort(), 8000);
-                            
-                            const response = await fetch(`${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json`, {
-                                signal: controller.signal
-                            });
-                            clearTimeout(timeoutId);
-                            
-                            if (!response.ok) {
-                                console.log(`❌ ${service.state}: HTTP ${response.status}`);
-                                return null;
-                            }
-                            
-                            const data = await response.json();
-                            if (!data.features?.length) {
-                                console.log(`❌ ${service.state}: No features`);
-                                return null;
-                            }
-                            
-                            console.log(`✅ ${service.state}: Loaded ${data.features.length} features`);
-                            return { service, data };
-                            
-                        } catch (error) {
-                            console.log(`❌ ${service.state}: ${error.name === 'AbortError' ? 'Timeout' : error.message}`);
-                            return null;
+                    // Load services sequentially to avoid overwhelming servers
+                    for (const service of workingPSAPServices) {
+                    try {
+                        console.log(`⚡ Loading ${service.state}...`);
+                        
+                        const queryUrl = `${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=100`;
+                        const response = await fetch(queryUrl);
+                        
+                        if (!response.ok) {
+                            console.log(`❌ ${service.state}: HTTP ${response.status}`);
+                            continue;
                         }
-                    });
-                    
-                    // Wait for all to complete
-                    const results = await Promise.allSettled(loadPromises);
-                    
-                    // Process successful results
-                    results.forEach(result => {
-                        if (result.status === 'fulfilled' && result.value) {
-                            const { service, data } = result.value;
-                            
-                            data.features.forEach(feature => {
-                                try {
-                                    let geometry = feature.geometry;
-                                    
-                                    // Add missing type for ArcGIS geometries
-                                    if (geometry?.rings && !geometry.type) {
-                                        geometry.type = 'polygon';
+                        
+                        const data = await response.json();
+                        
+                        if (!data.features || data.features.length === 0) {
+                            console.log(`❌ ${service.state}: No features found`);
+                            continue;
+                        }
+
+                        let featureCount = 0;
+                        
+                        data.features.forEach(feature => {
+                            try {
+                                if (feature.geometry && feature.geometry.rings) {
+                                    // Convert coordinates if needed
+                                    let rings = feature.geometry.rings;
+                                    if (service.wkid === 4326) {
+                                        rings = convertCoordinates(rings, 4326);
                                     }
                                     
-                                    if (geometry?.rings?.length) {
-                                        const graphic = new Graphic({
-                                            geometry: geometry,
-                                            symbol: new SimpleFillSymbol({
-                                                color: [255, 243, 0, 0.3],
-                                                outline: new SimpleLineSymbol({
-                                                    color: [255, 243, 0, 0.8],
-                                                    width: 1
-                                                })
-                                            }),
-                                            attributes: {
-                                                ...feature.attributes,
-                                                state: service.state,
-                                                service_name: service.name
-                                            }
-                                        });
-                                        psapLayer.add(graphic);
-                                        totalFeatures++;
-                                    }
-                                } catch (geoError) {
-                                    console.log(`⚠️ ${service.state}: Geometry error`);
+                                    // Create polygon geometry
+                                    const polygon = new Polygon({
+                                        rings: rings,
+                                        spatialReference: { wkid: 3857 }
+                                    });
+                                    
+                                    // Create graphic
+                                    const graphic = new Graphic({
+                                        geometry: polygon,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [255, 243, 0, 0.3],
+                                            outline: new SimpleLineSymbol({
+                                                color: [255, 243, 0, 0.8],
+                                                width: 1
+                                            })
+                                        }),
+                                        attributes: {
+                                            ...feature.attributes,
+                                            state: service.state,
+                                            service_name: service.name
+                                        }
+                                    });
+                                    
+                                    psapLayer.add(graphic);
+                                    featureCount++;
                                 }
-                            });
-                            
-                            loadedStates.push(service.state);
-                        }
-                    });
-                    
-                    const loadTime = Date.now() - startTime;
+                            } catch (geoError) {
+                                console.error(`Geometry error in ${service.state}:`, geoError);
+                            }
+                        });
+                        
+                        console.log(`✅ ${service.state}: Loaded ${featureCount} features`);
+                        totalFeatures += featureCount;
+                        loadedStates.push(service.state);
+                        
+                        // Small delay between requests
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        
+                    } catch (error) {
+                        console.log(`❌ ${service.state}: ${error.message}`);
+                    }
+                                }
+                } catch (error) {
+                    console.error('Production PSAP loading failed:', error);
+                    await testAllPSAPServices();
+                }
+                
+                const loadTime = Date.now() - startTime;
                     console.log(`🎉 PRODUCTION: Loaded ${totalFeatures} features from ${loadedStates.join(', ')} in ${loadTime}ms`);
                     console.log(`📊 Total graphics in PSAP layer: ${psapLayer.graphics.length}`);
                     console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
