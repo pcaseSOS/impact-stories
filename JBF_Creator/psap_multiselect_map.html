@@ -1385,6 +1385,32 @@
                 }, 500);
             }
             
+            // Helper function to convert decimal degrees to Web Mercator
+            function convertToWebMercator(geometry, state) {
+                const sampleRing = geometry?.rings?.[0];
+                if (sampleRing && sampleRing.length > 0) {
+                    const sampleCoord = sampleRing[0];
+                    const isDecimalDegrees = Math.abs(sampleCoord[0]) <= 180 && Math.abs(sampleCoord[1]) <= 90;
+                    
+                    if (isDecimalDegrees) {
+                        console.log(`🔄 ${state}: Converting decimal degrees to Web Mercator`);
+                        // Convert decimal degrees to Web Mercator
+                        geometry.rings = geometry.rings.map(ring => 
+                            ring.map(coord => {
+                                const lon = coord[0];
+                                const lat = coord[1];
+                                const x = lon * 20037508.34 / 180;
+                                const y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+                                return [x, y];
+                            })
+                        );
+                        geometry.spatialReference = { wkid: 3857 };
+                        console.log(`✅ ${state}: Converted coordinates`);
+                    }
+                }
+                return geometry;
+            }
+            
             // PRODUCTION: Fast loading of verified working services
             async function loadProductionPSAPData() {
                 console.log('🚀 PRODUCTION: Loading 12 verified working PSAP services...');
@@ -1507,10 +1533,23 @@
                                     graphics.forEach(graphic => {
                                         if (graphic.geometry && graphic.geometry.extent) {
                                             const ext = graphic.geometry.extent;
-                                            minX = Math.min(minX, ext.xmin);
-                                            minY = Math.min(minY, ext.ymin);
-                                            maxX = Math.max(maxX, ext.xmax);
-                                            maxY = Math.max(maxY, ext.ymax);
+                                            
+                                            // Check if coordinates are in decimal degrees and convert
+                                            let xmin = ext.xmin, ymin = ext.ymin, xmax = ext.xmax, ymax = ext.ymax;
+                                            
+                                            if (Math.abs(xmin) <= 180 && Math.abs(ymin) <= 90) {
+                                                // Convert decimal degrees to Web Mercator
+                                                xmin = xmin * 20037508.34 / 180;
+                                                ymin = Math.log(Math.tan((90 + ymin) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+                                                xmax = xmax * 20037508.34 / 180;
+                                                ymax = Math.log(Math.tan((90 + ymax) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+                                                console.log(`🔄 Converted extent from decimal degrees to Web Mercator`);
+                                            }
+                                            
+                                            minX = Math.min(minX, xmin);
+                                            minY = Math.min(minY, ymin);
+                                            maxX = Math.max(maxX, xmax);
+                                            maxY = Math.max(maxY, ymax);
                                             extentCount++;
                                         }
                                     });
