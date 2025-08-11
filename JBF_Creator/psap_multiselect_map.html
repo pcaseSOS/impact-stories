@@ -1411,8 +1411,8 @@
                 return geometry;
             }
             
-            // PRODUCTION: Fast loading of verified working services
-            async function loadProductionPSAPData() {
+            // PRODUCTION: Fast loading of verified working services with coordinate conversion
+            async function loadProductionPSAPDataWithConversion() {
                 console.log('🚀 PRODUCTION: Loading 12 verified working PSAP services...');
                 status.textContent = 'Loading verified PSAP services...';
                 
@@ -1942,7 +1942,7 @@
             // Load the PSAP data
             // Use fast production loading with verified working services
             try {
-                loadProductionPSAPData();
+                loadProductionPSAPDataWithConversion();
             } catch (error) {
                 console.error('Production loading failed, falling back to testing:', error);
                 testAllPSAPServices();
