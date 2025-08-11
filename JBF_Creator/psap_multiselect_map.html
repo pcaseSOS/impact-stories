@@ -1475,17 +1475,34 @@
                     
                     const loadTime = Date.now() - startTime;
                     console.log(`🎉 PRODUCTION: Loaded ${totalFeatures} features from ${loadedStates.join(', ')} in ${loadTime}ms`);
+                    console.log(`📊 Total graphics in PSAP layer: ${psapLayer.graphics.length}`);
+                    console.log(`👁️ PSAP Layer visible: ${psapLayer.visible}`);
+                    console.log(`🎨 PSAP Layer opacity: ${psapLayer.opacity}`);
                     
                     if (totalFeatures > 0) {
                         status.textContent = `Loaded ${totalFeatures} PSAP features from ${loadedStates.length} states (${loadTime}ms)`;
                         
-                        // Auto-zoom to data
+                        // Ensure layer is visible
+                        psapLayer.visible = true;
+                        psapLayer.opacity = 0.7;
+                        console.log('✅ Set PSAP layer visible and opacity');
+                        
+                        // Force layer refresh
+                        if (psapLayerView && psapLayerView.refresh) {
+                            psapLayerView.refresh();
+                            console.log('🔄 Refreshed PSAP layer view');
+                        }
+                        
+                        // Auto-zoom to data with better extent calculation
                         setTimeout(() => {
                             try {
                                 if (psapLayer.graphics.length > 0) {
+                                    console.log(`🗺️ Calculating extent for ${psapLayer.graphics.length} graphics...`);
+                                    
                                     // Calculate extent manually since zoomToLayerExtent might not be defined
                                     const graphics = psapLayer.graphics.toArray();
                                     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                                    let extentCount = 0;
                                     
                                     graphics.forEach(graphic => {
                                         if (graphic.geometry && graphic.geometry.extent) {
@@ -1494,8 +1511,11 @@
                                             minY = Math.min(minY, ext.ymin);
                                             maxX = Math.max(maxX, ext.xmax);
                                             maxY = Math.max(maxY, ext.ymax);
+                                            extentCount++;
                                         }
                                     });
+                                    
+                                    console.log(`📍 Found ${extentCount} graphics with extent data`);
                                     
                                     if (minX !== Infinity) {
                                         const extent = {
@@ -1505,14 +1525,20 @@
                                             ymax: maxY,
                                             spatialReference: { wkid: 3857 }
                                         };
+                                        console.log('🗺️ Extent:', extent);
                                         mapView.goTo(extent, { padding: 50 });
                                         console.log('🗺️ Auto-zoomed to PSAP data extent');
+                                    } else {
+                                        console.log('⚠️ No valid extents found - zooming to US');
+                                        mapView.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
                                     }
                                 }
                             } catch (e) {
                                 console.log('Auto-zoom failed:', e.message);
+                                // Fallback zoom to US
+                                mapView.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
                             }
-                        }, 500);
+                        }, 1000);
                     } else {
                         console.log('❌ Production loading failed - falling back to testing');
                         await testAllPSAPServices();
