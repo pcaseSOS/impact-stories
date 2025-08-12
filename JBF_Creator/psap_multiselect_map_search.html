@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSAP Multi-Select Map - Search</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+    <style>
+        html, body, #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #001559;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: #FFFFFF;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,21,89,0.3);
+            z-index: 1000;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid #29A8DD;
+        }
+        .status { margin: 5px 0; font-size: 12px; }
+        .success { color: #29A8DD; }
+        .error { color: #FFF300; }
+        .info { color: #005eFF; }
+        button { 
+            margin: 5px; 
+            padding: 8px 12px; 
+            cursor: pointer; 
+            background: #29A8DD;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #005eFF;
+        }
+        h3 { 
+            margin-top: 0; 
+            color: #001559;
+            border-bottom: 2px solid #29A8DD;
+            padding-bottom: 8px;
+        }
+        
+        /* Search styles */
+        .search-container {
+            margin: 10px 0;
+            padding: 15px;
+            background: #FFFFFF;
+            border-radius: 8px;
+            border: 2px solid #29A8DD;
+            box-shadow: 0 2px 8px rgba(0,21,89,0.2);
+        }
+        .search-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #29A8DD;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 8px;
+            background: #FFFFFF;
+            color: #001559;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #005eFF;
+            box-shadow: 0 0 8px rgba(0,94,255,0.3);
+        }
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 2px solid #29A8DD;
+            border-radius: 6px;
+            background: #FFFFFF;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0,21,89,0.2);
+        }
+        .search-result {
+            padding: 10px;
+            border-bottom: 1px solid #29A8DD;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+        }
+        .search-result:hover {
+            background: #FFF300;
+        }
+        .search-result:last-child {
+            border-bottom: none;
+        }
+        .result-title {
+            font-weight: bold;
+            color: #001559;
+        }
+        .result-details {
+            color: #005eFF;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        .highlight {
+            background-color: #FFF300;
+            font-weight: bold;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+        .search-stats {
+            font-size: 11px;
+            color: #001559;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        
+        /* Popup styles */
+        .popup {
+            position: absolute;
+            background: #FFFFFF;
+            border: 3px solid #29A8DD;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 6px 20px rgba(0,21,89,0.4);
+            max-width: 400px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 2000;
+            display: none;
+        }
+        .popup-header {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #001559;
+            border-bottom: 3px solid #29A8DD;
+            padding-bottom: 8px;
+        }
+        .popup-content {
+            font-size: 12px;
+        }
+        .popup-row {
+            display: flex;
+            margin: 8px 0;
+            border-bottom: 1px solid #29A8DD;
+            padding: 5px 0;
+        }
+        .popup-label {
+            font-weight: bold;
+            min-width: 120px;
+            color: #001559;
+        }
+        .popup-value {
+            flex: 1;
+            color: #005eFF;
+            word-break: break-word;
+        }
+        .popup-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            cursor: pointer;
+            font-size: 18px;
+            color: #29A8DD;
+            background: #FFFFFF;
+            border: 2px solid #29A8DD;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .popup-close:hover {
+            background: #005eFF;
+            color: #FFFFFF;
+            border-color: #005eFF;
+        }
+        
+        /* Highlight styles */
+        .highlight {
+            background: #FFF300;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        
+        /* Layer selector styles */
+        .layer-selector {
+            margin: 15px 0;
+            padding: 15px;
+            background: #FFFFFF;
+            border-radius: 8px;
+            border: 2px solid #29A8DD;
+            box-shadow: 0 2px 8px rgba(0,21,89,0.2);
+        }
+        .layer-selector h4 {
+            margin: 0 0 10px 0;
+            color: #001559;
+            font-size: 14px;
+            border-bottom: 2px solid #29A8DD;
+            padding-bottom: 5px;
+        }
+        .layer-selector select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #29A8DD;
+            border-radius: 4px;
+            background: #FFFFFF;
+            color: #001559;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .layer-selector select:focus {
+            outline: none;
+            border-color: #005eFF;
+            box-shadow: 0 0 8px rgba(0,94,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>PSAP Multi-Select Map - Search</h3>
+        <div id="status">Loading map...</div>
+        
+        <!-- Search Container -->
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search PSAPs, agencies, counties, etc..." />
+            <div id="searchResults" class="search-results"></div>
+            <div id="searchStats" class="search-stats"></div>
+        </div>
+        
+        <button onclick="loadPSAPData()">Load PSAP Data</button>
+        <button onclick="clearMap()">Clear Map</button>
+        <button onclick="zoomToUS()">Zoom to US</button>
+        <button onclick="clearSearch()">Clear Search</button>
+        <button onclick="showSearchStatus()">Show Search Status</button>
+        <button onclick="refreshSearchDatabase()">Refresh Search DB</button>
+        <button onclick="toggleCountyLayer()">Toggle Counties</button>
+        <button onclick="toggleStateLayer()">Toggle States</button>
+        <button onclick="testCountySearch()">Test Monmouth Search</button>
+        
+        <!-- USGS Layer Selector -->
+        <div class="layer-selector">
+            <h4>USGS Reference Layers</h4>
+            <select id="usgsLayerSelect" onchange="toggleUSGSLayer()">
+                <option value="">No additional layers</option>
+                <option value="21">State Boundaries (Small-Scale)</option>
+                <option value="22">State Boundaries (Large-Scale)</option>
+                <option value="23">County Boundaries</option>
+                <option value="24">Cities & Towns</option>
+                <option value="25">Unincorporated Places</option>
+                <option value="29">National Parks</option>
+                <option value="31">National Forests</option>
+                <option value="32">National Wilderness</option>
+                <option value="35">US Fish & Wildlife Service</option>
+                <option value="36">Bureau of Land Management</option>
+                <option value="37">Military Reserves</option>
+                <option value="41">Congressional Districts</option>
+            </select>
+        </div>
+        
+        <div style="margin-top: 10px; font-size: 11px; color: #001559;">
+            Click on any PSAP boundary to view details
+        </div>
+    </div>
+    
+    <!-- Popup for feature information -->
+    <div id="featurePopup" class="popup">
+        <div class="popup-close" onclick="closePopup()">&times;</div>
+        <div class="popup-header" id="popupHeader">Feature Information</div>
+        <div class="popup-content" id="popupContent"></div>
+    </div>
+    
+    <div id="viewDiv"></div>
+
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/GraphicsLayer",
+            "esri/layers/FeatureLayer",
+            "esri/Graphic",
+            "esri/geometry/Polygon",
+            "esri/symbols/SimpleFillSymbol",
+            "esri/symbols/SimpleLineSymbol",
+            "esri/geometry/SpatialReference"
+        ], function(Map, MapView, GraphicsLayer, FeatureLayer, Graphic, Polygon, SimpleFillSymbol, SimpleLineSymbol, SpatialReference) {
+            
+            // Working services with improved coordinate handling
+            const workingServices = [
+                { name: "Alabama", url: "https://services2.arcgis.com/Ao3oYLThb9Xbvgpw/arcgis/rest/services/Alabama_911_Centers/FeatureServer/1", wkid: 102100 },
+                { name: "Arizona", url: "https://server.azgeo.az.gov/arcgis/rest/services/az911/Arizona_PSAP_Boundary/FeatureServer/1", wkid: 4326 },
+                { name: "Colorado", url: "https://services3.arcgis.com/DgjqnJA1rgO92Soi/arcgis/rest/services/Colorado_PSAP_Review/FeatureServer/1", wkid: 102100 },
+                { name: "Illinois", url: "https://services1.arcgis.com/CNPdEkvnGl65jCX8/ArcGIS/rest/services/PSAPs_and_DIGBs_for_planning_purposes/FeatureServer/1", wkid: 102100 },
+                { name: "Nevada", url: "https://services3.arcgis.com/5GeA0r0IN0Q5uQUC/arcgis/rest/services/PSAP_boundaries/FeatureServer/1", wkid: 3395 },
+                { name: "North Carolina", url: "https://services5.arcgis.com/mSDBiLWaIfH92NqI/arcgis/rest/services/NC911_PSAPs/FeatureServer/0", wkid: 102100 },
+                { name: "Ohio", url: "https://services8.arcgis.com/gHHsN1i8OISt9wMD/arcgis/rest/services/PSAP_BOUNDARIES/FeatureServer/0", wkid: 102100 },
+                { name: "Tennessee", url: "https://services7.arcgis.com/aheAxJpwjYPDjSuN/arcgis/rest/services/TN_Emergency_Districts_Org/FeatureServer/3", wkid: 102100 },
+                { name: "Texas", url: "https://services.arcgis.com/8vL8ZFWfQxhb4uIP/arcgis/rest/services/Texas_911_Control_Points_WFL1/FeatureServer/3", wkid: 102100 }
+            ];
+
+            // Create map and view
+            const map = new Map({
+                basemap: "satellite"
+            });
+
+            const view = new MapView({
+                container: "viewDiv",
+                map: map,
+                zoom: 4,
+                center: [-98, 39]
+            });
+
+            // Create graphics layer for PSAP data
+            const psapLayer = new GraphicsLayer({
+                title: "PSAP Boundaries"
+            });
+            map.add(psapLayer);
+
+            // Add USGS County Labels layer for geographic context
+            const countyLabelsLayer = new FeatureLayer({
+                url: "https://carto.nationalmap.gov/arcgis/rest/services/govunits/mapserver/3",
+                title: "USGS County Labels",
+                opacity: 0.8,
+                visible: true
+            });
+            map.add(countyLabelsLayer);
+
+            // Store all loaded graphics for searching
+            let allGraphics = [];
+            let searchResults = [];
+            let countyLayer = null;
+            let stateLayer = null;
+
+            // Function to convert coordinates if needed
+            function convertCoordinates(rings, fromWkid) {
+                if (fromWkid === 4326) {
+                    // Convert from decimal degrees to Web Mercator
+                    return rings.map(ring => 
+                        ring.map(coord => {
+                            const lon = coord[0];
+                            const lat = coord[1];
+                            const x = lon * 20037508.34 / 180;
+                            const y = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+                            return [x, y];
+                        })
+                    );
+                }
+                // For other projected coordinate systems, assume they're already in Web Mercator or close enough
+                return rings;
+            }
+
+            // Function to format attribute values
+            function formatAttributeValue(value) {
+                if (value === null || value === undefined) {
+                    return '<em>Not specified</em>';
+                }
+                if (typeof value === 'string') {
+                    return value.trim() || '<em>Empty</em>';
+                }
+                if (typeof value === 'number') {
+                    return value.toLocaleString();
+                }
+                return String(value);
+            }
+
+            // Function to highlight search terms in text
+            function highlightSearchTerm(text, searchTerm) {
+                if (!searchTerm || !text) return text;
+                const regex = new RegExp(`(${searchTerm})`, 'gi');
+                return String(text).replace(regex, '<span class="highlight">$1</span>');
+            }
+
+            // Function to search across all graphics
+            function searchGraphics(searchTerm) {
+                if (!searchTerm || searchTerm.length < 2) {
+                    hideSearchResults();
+                    return;
+                }
+
+                const results = [];
+                const term = searchTerm.toLowerCase();
+                
+                // Debug: Log search database status
+                console.log(`Searching ${allGraphics.length} features for: "${searchTerm}"`);
+                const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
+                const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
+                console.log(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features`);
+                
+                // Debug: Show some USGS features if we have them
+                if (usgsCount > 0) {
+                    const sampleUSGS = allGraphics.filter(g => g.attributes.layerType === "USGS").slice(0, 2);
+                    sampleUSGS.forEach((g, i) => {
+                        console.log(`USGS Sample ${i+1}:`, g.attributes);
+                    });
+                }
+
+                allGraphics.forEach(graphic => {
+                    const attributes = graphic.attributes;
+                    let matchFound = false;
+                    let matchDetails = [];
+                    let matchScore = 0;
+
+                    // Search through ALL attributes (including previously excluded ones)
+                    Object.keys(attributes).forEach(key => {
+                        const value = attributes[key];
+                        if (value && String(value).toLowerCase().includes(term)) {
+                            matchFound = true;
+                            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                            matchDetails.push(`${label}: ${value}`);
+                            
+                            // Score matches - exact matches get higher scores
+                            if (String(value).toLowerCase() === term) {
+                                matchScore += 10; // Exact match
+                            } else if (String(value).toLowerCase().startsWith(term)) {
+                                matchScore += 5; // Starts with
+                            } else {
+                                matchScore += 1; // Contains
+                            }
+                        }
+                    });
+
+                    if (matchFound) {
+                        // Create a title for the result
+                        let title;
+                        if (attributes.layerType === "USGS") {
+                            // USGS feature
+                            title = `USGS ${attributes.layerName} - ${attributes.displayName || 'Feature'}`;
+                        } else {
+                            // PSAP feature
+                            title = attributes.state;
+                            if (attributes.name) title += ` - ${attributes.name}`;
+                            else if (attributes.psap_name) title += ` - ${attributes.psap_name}`;
+                            else if (attributes.agency_name) title += ` - ${attributes.agency_name}`;
+                            else title += ` PSAP`;
+                        }
+
+                        results.push({
+                            graphic: graphic,
+                            title: title,
+                            details: matchDetails.slice(0, 5).join(', '), // Show first 5 matches
+                            matchCount: matchDetails.length,
+                            matchScore: matchScore
+                        });
+                    }
+                });
+
+                // Sort results by relevance (score first, then match count, then alphabetically)
+                results.sort((a, b) => {
+                    if (b.matchScore !== a.matchScore) {
+                        return b.matchScore - a.matchScore;
+                    }
+                    if (b.matchCount !== a.matchCount) {
+                        return b.matchCount - a.matchCount;
+                    }
+                    return a.title.localeCompare(b.title);
+                });
+
+                displaySearchResults(results, searchTerm);
+            }
+
+            // Function to display search results
+            function displaySearchResults(results, searchTerm) {
+                const resultsDiv = document.getElementById('searchResults');
+                const statsDiv = document.getElementById('searchStats');
+
+                if (results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="search-result">No matches found</div>';
+                    statsDiv.textContent = '';
+                } else {
+                    let html = '';
+                    results.forEach((result, index) => {
+                        const highlightedTitle = highlightSearchTerm(result.title, searchTerm);
+                        const highlightedDetails = highlightSearchTerm(result.details, searchTerm);
+                        
+                        html += `
+                            <div class="search-result" onclick="selectSearchResult(${index})">
+                                <div class="result-title">${highlightedTitle}</div>
+                                <div class="result-details">${highlightedDetails}</div>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = html;
+                    statsDiv.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''}`;
+                }
+
+                resultsDiv.style.display = 'block';
+                searchResults = results;
+            }
+
+            // Function to hide search results
+            function hideSearchResults() {
+                document.getElementById('searchResults').style.display = 'none';
+                document.getElementById('searchStats').textContent = '';
+                searchResults = [];
+            }
+
+            // Function to select a search result
+            function selectSearchResult(index) {
+                if (searchResults[index]) {
+                    const graphic = searchResults[index].graphic;
+                    
+                    // Zoom to the graphic
+                    view.goTo(graphic, { padding: 50, duration: 1000 });
+                    
+                    // Show popup after zoom
+                    setTimeout(() => {
+                        const center = view.center;
+                        const screenPoint = view.toScreen(center);
+                        showFeaturePopup(graphic, screenPoint);
+                    }, 1200);
+                    
+                    // Hide search results
+                    hideSearchResults();
+                    document.getElementById('searchInput').value = '';
+                }
+            }
+
+            // Function to clear search
+            function clearSearch() {
+                document.getElementById('searchInput').value = '';
+                hideSearchResults();
+            }
+
+            // Function to show popup with feature information
+            function showFeaturePopup(graphic, screenPoint) {
+                const popup = document.getElementById('featurePopup');
+                const header = document.getElementById('popupHeader');
+                const content = document.getElementById('popupContent');
+                
+                const attributes = graphic.attributes;
+                
+                // Set header based on feature type
+                if (attributes.layerType === "USGS") {
+                    header.textContent = `USGS ${attributes.layerName} - ${attributes.displayName || 'Feature'}`;
+                } else {
+                    header.textContent = `${attributes.state} PSAP`;
+                }
+                
+                // Build content
+                let html = '';
+                
+                // Sort attributes to show important ones first
+                const sortedKeys = Object.keys(attributes).sort((a, b) => {
+                    let priority;
+                    if (attributes.layerType === "USGS") {
+                        priority = ['displayName', 'NAME', 'STATE_NAME', 'COUNTY_NAME', 'FCODE', 'AREASQKM', 'POPULATION'];
+                    } else {
+                        priority = ['state', 'name', 'psap_name', 'agency_name', 'county', 'city'];
+                    }
+                    const aIndex = priority.indexOf(a);
+                    const bIndex = priority.indexOf(b);
+                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                    if (aIndex !== -1) return -1;
+                    if (bIndex !== -1) return 1;
+                    return a.localeCompare(b);
+                });
+                
+                sortedKeys.forEach(key => {
+                    if (key !== 'state' && key !== 'service_name' && key !== 'layerType' && key !== 'layerName' && key !== 'source') { // Skip internal attributes
+                        const value = formatAttributeValue(attributes[key]);
+                        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                        
+                        html += `
+                            <div class="popup-row">
+                                <div class="popup-label">${label}:</div>
+                                <div class="popup-value">${value}</div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                if (html === '') {
+                    html = '<div style="color: #999; font-style: italic;">No additional attributes available</div>';
+                }
+                
+                content.innerHTML = html;
+                
+                // Position popup
+                const viewport = view.container.getBoundingClientRect();
+                const popupWidth = 400;
+                const popupHeight = 300;
+                
+                let left = screenPoint.x + 10;
+                let top = screenPoint.y - popupHeight - 10;
+                
+                // Adjust if popup would go off screen
+                if (left + popupWidth > viewport.width) {
+                    left = screenPoint.x - popupWidth - 10;
+                }
+                if (top < 0) {
+                    top = screenPoint.y + 10;
+                }
+                
+                popup.style.left = left + 'px';
+                popup.style.top = top + 'px';
+                popup.style.display = 'block';
+            }
+
+            // Function to close popup
+            function closePopup() {
+                document.getElementById('featurePopup').style.display = 'none';
+            }
+
+            // Function to load a single service
+            async function loadService(service) {
+                try {
+                    updateStatus(`Loading ${service.name}...`, 'info');
+                    
+                    // Remove record limit to get ALL features
+                    const queryUrl = `${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=10000`;
+                    const response = await fetch(queryUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (!data.features || data.features.length === 0) {
+                        updateStatus(`${service.name}: No features found`, 'error');
+                        return 0;
+                    }
+
+                    let featureCount = 0;
+                    
+                    data.features.forEach(feature => {
+                        try {
+                            if (feature.geometry && feature.geometry.rings) {
+                                // Convert coordinates if needed
+                                let rings = feature.geometry.rings;
+                                if (service.wkid === 4326) {
+                                    rings = convertCoordinates(rings, 4326);
+                                }
+                                
+                                // Create polygon geometry
+                                const polygon = new Polygon({
+                                    rings: rings,
+                                    spatialReference: { wkid: 3857 }
+                                });
+                                
+                                // Create graphic
+                                const graphic = new Graphic({
+                                    geometry: polygon,
+                                    symbol: new SimpleFillSymbol({
+                                        color: [41, 168, 221, 0.4], // Safety Blue with transparency
+                                        outline: new SimpleLineSymbol({
+                                            color: [0, 94, 255, 0.9], // Glow color
+                                            width: 2
+                                        })
+                                    }),
+                                    attributes: {
+                                        ...feature.attributes,
+                                        state: service.name,
+                                        layerType: "PSAP"
+                                    }
+                                });
+                                
+                                psapLayer.add(graphic);
+                                allGraphics.push(graphic); // Add to searchable graphics
+                                featureCount++;
+                            }
+                        } catch (geoError) {
+                            console.error(`Geometry error in ${service.name}:`, geoError);
+                        }
+                    });
+                    
+                    updateStatus(`${service.name}: ✅ Loaded ${featureCount} features`, 'success');
+                    return featureCount;
+                    
+                } catch (error) {
+                    updateStatus(`${service.name}: ❌ ${error.message}`, 'error');
+                    return 0;
+                }
+            }
+
+            // Function to load comprehensive geographic data
+            async function loadComprehensiveData() {
+                updateStatus('Loading comprehensive geographic data...', 'info');
+                
+                try {
+                    // Load all US counties in one go - using a more reliable source
+                    const countiesUrl = "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_Counties/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=10000";
+                    updateStatus('Fetching US counties data...', 'info');
+                    const countiesResponse = await fetch(countiesUrl);
+                    
+                    if (!countiesResponse.ok) {
+                        throw new Error(`Counties HTTP ${countiesResponse.status}`);
+                    }
+                    
+                    const countiesData = await countiesResponse.json();
+                    updateStatus(`Received counties data: ${countiesData.features ? countiesData.features.length : 0} features`, 'info');
+                    
+                    if (countiesData.features && countiesData.features.length > 0) {
+                        // Debug: Show the first county's attributes
+                        if (countiesData.features.length > 0) {
+                            console.log('First county attributes:', countiesData.features[0].attributes);
+                        }
+                        
+                        let countyCount = 0;
+                        countiesData.features.forEach(feature => {
+                            try {
+                                if (feature.geometry && feature.geometry.rings) {
+                                    const polygon = new Polygon({
+                                        rings: feature.geometry.rings,
+                                        spatialReference: { wkid: 3857 }
+                                    });
+                                    
+                                    const graphic = new Graphic({
+                                        geometry: polygon,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [255, 255, 0, 0.1], // Very light yellow
+                                            outline: new SimpleLineSymbol({
+                                                color: [255, 255, 0, 0.3],
+                                                width: 1
+                                            })
+                                        }),
+                                        attributes: {
+                                            ...feature.attributes,
+                                            layerType: "USGS",
+                                            layerName: "US Counties",
+                                            displayName: `${feature.attributes.NAME}, ${feature.attributes.STATE_NAME}`
+                                        }
+                                    });
+                                    
+                                    // Add to a separate layer for counties
+                                    if (!countyLayer) {
+                                        countyLayer = new GraphicsLayer({
+                                            title: "US Counties",
+                                            visible: false
+                                        });
+                                        map.add(countyLayer);
+                                    }
+                                    countyLayer.add(graphic);
+                                    allGraphics.push(graphic);
+                                    countyCount++;
+                                }
+                            } catch (geoError) {
+                                console.error('County geometry error:', geoError);
+                            }
+                        });
+                        updateStatus(`✅ Loaded ${countyCount} US counties`, 'success');
+                    }
+                    
+                    // Load all US states
+                    const statesUrl = "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=100";
+                    const statesResponse = await fetch(statesUrl);
+                    const statesData = await statesResponse.json();
+                    
+                    if (statesData.features && statesData.features.length > 0) {
+                        let stateCount = 0;
+                        statesData.features.forEach(feature => {
+                            try {
+                                if (feature.geometry && feature.geometry.rings) {
+                                    const polygon = new Polygon({
+                                        rings: feature.geometry.rings,
+                                        spatialReference: { wkid: 3857 }
+                                    });
+                                    
+                                    const graphic = new Graphic({
+                                        geometry: polygon,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [0, 255, 0, 0.1], // Very light green
+                                            outline: new SimpleLineSymbol({
+                                                color: [0, 255, 0, 0.3],
+                                                width: 1
+                                            })
+                                        }),
+                                        attributes: {
+                                            ...feature.attributes,
+                                            layerType: "USGS",
+                                            layerName: "US States",
+                                            displayName: feature.attributes.STATE_NAME
+                                        }
+                                    });
+                                    
+                                    // Add to a separate layer for states
+                                    if (!stateLayer) {
+                                        stateLayer = new GraphicsLayer({
+                                            title: "US States",
+                                            visible: false
+                                        });
+                                        map.add(stateLayer);
+                                    }
+                                    stateLayer.add(graphic);
+                                    allGraphics.push(graphic);
+                                    stateCount++;
+                                }
+                            } catch (geoError) {
+                                console.error('State geometry error:', geoError);
+                            }
+                        });
+                        updateStatus(`✅ Loaded ${stateCount} US states`, 'success');
+                    }
+                    
+                } catch (error) {
+                    updateStatus(`❌ Error loading comprehensive data: ${error.message}`, 'error');
+                }
+            }
+
+            // Function to load all PSAP data in parallel
+            async function loadPSAPData() {
+                clearMap();
+                updateStatus('Starting to load PSAP services in parallel...', 'info');
+                
+                const startTime = Date.now();
+                
+                // Load PSAP services in parallel
+                const psapPromises = workingServices.map(service => loadService(service));
+                const psapResults = await Promise.allSettled(psapPromises);
+                
+                let totalFeatures = 0;
+                psapResults.forEach((result, index) => {
+                    if (result.status === 'fulfilled') {
+                        totalFeatures += result.value;
+                    } else {
+                        updateStatus(`${workingServices[index].name}: ❌ Failed to load`, 'error');
+                    }
+                });
+                
+                const loadTime = Date.now() - startTime;
+                updateStatus(`🎉 PSAP Complete! Loaded ${totalFeatures} features in ${loadTime}ms`, 'success');
+                
+                // Load comprehensive geographic data
+                await loadComprehensiveData();
+                
+                // Auto-zoom to data if we have features
+                if (totalFeatures > 0) {
+                    setTimeout(() => {
+                        view.goTo(psapLayer.graphics.toArray(), { padding: 50 });
+                    }, 500);
+                }
+                
+                // Show final status
+                const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
+                const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
+                updateStatus(`📊 Final Database: ${allGraphics.length} total features (${psapCount} PSAP, ${usgsCount} USGS)`, 'success');
+            }
+
+            // Function to clear the map
+            function clearMap() {
+                psapLayer.removeAll();
+                if (countyLayer) countyLayer.removeAll();
+                if (stateLayer) stateLayer.removeAll();
+                allGraphics = [];
+                closePopup();
+                clearSearch();
+                updateStatus('Map cleared', 'info');
+            }
+
+            // Function to zoom to US
+            function zoomToUS() {
+                view.goTo({ center: [-98.5795, 39.8283], zoom: 4 });
+                updateStatus('Zoomed to US', 'info');
+            }
+
+            // Function to update status
+            function updateStatus(message, type = 'info') {
+                const statusDiv = document.getElementById('status');
+                const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+                statusDiv.innerHTML += `<div class="status ${className}">${message}</div>`;
+                statusDiv.scrollTop = statusDiv.scrollHeight;
+            }
+
+            // Add search input event listener
+            document.getElementById('searchInput').addEventListener('input', function(e) {
+                searchGraphics(e.target.value);
+            });
+
+            // Add click event handler
+            view.on("click", function(event) {
+                // Close any existing popup
+                closePopup();
+                
+                // Get the screen point
+                const screenPoint = {
+                    x: event.x,
+                    y: event.y
+                };
+                
+                // Query for graphics at the click location
+                view.hitTest(screenPoint).then(function(response) {
+                    if (response.results.length > 0) {
+                        const graphic = response.results[0].graphic;
+                        if (graphic && graphic.attributes) {
+                            // Check if it's a PSAP feature or USGS feature
+                            if (graphic.attributes.state || graphic.attributes.layerType === "USGS") {
+                                showFeaturePopup(graphic, screenPoint);
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Close popup when clicking outside
+            view.on("click", function(event) {
+                const popup = document.getElementById('featurePopup');
+                if (popup.style.display === 'block') {
+                    const popupRect = popup.getBoundingClientRect();
+                    const clickX = event.x;
+                    const clickY = event.y;
+                    
+                    if (clickX < popupRect.left || clickX > popupRect.right || 
+                        clickY < popupRect.top || clickY > popupRect.bottom) {
+                        closePopup();
+                    }
+                }
+            });
+
+            // Variable to track current USGS layer
+            let currentUSGSLayer = null;
+
+            // Function to toggle USGS layer
+            function toggleUSGSLayer() {
+                const select = document.getElementById('usgsLayerSelect');
+                const selectedValue = select.value;
+                
+                // Remove current layer if exists
+                if (currentUSGSLayer) {
+                    map.remove(currentUSGSLayer);
+                    // Remove USGS features from search database
+                    allGraphics = allGraphics.filter(graphic => graphic.attributes.layerType !== "USGS");
+                    currentUSGSLayer = null;
+                    updateStatus('Removed USGS reference layer and cleared from search', 'info');
+                }
+                
+                // Add new layer if selected
+                if (selectedValue) {
+                    const layerUrl = `https://carto.nationalmap.gov/arcgis/rest/services/govunits/mapserver/${selectedValue}`;
+                    const layerName = select.options[select.selectedIndex].text;
+                    
+                    currentUSGSLayer = new FeatureLayer({
+                        url: layerUrl,
+                        title: `USGS ${layerName}`,
+                        opacity: 0.6,
+                        visible: true,
+                        popupTemplate: {
+                            title: `{*}`,
+                            content: [
+                                {
+                                    type: "fields",
+                                    fieldInfos: [
+                                        { fieldName: "NAME", label: "Name" },
+                                        { fieldName: "STATE_NAME", label: "State" },
+                                        { fieldName: "COUNTY_NAME", label: "County" },
+                                        { fieldName: "FCODE", label: "Feature Code" },
+                                        { fieldName: "AREASQKM", label: "Area (sq km)" },
+                                        { fieldName: "POPULATION", label: "Population" }
+                                    ]
+                                }
+                            ]
+                        }
+                    });
+                    
+                    // Add click event to load features into search
+                    currentUSGSLayer.when(() => {
+                        loadUSGSFeaturesToSearch(currentUSGSLayer, layerName);
+                    });
+                    
+                    map.add(currentUSGSLayer);
+                    updateStatus(`Added USGS layer: ${layerName}`, 'success');
+                }
+            }
+
+            // Function to load USGS features into searchable graphics
+            async function loadUSGSFeaturesToSearch(layer, layerName) {
+                try {
+                    const query = layer.createQuery();
+                    query.where = "1=1";
+                    query.outFields = ["*"];
+                    query.returnGeometry = true;
+                    query.maxRecordCount = 1000;
+                    
+                    const results = await layer.queryFeatures(query);
+                    
+                    if (results.features && results.features.length > 0) {
+                        results.features.forEach(feature => {
+                            // Create a searchable graphic from the feature
+                            const searchableGraphic = {
+                                attributes: {
+                                    ...feature.attributes,
+                                    layerType: "USGS",
+                                    layerName: layerName,
+                                    displayName: getUSGSDisplayName(feature.attributes, layerName)
+                                },
+                                geometry: feature.geometry,
+                                source: "USGS"
+                            };
+                            
+                            allGraphics.push(searchableGraphic);
+                        });
+                        
+                        updateStatus(`Loaded ${results.features.length} ${layerName} features for search`, 'success');
+                    }
+                } catch (error) {
+                    console.error('Error loading USGS features for search:', error);
+                    updateStatus(`Error loading ${layerName} features for search`, 'error');
+                }
+            }
+
+            // Function to get display name for USGS features
+            function getUSGSDisplayName(attributes, layerName) {
+                if (attributes.NAME) return attributes.NAME;
+                if (attributes.STATE_NAME) return attributes.STATE_NAME;
+                if (attributes.COUNTY_NAME) return attributes.COUNTY_NAME;
+                if (attributes.GNIS_NAME) return attributes.GNIS_NAME;
+                return `${layerName} Feature`;
+            }
+
+            // Function to show search database status
+            function showSearchStatus() {
+                const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
+                const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
+                const totalCount = allGraphics.length;
+                
+                updateStatus(`Search Database: ${totalCount} total features (${psapCount} PSAP, ${usgsCount} USGS)`, 'info');
+                
+                // Show breakdown of USGS features by layer
+                if (usgsCount > 0) {
+                    const usgsLayers = {};
+                    allGraphics.filter(g => g.attributes.layerType === "USGS").forEach(g => {
+                        const layerName = g.attributes.layerName;
+                        usgsLayers[layerName] = (usgsLayers[layerName] || 0) + 1;
+                    });
+                    
+                    Object.keys(usgsLayers).forEach(layerName => {
+                        updateStatus(`  - ${layerName}: ${usgsLayers[layerName]} features`, 'info');
+                    });
+                }
+                
+                // Debug: Show some sample USGS features
+                if (usgsCount > 0) {
+                    const sampleUSGS = allGraphics.filter(g => g.attributes.layerType === "USGS").slice(0, 3);
+                    sampleUSGS.forEach((g, i) => {
+                        updateStatus(`  Sample ${i+1}: ${g.attributes.displayName || g.attributes.NAME || 'Unknown'}`, 'info');
+                    });
+                }
+            }
+
+            // Function to test search with specific county
+            function testCountySearch() {
+                const testCounty = "Monmouth";
+                updateStatus(`Testing search for "${testCounty}"...`, 'info');
+                
+                // Find all graphics that contain this county name
+                const matches = allGraphics.filter(g => {
+                    const attrs = g.attributes;
+                    return Object.values(attrs).some(value => 
+                        value && String(value).toLowerCase().includes(testCounty.toLowerCase())
+                    );
+                });
+                
+                updateStatus(`Found ${matches.length} matches for "${testCounty}":`, 'info');
+                matches.forEach((match, i) => {
+                    const layerType = match.attributes.layerType;
+                    const name = match.attributes.displayName || match.attributes.NAME || 'Unknown';
+                    updateStatus(`  ${i+1}. ${layerType}: ${name}`, 'info');
+                });
+                
+                // Also test the actual search function
+                searchGraphics(testCounty);
+            }
+
+            // Function to refresh search database
+            function refreshSearchDatabase() {
+                updateStatus('Refreshing search database...', 'info');
+                
+                // Clear current search database
+                allGraphics = [];
+                
+                // Re-add all PSAP graphics from the layer
+                psapLayer.graphics.forEach(graphic => {
+                    allGraphics.push(graphic);
+                });
+                
+                // Re-add all USGS graphics from loaded layers
+                map.layers.forEach(layer => {
+                    if (layer.title && layer.title.includes('USGS')) {
+                        // This is a USGS layer, try to get its features
+                        if (layer.graphics) {
+                            layer.graphics.forEach(graphic => {
+                                allGraphics.push(graphic);
+                            });
+                        }
+                    }
+                });
+                
+                const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
+                const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
+                const totalCount = allGraphics.length;
+                
+                updateStatus(`Search database refreshed: ${totalCount} total features (${psapCount} PSAP, ${usgsCount} USGS)`, 'success');
+            }
+
+            // Function to toggle county layer visibility
+            function toggleCountyLayer() {
+                if (countyLayer) {
+                    countyLayer.visible = !countyLayer.visible;
+                    updateStatus(`Counties ${countyLayer.visible ? 'shown' : 'hidden'}`, 'info');
+                } else {
+                    updateStatus('County layer not loaded yet', 'error');
+                }
+            }
+
+            // Function to toggle state layer visibility
+            function toggleStateLayer() {
+                if (stateLayer) {
+                    stateLayer.visible = !stateLayer.visible;
+                    updateStatus(`States ${stateLayer.visible ? 'shown' : 'hidden'}`, 'info');
+                } else {
+                    updateStatus('State layer not loaded yet', 'error');
+                }
+            }
+
+            // Make functions globally available
+            window.loadPSAPData = loadPSAPData;
+            window.clearMap = clearMap;
+            window.zoomToUS = zoomToUS;
+            window.closePopup = closePopup;
+            window.clearSearch = clearSearch;
+            window.selectSearchResult = selectSearchResult;
+            window.toggleUSGSLayer = toggleUSGSLayer;
+            window.showSearchStatus = showSearchStatus;
+            window.refreshSearchDatabase = refreshSearchDatabase;
+            window.toggleCountyLayer = toggleCountyLayer;
+            window.toggleStateLayer = toggleStateLayer;
+            window.testCountySearch = testCountySearch; // Add the new test function
+            
+            updateStatus('Map ready! Loading PSAP data automatically...', 'info');
+            
+            // Auto-load PSAP data when page loads
+            setTimeout(async () => {
+                await loadPSAPData();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
