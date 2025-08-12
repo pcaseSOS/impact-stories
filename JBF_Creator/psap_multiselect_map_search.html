@@ -248,6 +248,8 @@
         <button onclick="showAllLayers()">Show All Layers</button>
         <button onclick="hideAllLayers()">Hide All Layers</button>
         <button onclick="testCountySearch()">Test Monmouth Search</button>
+        <button onclick="showBoundariesForCurrentView()">Show Boundaries for Current View</button>
+        <button onclick="clearAllBoundaries()">Clear All Boundaries</button>
         <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
         <button onclick="debugLayerStatus()">Debug Layer Status</button>
         <button onclick="hideAllLayers()">Hide All Layers</button>
@@ -1040,7 +1042,7 @@
                 // Show final status
                 const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
                 const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                updateStatus(`📊 Final Database: ${allGraphics.length} total features (${psapCount} PSAP, ${usgsCount} USGS) - Search to show layers`, 'success');
+                updateStatus(`📊 Final Database: ${allGraphics.length} total features (${psapCount} PSAP, ${usgsCount} USGS) - Zoom to an area and click "Show Boundaries for Current View"`, 'success');
             }
 
             // Function to clear the map
@@ -1071,6 +1073,23 @@
             // Add search input event listener
             document.getElementById('searchInput').addEventListener('input', function(e) {
                 searchGraphics(e.target.value);
+            });
+
+            // Add automatic boundary loading when map view changes
+            let boundaryLoadTimeout;
+            view.watch("extent", function(newExtent) {
+                // Clear previous timeout
+                if (boundaryLoadTimeout) {
+                    clearTimeout(boundaryLoadTimeout);
+                }
+                
+                // Set a new timeout to load boundaries after user stops moving
+                boundaryLoadTimeout = setTimeout(() => {
+                    // Only auto-load if zoom level is appropriate (not too zoomed out)
+                    if (view.zoom > 6) {
+                        showBoundariesForCurrentView();
+                    }
+                }, 1000); // Wait 1 second after user stops moving
             });
 
             // Add click event handler
@@ -1394,6 +1413,71 @@
                 updateStatus('Layer status logged to console', 'info');
             }
 
+            // Function to show boundaries for current map view
+            function showBoundariesForCurrentView() {
+                updateStatus('Loading boundaries for current view...', 'info');
+                
+                // Get the current map extent
+                const extent = view.extent;
+                console.log('Current map extent:', extent);
+                
+                // Clear existing graphics
+                psapLayer.removeAll();
+                if (countyLayer) countyLayer.removeAll();
+                
+                // Find all graphics within the current extent
+                const visibleGraphics = allGraphics.filter(graphic => {
+                    if (graphic.geometry) {
+                        return extent.contains(graphic.geometry);
+                    }
+                    return false;
+                });
+                
+                console.log(`Found ${visibleGraphics.length} features in current view`);
+                
+                // Group by layer type
+                const psapFeatures = visibleGraphics.filter(g => g.attributes.layerType === "PSAP");
+                const countyFeatures = visibleGraphics.filter(g => g.attributes.layerType === "USGS" && g.attributes.layerName === "US Counties");
+                
+                // Show PSAP features
+                if (psapFeatures.length > 0) {
+                    psapFeatures.forEach(graphic => {
+                        psapLayer.add(graphic);
+                    });
+                    psapLayer.visible = true;
+                    updateStatus(`✅ Showing ${psapFeatures.length} PSAP boundaries`, 'success');
+                }
+                
+                // Show county features
+                if (countyFeatures.length > 0) {
+                    if (!countyLayer) {
+                        countyLayer = new GraphicsLayer({
+                            title: "US Counties",
+                            visible: true
+                        });
+                        map.add(countyLayer);
+                    }
+                    
+                    countyFeatures.forEach(graphic => {
+                        countyLayer.add(graphic);
+                    });
+                    updateStatus(`✅ Showing ${countyFeatures.length} county boundaries`, 'success');
+                }
+                
+                if (psapFeatures.length === 0 && countyFeatures.length === 0) {
+                    updateStatus('No boundaries found in current view - try zooming to a different area', 'info');
+                }
+            }
+
+            // Function to clear all boundaries
+            function clearAllBoundaries() {
+                psapLayer.removeAll();
+                if (countyLayer) countyLayer.removeAll();
+                psapLayer.visible = false;
+                if (countyLayer) countyLayer.visible = false;
+                updateStatus('All boundaries cleared', 'info');
+            }
+
             // Make functions globally available
             window.loadPSAPData = loadPSAPData;
             window.clearMap = clearMap;
@@ -1413,8 +1497,10 @@
             window.loadFallbackUSGSData = loadFallbackUSGSData; // Add the fallback function
             window.debugLayerStatus = debugLayerStatus; // Add the debug function
             window.highlightLayerTemporarily = highlightLayerTemporarily; // Add the highlight function
+            window.showBoundariesForCurrentView = showBoundariesForCurrentView; // Add the new boundary function
+            window.clearAllBoundaries = clearAllBoundaries; // Add the new boundary function
             
-            updateStatus('Map ready! Loading PSAP data automatically (layers hidden by default)...', 'info');
+            updateStatus('Map ready! Zoom to an area and click "Show Boundaries for Current View" to see local boundaries', 'info');
             
             // Auto-load PSAP data when page loads
             setTimeout(async () => {
