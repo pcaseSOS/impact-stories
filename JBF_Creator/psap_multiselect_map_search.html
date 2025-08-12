@@ -245,6 +245,8 @@
         <button onclick="refreshSearchDatabase()">Refresh Search DB</button>
         <button onclick="toggleCountyLayer()">Toggle Counties</button>
         <button onclick="toggleStateLayer()">Toggle States</button>
+        <button onclick="showAllLayers()">Show All Layers</button>
+        <button onclick="hideAllLayers()">Hide All Layers</button>
         <button onclick="testCountySearch()">Test Monmouth Search</button>
         <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
         
@@ -476,6 +478,9 @@
                 if (results.length === 0) {
                     resultsDiv.innerHTML = '<div class="search-result">No matches found</div>';
                     statsDiv.textContent = '';
+                    
+                    // Hide all layers when no results
+                    hideAllLayers();
                 } else {
                     let html = '';
                     results.forEach((result, index) => {
@@ -491,6 +496,9 @@
                     });
                     resultsDiv.innerHTML = html;
                     statsDiv.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''}`;
+                    
+                    // Show relevant layers based on search results
+                    showRelevantLayers(results);
                 }
 
                 resultsDiv.style.display = 'block';
@@ -502,6 +510,8 @@
                 document.getElementById('searchResults').style.display = 'none';
                 document.getElementById('searchStats').textContent = '';
                 searchResults = [];
+                // Hide all layers when search is cleared
+                hideAllLayers();
             }
 
             // Function to select a search result
@@ -1270,6 +1280,55 @@
                 }
             }
 
+            // Function to show relevant layers based on search results
+            function showRelevantLayers(results) {
+                const hasPSAP = results.some(r => r.graphic.attributes.layerType === "PSAP");
+                const hasCounties = results.some(r => r.graphic.attributes.layerType === "USGS" && r.graphic.attributes.layerName === "US Counties");
+                const hasStates = results.some(r => r.graphic.attributes.layerType === "USGS" && r.graphic.attributes.layerName === "US States");
+                
+                // Show PSAP layer if PSAP results found
+                if (hasPSAP) {
+                    psapLayer.visible = true;
+                    updateStatus('PSAP layer shown for search results', 'info');
+                }
+                
+                // Show county layer if county results found
+                if (hasCounties && countyLayer) {
+                    countyLayer.visible = true;
+                    updateStatus('County layer shown for search results', 'info');
+                }
+                
+                // Show state layer if state results found
+                if (hasStates && stateLayer) {
+                    stateLayer.visible = true;
+                    updateStatus('State layer shown for search results', 'info');
+                }
+                
+                // If no specific layer types found, show all layers
+                if (!hasPSAP && !hasCounties && !hasStates) {
+                    psapLayer.visible = true;
+                    if (countyLayer) countyLayer.visible = true;
+                    if (stateLayer) stateLayer.visible = true;
+                    updateStatus('All layers shown for search results', 'info');
+                }
+            }
+
+            // Function to hide all layers
+            function hideAllLayers() {
+                psapLayer.visible = false;
+                if (countyLayer) countyLayer.visible = false;
+                if (stateLayer) stateLayer.visible = false;
+                updateStatus('All layers hidden - no search results', 'info');
+            }
+
+            // Function to show all layers
+            function showAllLayers() {
+                psapLayer.visible = true;
+                if (countyLayer) countyLayer.visible = true;
+                if (stateLayer) stateLayer.visible = true;
+                updateStatus('All layers shown', 'info');
+            }
+
             // Make functions globally available
             window.loadPSAPData = loadPSAPData;
             window.clearMap = clearMap;
@@ -1282,6 +1341,8 @@
             window.refreshSearchDatabase = refreshSearchDatabase;
             window.toggleCountyLayer = toggleCountyLayer;
             window.toggleStateLayer = toggleStateLayer;
+            window.showAllLayers = showAllLayers;
+            window.hideAllLayers = hideAllLayers;
             window.testCountySearch = testCountySearch; // Add the new test function
             window.loadFallbackUSGSData = loadFallbackUSGSData; // Add the fallback function
             
