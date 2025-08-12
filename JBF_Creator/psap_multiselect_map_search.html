@@ -249,6 +249,7 @@
         <button onclick="hideAllLayers()">Hide All Layers</button>
         <button onclick="testCountySearch()">Test Monmouth Search</button>
         <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
+        <button onclick="debugLayerStatus()">Debug Layer Status</button>
         
         <!-- USGS Layer Selector -->
         <div class="layer-selector">
@@ -499,6 +500,7 @@
                     statsDiv.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''}`;
                     
                     // Show relevant layers based on search results
+                    console.log('Search results found, calling showRelevantLayers with:', results.length, 'results');
                     showRelevantLayers(results);
                 }
 
@@ -542,27 +544,46 @@
             // Function to show the relevant layer for a specific graphic
             function showLayerForGraphic(graphic) {
                 const attributes = graphic.attributes;
+                console.log('showLayerForGraphic called with:', attributes);
                 
                 if (attributes.layerType === "PSAP") {
                     psapLayer.visible = true;
+                    console.log('PSAP layer visibility set to:', psapLayer.visible);
                     updateStatus('PSAP layer shown for selected feature', 'info');
                 } else if (attributes.layerType === "USGS") {
+                    console.log('USGS feature detected, layerName:', attributes.layerName);
                     if (attributes.layerName === "US Counties") {
                         if (countyLayer) {
                             countyLayer.visible = true;
+                            console.log('County layer visibility set to:', countyLayer.visible);
                             updateStatus('County layer shown for selected feature', 'info');
+                        } else {
+                            console.log('County layer not found!');
+                            updateStatus('County layer not available', 'error');
                         }
                     } else if (attributes.layerName === "US States") {
                         if (stateLayer) {
                             stateLayer.visible = true;
+                            console.log('State layer visibility set to:', stateLayer.visible);
                             updateStatus('State layer shown for selected feature', 'info');
+                        } else {
+                            console.log('State layer not found!');
+                            updateStatus('State layer not available', 'error');
                         }
                     } else if (attributes.layerName === "Test Counties") {
                         if (countyLayer) {
                             countyLayer.visible = true;
+                            console.log('Test county layer visibility set to:', countyLayer.visible);
                             updateStatus('Test county layer shown for selected feature', 'info');
+                        } else {
+                            console.log('Test county layer not found!');
+                            updateStatus('Test county layer not available', 'error');
                         }
+                    } else {
+                        console.log('Unknown USGS layer name:', attributes.layerName);
                     }
+                } else {
+                    console.log('Unknown layer type:', attributes.layerType);
                 }
             }
 
@@ -1315,20 +1336,28 @@
 
             // Function to show relevant layers based on search results
             function showRelevantLayers(results) {
+                console.log('showRelevantLayers called with', results.length, 'results');
                 const hasPSAP = results.some(r => r.graphic.attributes.layerType === "PSAP");
                 const hasCounties = results.some(r => r.graphic.attributes.layerType === "USGS" && r.graphic.attributes.layerName === "US Counties");
                 const hasStates = results.some(r => r.graphic.attributes.layerType === "USGS" && r.graphic.attributes.layerName === "US States");
                 
+                console.log('Layer detection:', { hasPSAP, hasCounties, hasStates });
+                
                 // Show PSAP layer if PSAP results found
                 if (hasPSAP) {
                     psapLayer.visible = true;
+                    console.log('PSAP layer visibility set to:', psapLayer.visible);
                     updateStatus('PSAP layer shown for search results', 'info');
                 }
                 
                 // Show county layer if county results found
                 if (hasCounties && countyLayer) {
                     countyLayer.visible = true;
+                    console.log('County layer visibility set to:', countyLayer.visible);
                     updateStatus('County layer shown for search results', 'info');
+                } else if (hasCounties && !countyLayer) {
+                    console.log('County results found but countyLayer is null!');
+                    updateStatus('County layer not available', 'error');
                 }
                 
                 // Show state layer if state results found
@@ -1362,6 +1391,23 @@
                 updateStatus('All layers shown', 'info');
             }
 
+            // Function to debug layer status
+            function debugLayerStatus() {
+                console.log('=== LAYER STATUS DEBUG ===');
+                console.log('PSAP Layer exists:', !!psapLayer);
+                console.log('PSAP Layer visible:', psapLayer ? psapLayer.visible : 'N/A');
+                console.log('County Layer exists:', !!countyLayer);
+                console.log('County Layer visible:', countyLayer ? countyLayer.visible : 'N/A');
+                console.log('State Layer exists:', !!stateLayer);
+                console.log('State Layer visible:', stateLayer ? stateLayer.visible : 'N/A');
+                console.log('Total graphics in database:', allGraphics.length);
+                console.log('PSAP graphics:', allGraphics.filter(g => g.attributes.layerType === "PSAP").length);
+                console.log('USGS graphics:', allGraphics.filter(g => g.attributes.layerType === "USGS").length);
+                console.log('========================');
+                
+                updateStatus('Layer status logged to console', 'info');
+            }
+
             // Make functions globally available
             window.loadPSAPData = loadPSAPData;
             window.clearMap = clearMap;
@@ -1379,6 +1425,7 @@
             window.showLayerForGraphic = showLayerForGraphic;
             window.testCountySearch = testCountySearch; // Add the new test function
             window.loadFallbackUSGSData = loadFallbackUSGSData; // Add the fallback function
+            window.debugLayerStatus = debugLayerStatus; // Add the debug function
             
             updateStatus('Map ready! Loading PSAP data automatically (layers hidden by default)...', 'info');
             
