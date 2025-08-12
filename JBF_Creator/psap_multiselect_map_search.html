@@ -250,6 +250,7 @@
         <button onclick="testCountySearch()">Test Monmouth Search</button>
         <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
         <button onclick="debugLayerStatus()">Debug Layer Status</button>
+        <button onclick="hideAllLayers()">Hide All Layers</button>
         
         <!-- USGS Layer Selector -->
         <div class="layer-selector">
@@ -513,8 +514,7 @@
                 document.getElementById('searchResults').style.display = 'none';
                 document.getElementById('searchStats').textContent = '';
                 searchResults = [];
-                // Hide all layers when search is cleared
-                hideAllLayers();
+                // Don't hide layers when search results are cleared - let them stay visible
             }
 
             // Function to select a search result
@@ -535,9 +535,11 @@
                         showFeaturePopup(graphic, screenPoint);
                     }, 1200);
                     
-                    // Hide search results
-                    hideSearchResults();
+                    // Hide search results but keep layers visible
+                    document.getElementById('searchResults').style.display = 'none';
+                    document.getElementById('searchStats').textContent = '';
                     document.getElementById('searchInput').value = '';
+                    searchResults = [];
                 }
             }
 
@@ -623,6 +625,7 @@
             function clearSearch() {
                 document.getElementById('searchInput').value = '';
                 hideSearchResults();
+                // Don't hide layers when search is cleared - let them stay visible
             }
 
             // Function to show popup with feature information
