@@ -520,6 +520,9 @@
                 if (searchResults[index]) {
                     const graphic = searchResults[index].graphic;
                     
+                    // Show the relevant layer for this graphic
+                    showLayerForGraphic(graphic);
+                    
                     // Zoom to the graphic
                     view.goTo(graphic, { padding: 50, duration: 1000 });
                     
@@ -533,6 +536,33 @@
                     // Hide search results
                     hideSearchResults();
                     document.getElementById('searchInput').value = '';
+                }
+            }
+
+            // Function to show the relevant layer for a specific graphic
+            function showLayerForGraphic(graphic) {
+                const attributes = graphic.attributes;
+                
+                if (attributes.layerType === "PSAP") {
+                    psapLayer.visible = true;
+                    updateStatus('PSAP layer shown for selected feature', 'info');
+                } else if (attributes.layerType === "USGS") {
+                    if (attributes.layerName === "US Counties") {
+                        if (countyLayer) {
+                            countyLayer.visible = true;
+                            updateStatus('County layer shown for selected feature', 'info');
+                        }
+                    } else if (attributes.layerName === "US States") {
+                        if (stateLayer) {
+                            stateLayer.visible = true;
+                            updateStatus('State layer shown for selected feature', 'info');
+                        }
+                    } else if (attributes.layerName === "Test Counties") {
+                        if (countyLayer) {
+                            countyLayer.visible = true;
+                            updateStatus('Test county layer shown for selected feature', 'info');
+                        }
+                    }
                 }
             }
 
@@ -1054,6 +1084,8 @@
                         if (graphic && graphic.attributes) {
                             // Check if it's a PSAP feature or USGS feature
                             if (graphic.attributes.state || graphic.attributes.layerType === "USGS") {
+                                // Show the relevant layer for this graphic
+                                showLayerForGraphic(graphic);
                                 showFeaturePopup(graphic, screenPoint);
                             }
                         }
@@ -1344,6 +1376,7 @@
             window.toggleStateLayer = toggleStateLayer;
             window.showAllLayers = showAllLayers;
             window.hideAllLayers = hideAllLayers;
+            window.showLayerForGraphic = showLayerForGraphic;
             window.testCountySearch = testCountySearch; // Add the new test function
             window.loadFallbackUSGSData = loadFallbackUSGSData; // Add the fallback function
             
