@@ -862,56 +862,8 @@
                     // Load all US states using a simple approach
                     const statesData = {
                         features: [
-                            { properties: { STATE_NAME: "Alabama" }, geometry: { coordinates: [[[-88.473227, 30.223334], [-84.888246, 30.223334], [-84.888246, 35.008028], [-88.473227, 35.008028], [-88.473227, 30.223334]]] } },
-                            { properties: { STATE_NAME: "Alaska" }, geometry: { coordinates: [[[-180, 51.175092], [-130, 51.175092], [-130, 71.5388], [-180, 71.5388], [-180, 51.175092]]] } },
-                            { properties: { STATE_NAME: "Arizona" }, geometry: { coordinates: [[[-114.816591, 31.332177], [-109.045223, 31.332177], [-109.045223, 37.00426], [-114.816591, 37.00426], [-114.816591, 31.332177]]] } },
-                            { properties: { STATE_NAME: "Arkansas" }, geometry: { coordinates: [[[-94.617919, 33.004106], [-89.644395, 33.004106], [-89.644395, 36.4996], [-94.617919, 36.4996], [-94.617919, 33.004106]]] } },
-                            { properties: { STATE_NAME: "California" }, geometry: { coordinates: [[[-124.482003, 32.512317], [-114.131211, 32.512317], [-114.131211, 42.009518], [-124.482003, 42.009518], [-124.482003, 32.512317]]] } },
-                            { properties: { STATE_NAME: "Colorado" }, geometry: { coordinates: [[[-109.060253, 36.992426], [-102.041524, 36.992426], [-102.041524, 41.003444], [-109.060253, 41.003444], [-109.060253, 36.992426]]] } },
-                            { properties: { STATE_NAME: "Connecticut" }, geometry: { coordinates: [[[-73.727775, 40.980144], [-71.787239, 40.980144], [-71.787239, 42.050587], [-73.727775, 42.050587], [-73.727775, 40.980144]]] } },
-                            { properties: { STATE_NAME: "Delaware" }, geometry: { coordinates: [[[-75.789921, 38.451013], [-75.048689, 38.451013], [-75.048689, 39.839007], [-75.789921, 39.839007], [-75.789921, 38.451013]]] } },
-                            { properties: { STATE_NAME: "Florida" }, geometry: { coordinates: [[[-87.634938, 24.396308], [-80.031362, 24.396308], [-80.031362, 31.000968], [-87.634938, 31.000968], [-87.634938, 24.396308]]] } },
-                            { properties: { STATE_NAME: "Georgia" }, geometry: { coordinates: [[[-85.605165, 30.355756], [-80.840409, 30.355756], [-80.840409, 35.000659], [-85.605165, 35.000659], [-85.605165, 30.355756]]] } },
-                            { properties: { STATE_NAME: "Hawaii" }, geometry: { coordinates: [[[-178.443593, 18.91619], [-154.806773, 18.91619], [-154.806773, 28.402123], [-178.443593, 28.402123], [-178.443593, 18.91619]]] } },
-                            { properties: { STATE_NAME: "Idaho" }, geometry: { coordinates: [[[-117.243027, 41.988057], [-111.043564, 41.988057], [-111.043564, 49.000239], [-117.243027, 49.000239], [-117.243027, 41.988057]]] } },
-                            { properties: { STATE_NAME: "Illinois" }, geometry: { coordinates: [[[-91.513079, 36.970298], [-87.495199, 36.970298], [-87.495199, 42.508338], [-91.513079, 42.508338], [-91.513079, 36.970298]]] } },
-                            { properties: { STATE_NAME: "Indiana" }, geometry: { coordinates: [[[-88.09776, 37.771742], [-84.784579, 37.771742], [-84.784579, 41.760592], [-88.09776, 41.760592], [-88.09776, 37.771742]]] } },
-                            { properties: { STATE_NAME: "Iowa" }, geometry: { coordinates: [[[-96.639704, 40.375501], [-90.140061, 40.375501], [-90.140061, 43.501196], [-96.639704, 43.501196], [-96.639704, 40.375501]]] } },
-                            { properties: { STATE_NAME: "Kansas" }, geometry: { coordinates: [[[-102.051744, 36.993016], [-94.588413, 36.993016], [-94.588413, 40.003162], [-102.051744, 40.003162], [-102.051744, 36.993016]]] } },
-                            { properties: { STATE_NAME: "Kentucky" }, geometry: { coordinates: [[[-89.571509, 36.497129], [-81.964971, 36.497129], [-81.964971, 39.147458], [-89.571509, 39.147458], [-89.571509, 36.497129]]] } },
-                            { properties: { STATE_NAME: "Louisiana" }, geometry: { coordinates: [[[-94.043147, 28.928609], [-88.817017, 28.928609], [-88.817017, 33.019457], [-94.043147, 33.019457], [-94.043147, 28.928609]]] } },
-                            { properties: { STATE_NAME: "Maine" }, geometry: { coordinates: [[[-71.083924, 42.977764], [-66.949895, 42.977764], [-66.949895, 47.459686], [-71.083924, 47.459686], [-71.083924, 42.977764]]] } },
-                            { properties: { STATE_NAME: "Maryland" }, geometry: { coordinates: [[[-79.487651, 37.88654], [-75.048689, 37.88654], [-75.048689, 39.723043], [-79.487651, 39.723043], [-79.487651, 37.88654]]] } },
-                            { properties: { STATE_NAME: "Massachusetts" }, geometry: { coordinates: [[[-73.508142, 41.187053], [-69.858861, 41.187053], [-69.858861, 42.886589], [-73.508142, 42.886589], [-73.508142, 41.187053]]] } },
-                            { properties: { STATE_NAME: "Michigan" }, geometry: { coordinates: [[[-90.418136, 41.696118], [-82.122986, 41.696118], [-82.122986, 48.2388], [-90.418136, 48.2388], [-90.418136, 41.696118]]] } },
-                            { properties: { STATE_NAME: "Minnesota" }, geometry: { coordinates: [[[-97.239209, 43.499356], [-89.491739, 43.499356], [-89.491739, 49.384358], [-97.239209, 49.384358], [-97.239209, 43.499356]]] } },
-                            { properties: { STATE_NAME: "Mississippi" }, geometry: { coordinates: [[[-91.655009, 30.173943], [-88.09776, 30.173943], [-88.09776, 34.996052], [-91.655009, 34.996052], [-91.655009, 30.173943]]] } },
-                            { properties: { STATE_NAME: "Missouri" }, geometry: { coordinates: [[[-95.774704, 35.995683], [-89.098843, 35.995683], [-89.098843, 40.61364], [-95.774704, 40.61364], [-95.774704, 35.995683]]] } },
-                            { properties: { STATE_NAME: "Montana" }, geometry: { coordinates: [[[-116.050003, 44.357935], [-104.039138, 44.357935], [-104.039138, 49.000239], [-116.050003, 49.000239], [-116.050003, 44.357935]]] } },
-                            { properties: { STATE_NAME: "Nebraska" }, geometry: { coordinates: [[[-104.053514, 39.999998], [-95.30829, 39.999998], [-95.30829, 43.001707], [-104.053514, 43.001707], [-104.053514, 39.999998]]] } },
-                            { properties: { STATE_NAME: "Nevada" }, geometry: { coordinates: [[[-120.005746, 35.001857], [-114.039648, 35.001857], [-114.039648, 42.002207], [-120.005746, 42.002207], [-120.005746, 35.001857]]] } },
-                            { properties: { STATE_NAME: "New Hampshire" }, geometry: { coordinates: [[[-72.557247, 42.69699], [-70.610621, 42.69699], [-70.610621, 45.305476], [-72.557247, 45.305476], [-72.557247, 42.69699]]] } },
-                            { properties: { STATE_NAME: "New Jersey" }, geometry: { coordinates: [[[-75.559614, 38.928519], [-73.891484, 38.928519], [-73.891484, 41.357423], [-75.559614, 41.357423], [-75.559614, 38.928519]]] } },
-                            { properties: { STATE_NAME: "New Mexico" }, geometry: { coordinates: [[[-109.050431, 31.332177], [-103.002006, 31.332177], [-103.002006, 37.000232], [-109.050431, 37.000232], [-109.050431, 31.332177]]] } },
-                            { properties: { STATE_NAME: "New York" }, geometry: { coordinates: [[[-79.762152, 40.496103], [-71.777491, 40.496103], [-71.777491, 45.015865], [-79.762152, 45.015865], [-79.762152, 40.496103]]] } },
-                            { properties: { STATE_NAME: "North Carolina" }, geometry: { coordinates: [[[-84.321869, 33.841995], [-75.460621, 33.841995], [-75.460621, 36.588117], [-84.321869, 36.588117], [-84.321869, 33.841995]]] } },
-                            { properties: { STATE_NAME: "North Dakota" }, geometry: { coordinates: [[[-104.047534, 45.935054], [-96.554507, 45.935054], [-96.554507, 49.000239], [-104.047534, 49.000239], [-104.047534, 45.935054]]] } },
-                            { properties: { STATE_NAME: "Ohio" }, geometry: { coordinates: [[[-84.820159, 38.403202], [-80.518693, 38.403202], [-80.518693, 41.977523], [-84.820159, 41.977523], [-84.820159, 38.403202]]] } },
-                            { properties: { STATE_NAME: "Oklahoma" }, geometry: { coordinates: [[[-103.002006, 33.619217], [-94.430662, 33.619217], [-94.430662, 37.002206], [-103.002006, 37.002206], [-103.002006, 33.619217]]] } },
-                            { properties: { STATE_NAME: "Oregon" }, geometry: { coordinates: [[[-124.566244, 41.991794], [-116.463504, 41.991794], [-116.463504, 46.292035], [-124.566244, 46.292035], [-124.566244, 41.991794]]] } },
-                            { properties: { STATE_NAME: "Pennsylvania" }, geometry: { coordinates: [[[-80.524269, 39.7198], [-74.689516, 39.7198], [-74.689516, 42.26986], [-80.524269, 42.26986], [-80.524269, 39.7198]]] } },
-                            { properties: { STATE_NAME: "Rhode Island" }, geometry: { coordinates: [[[-71.907263, 41.095244], [-71.12057, 41.095244], [-71.12057, 42.018798], [-71.907263, 42.018798], [-71.907263, 41.095244]]] } },
-                            { properties: { STATE_NAME: "South Carolina" }, geometry: { coordinates: [[[-83.35391, 32.0346], [-78.54203, 32.0346], [-78.54203, 35.215402], [-83.35391, 35.215402], [-83.35391, 32.0346]]] } },
-                            { properties: { STATE_NAME: "South Dakota" }, geometry: { coordinates: [[[-104.057698, 42.479635], [-96.436589, 42.479635], [-96.436589, 45.94545], [-104.057698, 45.94545], [-104.057698, 42.479635]]] } },
-                            { properties: { STATE_NAME: "Tennessee" }, geometry: { coordinates: [[[-90.310298, 34.982995], [-81.6469, 34.982995], [-81.6469, 36.678118], [-90.310298, 36.678118], [-90.310298, 34.982995]]] } },
-                            { properties: { STATE_NAME: "Texas" }, geometry: { coordinates: [[[-106.645646, 25.837377], [-93.508292, 25.837377], [-93.508292, 36.500704], [-106.645646, 36.500704], [-106.645646, 25.837377]]] } },
-                            { properties: { STATE_NAME: "Utah" }, geometry: { coordinates: [[[-114.052962, 36.997968], [-109.041058, 36.997968], [-109.041058, 42.001567], [-114.052962, 42.001567], [-114.052962, 36.997968]]] } },
-                            { properties: { STATE_NAME: "Vermont" }, geometry: { coordinates: [[[-73.43774, 42.726853], [-71.465288, 42.726853], [-71.465288, 45.016659], [-73.43774, 45.016659], [-73.43774, 42.726853]]] } },
-                            { properties: { STATE_NAME: "Virginia" }, geometry: { coordinates: [[[-83.675395, 36.540738], [-75.242266, 36.540738], [-75.242266, 39.466012], [-83.675395, 39.466012], [-83.675395, 36.540738]]] } },
-                            { properties: { STATE_NAME: "Washington" }, geometry: { coordinates: [[[-124.763068, 45.543541], [-116.915989, 45.543541], [-116.915989, 49.002494], [-124.763068, 49.002494], [-124.763068, 45.543541]]] } },
-                            { properties: { STATE_NAME: "West Virginia" }, geometry: { coordinates: [[[-82.644739, 37.201483], [-77.719519, 37.201483], [-77.719519, 40.638801], [-82.644739, 40.638801], [-82.644739, 37.201483]]] } },
-                            { properties: { STATE_NAME: "Wisconsin" }, geometry: { coordinates: [[[-92.888114, 42.491983], [-86.250356, 42.491983], [-86.250356, 47.080621], [-92.888114, 47.080621], [-92.888114, 42.491983]]] } },
-                            { properties: { STATE_NAME: "Wyoming" }, geometry: { coordinates: [[[-111.056888, 40.994746], [-104.052162, 40.994746], [-104.052162, 45.005904], [-111.056888, 45.005904], [-111.056888, 40.994746]]] } }
+                            // Removed state boundaries - they're not very useful and cause visual clutter
+                            // County boundaries are much more useful for search
                         ]
                     };
                     
@@ -929,15 +881,15 @@
                                     spatialReference: { wkid: 4326 }
                                 });
                                 
-                                                                    const graphic = new Graphic({
-                                        geometry: polygon,
-                                        symbol: new SimpleFillSymbol({
-                                            color: [0, 255, 0, 0.3], // More visible green
-                                            outline: new SimpleLineSymbol({
-                                                color: [0, 255, 0, 0.8], // More visible outline
-                                                width: 2
-                                            })
-                                        }),
+                                const graphic = new Graphic({
+                                    geometry: polygon,
+                                    symbol: new SimpleFillSymbol({
+                                        color: [0, 255, 0, 0.05], // Very subtle green (almost invisible)
+                                        outline: new SimpleLineSymbol({
+                                            color: [0, 255, 0, 0.2], // Very subtle outline
+                                            width: 1
+                                        })
+                                    }),
                                     attributes: {
                                         STATE_NAME: feature.properties.STATE_NAME,
                                         layerType: "USGS",
@@ -946,14 +898,13 @@
                                     }
                                 });
                                 
-                                                                    // Add to a separate layer for states
-                                    if (!stateLayer) {
-                                        stateLayer = new GraphicsLayer({
-                                            title: "US States",
-                                            visible: false  // Hidden by default
-                                        });
-                                        map.add(stateLayer);
-                                    }
+                                if (!stateLayer) {
+                                    stateLayer = new GraphicsLayer({
+                                        title: "US States",
+                                        visible: false  // Hidden by default
+                                    });
+                                    map.add(stateLayer);
+                                }
                                 stateLayer.add(graphic);
                                 allGraphics.push(graphic);
                                 stateCount++;
@@ -962,8 +913,8 @@
                             console.error('State geometry error:', geoError);
                         }
                     });
-                    updateStatus(`✅ Loaded ${stateCount} US states`, 'success');
-                    console.log(`Added ${stateCount} states to search database`);
+                    updateStatus(`✅ No state boundaries loaded (counties are more useful)`, 'success');
+                    console.log(`No states loaded - focusing on counties`);
                     
                     // Final debug check
                     const finalPSAPCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
