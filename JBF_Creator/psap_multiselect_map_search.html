@@ -246,6 +246,7 @@
         <button onclick="toggleCountyLayer()">Toggle Counties</button>
         <button onclick="toggleStateLayer()">Toggle States</button>
         <button onclick="testCountySearch()">Test Monmouth Search</button>
+        <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
         
         <!-- USGS Layer Selector -->
         <div class="layer-selector">
@@ -748,12 +749,23 @@
                             }
                         });
                         updateStatus(`✅ Loaded ${countyCount} US counties`, 'success');
+                        console.log(`Added ${countyCount} counties to search database`);
+                    } else {
+                        updateStatus('❌ No county features found in response', 'error');
+                        console.error('Counties response:', countiesData);
                     }
                     
                     // Load all US states
                     const statesUrl = "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/USA_States/FeatureServer/0/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=100";
+                    updateStatus('Fetching US states data...', 'info');
                     const statesResponse = await fetch(statesUrl);
+                    
+                    if (!statesResponse.ok) {
+                        throw new Error(`States HTTP ${statesResponse.status}`);
+                    }
+                    
                     const statesData = await statesResponse.json();
+                    updateStatus(`Received states data: ${statesData.features ? statesData.features.length : 0} features`, 'info');
                     
                     if (statesData.features && statesData.features.length > 0) {
                         let stateCount = 0;
@@ -799,10 +811,97 @@
                             }
                         });
                         updateStatus(`✅ Loaded ${stateCount} US states`, 'success');
+                        console.log(`Added ${stateCount} states to search database`);
+                    } else {
+                        updateStatus('❌ No state features found in response', 'error');
+                        console.error('States response:', statesData);
                     }
+                    
+                    // Final debug check
+                    const finalPSAPCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
+                    const finalUSGSCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
+                    console.log(`Final database after comprehensive load: ${allGraphics.length} total (${finalPSAPCount} PSAP, ${finalUSGSCount} USGS)`);
                     
                 } catch (error) {
                     updateStatus(`❌ Error loading comprehensive data: ${error.message}`, 'error');
+                    console.error('Comprehensive data loading error:', error);
+                    
+                    // Fallback: Try loading a simple test dataset
+                    updateStatus('Trying fallback data loading...', 'info');
+                    await loadFallbackUSGSData();
+                }
+            }
+
+            // Fallback function to load USGS data using a different approach
+            async function loadFallbackUSGSData() {
+                try {
+                    updateStatus('Loading fallback USGS data...', 'info');
+                    
+                    // Create some test county data manually
+                    const testCounties = [
+                        { name: "Monmouth", state: "New Jersey", lat: 40.28, lon: -74.15 },
+                        { name: "Monmouth", state: "Illinois", lat: 40.91, lon: -90.64 },
+                        { name: "Essex", state: "New Jersey", lat: 40.79, lon: -74.25 },
+                        { name: "Bergen", state: "New Jersey", lat: 40.96, lon: -74.07 }
+                    ];
+                    
+                    let countyCount = 0;
+                    testCounties.forEach(county => {
+                        try {
+                            // Create a simple polygon for the county (approximate)
+                            const rings = [[
+                                [county.lon - 0.1, county.lat - 0.1],
+                                [county.lon + 0.1, county.lat - 0.1],
+                                [county.lon + 0.1, county.lat + 0.1],
+                                [county.lon - 0.1, county.lat + 0.1],
+                                [county.lon - 0.1, county.lat - 0.1]
+                            ]];
+                            
+                            const polygon = new Polygon({
+                                rings: rings,
+                                spatialReference: { wkid: 4326 }
+                            });
+                            
+                            const graphic = new Graphic({
+                                geometry: polygon,
+                                symbol: new SimpleFillSymbol({
+                                    color: [255, 255, 0, 0.3],
+                                    outline: new SimpleLineSymbol({
+                                        color: [255, 255, 0, 0.8],
+                                        width: 2
+                                    })
+                                }),
+                                attributes: {
+                                    NAME: county.name,
+                                    STATE_NAME: county.state,
+                                    layerType: "USGS",
+                                    layerName: "Test Counties",
+                                    displayName: `${county.name}, ${county.state}`
+                                }
+                            });
+                            
+                            if (!countyLayer) {
+                                countyLayer = new GraphicsLayer({
+                                    title: "Test Counties",
+                                    visible: true
+                                });
+                                map.add(countyLayer);
+                            }
+                            countyLayer.add(graphic);
+                            allGraphics.push(graphic);
+                            countyCount++;
+                            
+                        } catch (geoError) {
+                            console.error('Test county geometry error:', geoError);
+                        }
+                    });
+                    
+                    updateStatus(`✅ Loaded ${countyCount} test counties as fallback`, 'success');
+                    console.log(`Added ${countyCount} test counties to search database`);
+                    
+                } catch (error) {
+                    updateStatus(`❌ Fallback loading also failed: ${error.message}`, 'error');
+                    console.error('Fallback loading error:', error);
                 }
             }
 
@@ -1133,6 +1232,7 @@
             window.toggleCountyLayer = toggleCountyLayer;
             window.toggleStateLayer = toggleStateLayer;
             window.testCountySearch = testCountySearch; // Add the new test function
+            window.loadFallbackUSGSData = loadFallbackUSGSData; // Add the fallback function
             
             updateStatus('Map ready! Loading PSAP data automatically...', 'info');
             
