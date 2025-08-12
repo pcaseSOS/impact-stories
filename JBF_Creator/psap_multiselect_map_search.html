@@ -550,6 +550,7 @@
                     psapLayer.visible = true;
                     console.log('PSAP layer visibility set to:', psapLayer.visible);
                     updateStatus('PSAP layer shown for selected feature', 'info');
+                    highlightLayerTemporarily(psapLayer, 'PSAP');
                 } else if (attributes.layerType === "USGS") {
                     console.log('USGS feature detected, layerName:', attributes.layerName);
                     if (attributes.layerName === "US Counties") {
@@ -557,6 +558,7 @@
                             countyLayer.visible = true;
                             console.log('County layer visibility set to:', countyLayer.visible);
                             updateStatus('County layer shown for selected feature', 'info');
+                            highlightLayerTemporarily(countyLayer, 'County');
                         } else {
                             console.log('County layer not found!');
                             updateStatus('County layer not available', 'error');
@@ -566,6 +568,7 @@
                             stateLayer.visible = true;
                             console.log('State layer visibility set to:', stateLayer.visible);
                             updateStatus('State layer shown for selected feature', 'info');
+                            highlightLayerTemporarily(stateLayer, 'State');
                         } else {
                             console.log('State layer not found!');
                             updateStatus('State layer not available', 'error');
@@ -575,6 +578,7 @@
                             countyLayer.visible = true;
                             console.log('Test county layer visibility set to:', countyLayer.visible);
                             updateStatus('Test county layer shown for selected feature', 'info');
+                            highlightLayerTemporarily(countyLayer, 'Test County');
                         } else {
                             console.log('Test county layer not found!');
                             updateStatus('Test county layer not available', 'error');
@@ -585,6 +589,34 @@
                 } else {
                     console.log('Unknown layer type:', attributes.layerType);
                 }
+            }
+
+            // Function to temporarily highlight a layer
+            function highlightLayerTemporarily(layer, layerName) {
+                // Flash the layer with a bright color for 2 seconds
+                const originalGraphics = layer.graphics.toArray();
+                
+                // Create bright highlight graphics
+                const highlightGraphics = originalGraphics.map(graphic => {
+                    const highlightGraphic = graphic.clone();
+                    highlightGraphic.symbol = new SimpleFillSymbol({
+                        color: [255, 255, 255, 0.8], // Bright white
+                        outline: new SimpleLineSymbol({
+                            color: [255, 0, 0, 1], // Bright red outline
+                            width: 3
+                        })
+                    });
+                    return highlightGraphic;
+                });
+                
+                // Add highlight graphics
+                highlightGraphics.forEach(g => layer.add(g));
+                
+                // Remove highlight after 2 seconds
+                setTimeout(() => {
+                    highlightGraphics.forEach(g => layer.remove(g));
+                    updateStatus(`${layerName} layer highlighted and now visible`, 'success');
+                }, 2000);
             }
 
             // Function to clear search
@@ -785,10 +817,10 @@
                                     const graphic = new Graphic({
                                         geometry: polygon,
                                         symbol: new SimpleFillSymbol({
-                                            color: [255, 255, 0, 0.1], // Very light yellow
+                                            color: [255, 255, 0, 0.3], // More visible yellow
                                             outline: new SimpleLineSymbol({
-                                                color: [255, 255, 0, 0.3],
-                                                width: 1
+                                                color: [255, 255, 0, 0.8], // More visible outline
+                                                width: 2
                                             })
                                         }),
                                         attributes: {
@@ -894,15 +926,15 @@
                                     spatialReference: { wkid: 4326 }
                                 });
                                 
-                                const graphic = new Graphic({
-                                    geometry: polygon,
-                                    symbol: new SimpleFillSymbol({
-                                        color: [0, 255, 0, 0.1], // Very light green
-                                        outline: new SimpleLineSymbol({
-                                            color: [0, 255, 0, 0.3],
-                                            width: 1
-                                        })
-                                    }),
+                                                                    const graphic = new Graphic({
+                                        geometry: polygon,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [0, 255, 0, 0.3], // More visible green
+                                            outline: new SimpleLineSymbol({
+                                                color: [0, 255, 0, 0.8], // More visible outline
+                                                width: 2
+                                            })
+                                        }),
                                     attributes: {
                                         STATE_NAME: feature.properties.STATE_NAME,
                                         layerType: "USGS",
@@ -1426,6 +1458,7 @@
             window.testCountySearch = testCountySearch; // Add the new test function
             window.loadFallbackUSGSData = loadFallbackUSGSData; // Add the fallback function
             window.debugLayerStatus = debugLayerStatus; // Add the debug function
+            window.highlightLayerTemporarily = highlightLayerTemporarily; // Add the highlight function
             
             updateStatus('Map ready! Loading PSAP data automatically (layers hidden by default)...', 'info');
             
