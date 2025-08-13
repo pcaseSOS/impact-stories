@@ -248,7 +248,7 @@
         <button onclick="showAllLayers()">Show All Layers</button>
         <button onclick="hideAllLayers()">Hide All Layers</button>
         <button onclick="testCountySearch()">Test Monmouth Search</button>
-        <button onclick="showBoundariesForCurrentView()">Show Boundaries for Current View</button>
+        <button onclick="showBoundariesForCurrentView()">Load PSAP Data for Current Area</button>
         <button onclick="clearAllBoundaries()">Clear All Boundaries</button>
         <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
         <button onclick="debugLayerStatus()">Debug Layer Status</button>
@@ -275,7 +275,11 @@
         </div>
         
         <div style="margin-top: 10px; font-size: 11px; color: #001559;">
-            Click on any PSAP boundary to view details
+            <strong>How to use:</strong><br>
+            • PSAP data loads automatically when you zoom to an area<br>
+            • Use search box for specific locations<br>
+            • Select USGS layers from dropdown for county/state boundaries<br>
+            • Click on any boundary to view details
         </div>
     </div>
     
@@ -1042,7 +1046,7 @@
                 // Show final status
                 const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
                 const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                updateStatus(`📊 Final Database: ${allGraphics.length} total features (${psapCount} PSAP, ${usgsCount} USGS) - Zoom to an area and click "Show Boundaries for Current View"`, 'success');
+                updateStatus(`📊 Final Database: ${allGraphics.length} total features (${psapCount} PSAP, ${usgsCount} USGS) - PSAP data loads automatically when you zoom to an area`, 'success');
             }
 
             // Function to clear the map
@@ -1089,7 +1093,7 @@
                     if (view.zoom > 6) {
                         showBoundariesForCurrentView();
                     }
-                }, 1000); // Wait 1 second after user stops moving
+                }, 1500); // Wait 1.5 seconds after user stops moving
             });
 
             // Add click event handler
@@ -1439,33 +1443,50 @@
                 const psapFeatures = visibleGraphics.filter(g => g.attributes.layerType === "PSAP");
                 const countyFeatures = visibleGraphics.filter(g => g.attributes.layerType === "USGS" && g.attributes.layerName === "US Counties");
                 
-                // Show PSAP features
+                // Always try to show PSAP features first
                 if (psapFeatures.length > 0) {
                     psapFeatures.forEach(graphic => {
                         psapLayer.add(graphic);
                     });
                     psapLayer.visible = true;
-                    updateStatus(`✅ Showing ${psapFeatures.length} PSAP boundaries`, 'success');
-                }
-                
-                // Show county features
-                if (countyFeatures.length > 0) {
-                    if (!countyLayer) {
-                        countyLayer = new GraphicsLayer({
-                            title: "US Counties",
-                            visible: true
-                        });
-                        map.add(countyLayer);
-                    }
+                    updateStatus(`✅ Showing ${psapFeatures.length} PSAP boundaries for current area`, 'success');
                     
-                    countyFeatures.forEach(graphic => {
-                        countyLayer.add(graphic);
-                    });
-                    updateStatus(`✅ Showing ${countyFeatures.length} county boundaries`, 'success');
-                }
-                
-                if (psapFeatures.length === 0 && countyFeatures.length === 0) {
-                    updateStatus('No boundaries found in current view - try zooming to a different area', 'info');
+                    // Also show county boundaries for context
+                    if (countyFeatures.length > 0) {
+                        if (!countyLayer) {
+                            countyLayer = new GraphicsLayer({
+                                title: "US Counties",
+                                visible: true
+                            });
+                            map.add(countyLayer);
+                        }
+                        
+                        countyFeatures.forEach(graphic => {
+                            countyLayer.add(graphic);
+                        });
+                        updateStatus(`✅ Also showing ${countyFeatures.length} county boundaries for context`, 'success');
+                    }
+                } else {
+                    // No PSAP data in this area - guide user to search USGS layers
+                    updateStatus('❌ No PSAP data found in this area', 'error');
+                    updateStatus('💡 Try searching for specific locations using the search box above', 'info');
+                    updateStatus('💡 Or select a USGS layer from the dropdown to see county/state boundaries', 'info');
+                    
+                    // Optionally show county boundaries anyway for reference
+                    if (countyFeatures.length > 0) {
+                        if (!countyLayer) {
+                            countyLayer = new GraphicsLayer({
+                                title: "US Counties",
+                                visible: true
+                            });
+                            map.add(countyLayer);
+                        }
+                        
+                        countyFeatures.forEach(graphic => {
+                            countyLayer.add(graphic);
+                        });
+                        updateStatus(`✅ Showing ${countyFeatures.length} county boundaries for reference`, 'info');
+                    }
                 }
             }
 
@@ -1500,7 +1521,7 @@
             window.showBoundariesForCurrentView = showBoundariesForCurrentView; // Add the new boundary function
             window.clearAllBoundaries = clearAllBoundaries; // Add the new boundary function
             
-            updateStatus('Map ready! Zoom to an area and click "Show Boundaries for Current View" to see local boundaries', 'info');
+            updateStatus('Map ready! PSAP data will load automatically when you zoom to an area. Use search box for specific locations.', 'info');
             
             // Auto-load PSAP data when page loads
             setTimeout(async () => {
