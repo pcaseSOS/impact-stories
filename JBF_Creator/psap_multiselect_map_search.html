@@ -324,14 +324,7 @@
                 center: [-98, 39]
             });
 
-            // Create graphics layer for PSAP data
-            const psapLayer = new GraphicsLayer({
-                title: "PSAP Boundaries",
-                visible: true  // Visible by default
-            });
-            map.add(psapLayer);
-
-            // Add USGS County Labels layer for geographic context
+            // Add USGS County Labels layer for geographic context (behind PSAP layers)
             const countyLabelsLayer = new FeatureLayer({
                 url: "https://carto.nationalmap.gov/arcgis/rest/services/govunits/mapserver/3",
                 title: "USGS County Labels",
@@ -339,6 +332,13 @@
                 visible: true
             });
             map.add(countyLabelsLayer);
+
+            // Create graphics layer for PSAP data (on top of USGS layers)
+            const psapLayer = new GraphicsLayer({
+                title: "PSAP Boundaries",
+                visible: true  // Visible by default
+            });
+            map.add(psapLayer);
 
             // Store all loaded graphics for searching
             let allGraphics = [];
@@ -851,7 +851,8 @@
                                             title: "US Counties",
                                             visible: true  // Visible by default
                                         });
-                                        map.add(countyLayer);
+                                        // Add county layer behind PSAP layers (at index 0)
+                                        map.add(countyLayer, 0);
                                     }
                                     countyLayer.add(graphic);
                                     allGraphics.push(graphic);
@@ -993,7 +994,8 @@
                                     title: "Test Counties",
                                     visible: false  // Hidden by default
                                 });
-                                map.add(countyLayer);
+                                // Add county layer behind PSAP layers (at index 0)
+                                map.add(countyLayer, 0);
                             }
                             countyLayer.add(graphic);
                             allGraphics.push(graphic);
@@ -1201,7 +1203,8 @@
                         loadUSGSFeaturesToSearch(currentUSGSLayer, layerName);
                     });
                     
-                    map.add(currentUSGSLayer);
+                    // Add USGS layer behind PSAP layers (at index 0 to put it behind everything)
+                    map.add(currentUSGSLayer, 0);
                     updateStatus(`Added USGS layer: ${layerName}`, 'success');
                 }
             }
@@ -1471,7 +1474,8 @@
                                 title: "US Counties",
                                 visible: true  // Visible by default
                             });
-                            map.add(countyLayer);
+                            // Add county layer behind PSAP layers (at index 0)
+                            map.add(countyLayer, 0);
                         }
                         
                         countyFeatures.forEach(graphic => {
@@ -1492,7 +1496,8 @@
                                 title: "US Counties",
                                 visible: true  // Visible by default
                             });
-                            map.add(countyLayer);
+                            // Add county layer behind PSAP layers (at index 0)
+                            map.add(countyLayer, 0);
                         }
                         
                         countyFeatures.forEach(graphic => {
