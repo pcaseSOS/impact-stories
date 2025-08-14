@@ -253,6 +253,8 @@
         <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
         <button onclick="debugLayerStatus()">Debug Layer Status</button>
         <button onclick="hideAllLayers()">Hide All Layers</button>
+        <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
+        <button onclick="showLogs()">View Logs</button>
         
         <!-- USGS Layer Selector -->
         <div class="layer-selector">
@@ -351,6 +353,8 @@
             let searchResults = [];
             let countyLayer = null;
             let stateLayer = null;
+            let logMessages = []; // Array to store log messages
+            let isLoggingEnabled = false; // Flag to control console logging
 
             // Function to convert coordinates if needed
             function convertCoordinates(rings, fromWkid) {
@@ -402,16 +406,16 @@
                 const term = searchTerm.toLowerCase();
                 
                 // Debug: Log search database status
-                console.log(`Searching ${allGraphics.length} features for: "${searchTerm}"`);
+                logMessage(`Searching ${allGraphics.length} features for: "${searchTerm}"`, 'info');
                 const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
                 const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                console.log(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features`);
+                logMessage(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features`, 'info');
                 
                 // Debug: Show some USGS features if we have them
                 if (usgsCount > 0) {
                     const sampleUSGS = allGraphics.filter(g => g.attributes.layerType === "USGS").slice(0, 2);
                     sampleUSGS.forEach((g, i) => {
-                        console.log(`USGS Sample ${i+1}:`, g.attributes);
+                        logMessage(`USGS Sample ${i+1}: ${JSON.stringify(g.attributes)}`, 'info');
                     });
                 }
 
@@ -507,7 +511,7 @@
                     statsDiv.textContent = `Found ${results.length} result${results.length !== 1 ? 's' : ''}`;
                     
                     // Show relevant layers based on search results
-                    console.log('Search results found, calling showRelevantLayers with:', results.length, 'results');
+                    logMessage(`Search results found, calling showRelevantLayers with: ${results.length} results`, 'info');
                     showRelevantLayers(results);
                 }
 
@@ -552,50 +556,50 @@
             // Function to show the relevant layer for a specific graphic
             function showLayerForGraphic(graphic) {
                 const attributes = graphic.attributes;
-                console.log('showLayerForGraphic called with:', attributes);
+                logMessage(`showLayerForGraphic called with: ${JSON.stringify(attributes)}`, 'info');
                 
                 if (attributes.layerType === "PSAP") {
                     psapLayer.visible = true;
-                    console.log('PSAP layer visibility set to:', psapLayer.visible);
+                    logMessage(`PSAP layer visibility set to: ${psapLayer.visible}`, 'info');
                     updateStatus('PSAP layer shown for selected feature', 'info');
                     highlightLayerTemporarily(psapLayer, 'PSAP');
                 } else if (attributes.layerType === "USGS") {
-                    console.log('USGS feature detected, layerName:', attributes.layerName);
+                    logMessage(`USGS feature detected, layerName: ${attributes.layerName}`, 'info');
                     if (attributes.layerName === "US Counties") {
                         if (countyLayer) {
                             countyLayer.visible = true;
-                            console.log('County layer visibility set to:', countyLayer.visible);
+                            logMessage(`County layer visibility set to: ${countyLayer.visible}`, 'info');
                             updateStatus('County layer shown for selected feature', 'info');
                             highlightLayerTemporarily(countyLayer, 'County');
                         } else {
-                            console.log('County layer not found!');
+                            logMessage('County layer not found!', 'error');
                             updateStatus('County layer not available', 'error');
                         }
                     } else if (attributes.layerName === "US States") {
                         if (stateLayer) {
                             stateLayer.visible = true;
-                            console.log('State layer visibility set to:', stateLayer.visible);
+                            logMessage(`State layer visibility set to: ${stateLayer.visible}`, 'info');
                             updateStatus('State layer shown for selected feature', 'info');
                             highlightLayerTemporarily(stateLayer, 'State');
                         } else {
-                            console.log('State layer not found!');
+                            logMessage('State layer not found!', 'error');
                             updateStatus('State layer not available', 'error');
                         }
                     } else if (attributes.layerName === "Test Counties") {
                         if (countyLayer) {
                             countyLayer.visible = true;
-                            console.log('Test county layer visibility set to:', countyLayer.visible);
+                            logMessage(`Test county layer visibility set to: ${countyLayer.visible}`, 'info');
                             updateStatus('Test county layer shown for selected feature', 'info');
                             highlightLayerTemporarily(countyLayer, 'Test County');
                         } else {
-                            console.log('Test county layer not found!');
+                            logMessage('Test county layer not found!', 'error');
                             updateStatus('Test county layer not available', 'error');
                         }
                     } else {
-                        console.log('Unknown USGS layer name:', attributes.layerName);
+                        logMessage(`Unknown USGS layer name: ${attributes.layerName}`, 'warning');
                     }
                 } else {
-                    console.log('Unknown layer type:', attributes.layerType);
+                    logMessage(`Unknown layer type: ${attributes.layerType}`, 'warning');
                 }
             }
 
@@ -805,10 +809,10 @@
                     updateStatus(`Received counties data: ${countiesData.features ? countiesData.features.length : 0} features`, 'info');
                     
                     if (countiesData.features && countiesData.features.length > 0) {
-                        // Debug: Show the first county's attributes
-                        if (countiesData.features.length > 0) {
-                            console.log('First county attributes:', countiesData.features[0].properties);
-                        }
+                                            // Debug: Show the first county's attributes
+                    if (countiesData.features.length > 0) {
+                        logMessage(`First county attributes: ${JSON.stringify(countiesData.features[0].properties)}`, 'info');
+                    }
                         
                         let countyCount = 0;
                         countiesData.features.forEach(feature => {
@@ -854,12 +858,12 @@
                                     allGraphics.push(graphic);
                                     countyCount++;
                                 }
-                            } catch (geoError) {
-                                console.error('County geometry error:', geoError);
-                            }
+                                                    } catch (geoError) {
+                            logMessage(`County geometry error: ${geoError.message}`, 'error');
+                        }
                         });
                         updateStatus(`✅ Loaded ${countyCount} US counties`, 'success');
-                        console.log(`Added ${countyCount} counties to search database`);
+                        logMessage(`Added ${countyCount} counties to search database`, 'success');
                     } else {
                         updateStatus('❌ No county features found in response', 'error');
                         console.error('Counties response:', countiesData);
@@ -916,20 +920,20 @@
                                 stateCount++;
                             }
                         } catch (geoError) {
-                            console.error('State geometry error:', geoError);
+                            logMessage(`State geometry error: ${geoError.message}`, 'error');
                         }
                     });
                     updateStatus(`✅ No state boundaries loaded (counties are more useful)`, 'success');
-                    console.log(`No states loaded - focusing on counties`);
+                    logMessage(`No states loaded - focusing on counties`, 'info');
                     
                     // Final debug check
                     const finalPSAPCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
                     const finalUSGSCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                    console.log(`Final database after comprehensive load: ${allGraphics.length} total (${finalPSAPCount} PSAP, ${finalUSGSCount} USGS)`);
+                    logMessage(`Final database after comprehensive load: ${allGraphics.length} total (${finalPSAPCount} PSAP, ${finalUSGSCount} USGS)`, 'success');
                     
                 } catch (error) {
                     updateStatus(`❌ Error loading comprehensive data: ${error.message}`, 'error');
-                    console.error('Comprehensive data loading error:', error);
+                    logMessage(`Comprehensive data loading error: ${error.message}`, 'error');
                     
                     // Fallback: Try loading a simple test dataset
                     updateStatus('Trying fallback data loading...', 'info');
@@ -997,16 +1001,16 @@
                             countyCount++;
                             
                         } catch (geoError) {
-                            console.error('Test county geometry error:', geoError);
+                            logMessage(`Test county geometry error: ${geoError.message}`, 'error');
                         }
                     });
                     
-                    updateStatus(`✅ Loaded ${countyCount} test counties as fallback`, 'success');
-                    console.log(`Added ${countyCount} test counties to search database`);
+                                            updateStatus(`✅ Loaded ${countyCount} test counties as fallback`, 'success');
+                        logMessage(`Added ${countyCount} test counties to search database`, 'success');
                     
                 } catch (error) {
                     updateStatus(`❌ Fallback loading also failed: ${error.message}`, 'error');
-                    console.error('Fallback loading error:', error);
+                    logMessage(`Fallback loading error: ${error.message}`, 'error');
                 }
             }
 
@@ -1345,27 +1349,27 @@
 
             // Function to show relevant layers based on search results
             function showRelevantLayers(results) {
-                console.log('showRelevantLayers called with', results.length, 'results');
+                logMessage(`showRelevantLayers called with ${results.length} results`, 'info');
                 const hasPSAP = results.some(r => r.graphic.attributes.layerType === "PSAP");
                 const hasCounties = results.some(r => r.graphic.attributes.layerType === "USGS" && r.graphic.attributes.layerName === "US Counties");
                 const hasStates = results.some(r => r.graphic.attributes.layerType === "USGS" && r.graphic.attributes.layerName === "US States");
                 
-                console.log('Layer detection:', { hasPSAP, hasCounties, hasStates });
+                logMessage(`Layer detection: ${JSON.stringify({ hasPSAP, hasCounties, hasStates })}`, 'info');
                 
                 // Show PSAP layer if PSAP results found
                 if (hasPSAP) {
                     psapLayer.visible = true;
-                    console.log('PSAP layer visibility set to:', psapLayer.visible);
+                    logMessage(`PSAP layer visibility set to: ${psapLayer.visible}`, 'info');
                     updateStatus('PSAP layer shown for search results', 'info');
                 }
                 
                 // Show county layer if county results found
                 if (hasCounties && countyLayer) {
                     countyLayer.visible = true;
-                    console.log('County layer visibility set to:', countyLayer.visible);
+                    logMessage(`County layer visibility set to: ${countyLayer.visible}`, 'info');
                     updateStatus('County layer shown for search results', 'info');
                 } else if (hasCounties && !countyLayer) {
-                    console.log('County results found but countyLayer is null!');
+                    logMessage('County results found but countyLayer is null!', 'error');
                     updateStatus('County layer not available', 'error');
                 }
                 
@@ -1402,19 +1406,19 @@
 
             // Function to debug layer status
             function debugLayerStatus() {
-                console.log('=== LAYER STATUS DEBUG ===');
-                console.log('PSAP Layer exists:', !!psapLayer);
-                console.log('PSAP Layer visible:', psapLayer ? psapLayer.visible : 'N/A');
-                console.log('County Layer exists:', !!countyLayer);
-                console.log('County Layer visible:', countyLayer ? countyLayer.visible : 'N/A');
-                console.log('State Layer exists:', !!stateLayer);
-                console.log('State Layer visible:', stateLayer ? stateLayer.visible : 'N/A');
-                console.log('Total graphics in database:', allGraphics.length);
-                console.log('PSAP graphics:', allGraphics.filter(g => g.attributes.layerType === "PSAP").length);
-                console.log('USGS graphics:', allGraphics.filter(g => g.attributes.layerType === "USGS").length);
-                console.log('========================');
+                logMessage('=== LAYER STATUS DEBUG ===', 'info');
+                logMessage(`PSAP Layer exists: ${!!psapLayer}`, 'info');
+                logMessage(`PSAP Layer visible: ${psapLayer ? psapLayer.visible : 'N/A'}`, 'info');
+                logMessage(`County Layer exists: ${!!countyLayer}`, 'info');
+                logMessage(`County Layer visible: ${countyLayer ? countyLayer.visible : 'N/A'}`, 'info');
+                logMessage(`State Layer exists: ${!!stateLayer}`, 'info');
+                logMessage(`State Layer visible: ${stateLayer ? stateLayer.visible : 'N/A'}`, 'info');
+                logMessage(`Total graphics in database: ${allGraphics.length}`, 'info');
+                logMessage(`PSAP graphics: ${allGraphics.filter(g => g.attributes.layerType === "PSAP").length}`, 'info');
+                logMessage(`USGS graphics: ${allGraphics.filter(g => g.attributes.layerType === "USGS").length}`, 'info');
+                logMessage('========================', 'info');
                 
-                updateStatus('Layer status logged to console', 'info');
+                updateStatus('Layer status logged - click "View Logs" to see details', 'info');
             }
 
             // Function to show boundaries for current map view
@@ -1423,7 +1427,7 @@
                 
                 // Get the current map extent
                 const extent = view.extent;
-                console.log('Current map extent:', extent);
+                logMessage(`Current map extent: ${JSON.stringify(extent)}`, 'info');
                 
                 // Clear existing graphics
                 psapLayer.removeAll();
@@ -1437,7 +1441,7 @@
                     return false;
                 });
                 
-                console.log(`Found ${visibleGraphics.length} features in current view`);
+                logMessage(`Found ${visibleGraphics.length} features in current view`, 'info');
                 
                 // Group by layer type
                 const psapFeatures = visibleGraphics.filter(g => g.attributes.layerType === "PSAP");
@@ -1499,6 +1503,73 @@
                 updateStatus('All boundaries cleared', 'info');
             }
 
+            // Function to log messages (hidden from console by default)
+            function logMessage(message, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = {
+                    timestamp: timestamp,
+                    message: message,
+                    type: type
+                };
+                logMessages.push(logEntry);
+                
+                // Only log to console if debugging is enabled
+                if (isLoggingEnabled) {
+                    console.log(`[${timestamp}] ${message}`);
+                }
+            }
+
+            // Function to enable/disable console logging
+            function toggleLogging() {
+                isLoggingEnabled = !isLoggingEnabled;
+                const button = document.getElementById('toggleLoggingBtn');
+                if (button) {
+                    button.textContent = isLoggingEnabled ? 'Disable Logging' : 'Enable Logging';
+                    button.style.backgroundColor = isLoggingEnabled ? '#FF6B6B' : '#29A8DD';
+                }
+                updateStatus(`Console logging ${isLoggingEnabled ? 'enabled' : 'disabled'}`, 'info');
+            }
+
+            // Function to show all stored logs
+            function showLogs() {
+                const logWindow = window.open('', '_blank', 'width=800,height=600');
+                logWindow.document.write(`
+                    <html>
+                    <head>
+                        <title>PSAP Map Logs</title>
+                        <style>
+                            body { font-family: monospace; font-size: 12px; margin: 20px; }
+                            .log-entry { margin: 5px 0; padding: 5px; border-left: 3px solid #ccc; }
+                            .log-entry.info { border-left-color: #29A8DD; }
+                            .log-entry.success { border-left-color: #4CAF50; }
+                            .log-entry.error { border-left-color: #FF6B6B; }
+                            .log-entry.warning { border-left-color: #FFA726; }
+                            .timestamp { color: #666; font-weight: bold; }
+                            .message { margin-left: 10px; }
+                            .controls { margin-bottom: 20px; }
+                            button { margin: 5px; padding: 8px 12px; cursor: pointer; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>PSAP Map Application Logs</h2>
+                        <div class="controls">
+                            <button onclick="window.print()">Print Logs</button>
+                            <button onclick="document.getElementById('logs').innerHTML = ''">Clear Logs</button>
+                            <button onclick="window.close()">Close</button>
+                        </div>
+                        <div id="logs">
+                            ${logMessages.map(log => `
+                                <div class="log-entry ${log.type}">
+                                    <span class="timestamp">[${log.timestamp}]</span>
+                                    <span class="message">${log.message}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </body>
+                    </html>
+                `);
+            }
+
             // Make functions globally available
             window.loadPSAPData = loadPSAPData;
             window.clearMap = clearMap;
@@ -1520,6 +1591,9 @@
             window.highlightLayerTemporarily = highlightLayerTemporarily; // Add the highlight function
             window.showBoundariesForCurrentView = showBoundariesForCurrentView; // Add the new boundary function
             window.clearAllBoundaries = clearAllBoundaries; // Add the new boundary function
+            window.logMessage = logMessage; // Add the new logging function
+            window.toggleLogging = toggleLogging; // Add the new logging function
+            window.showLogs = showLogs; // Add the new logging function
             
             updateStatus('Map ready! PSAP data will load automatically when you zoom to an area. Use search box for specific locations.', 'info');
             
