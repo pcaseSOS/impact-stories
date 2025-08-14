@@ -223,12 +223,82 @@
             border-color: #005eFF;
             box-shadow: 0 0 8px rgba(0,94,255,0.3);
         }
+        
+        /* Button Groups */
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #29A8DD 0%, #005eFF 100%);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            color: #495057;
+            border: 1px solid #dee2e6;
+            padding: 8px 14px;
+            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            border-color: #adb5bd;
+        }
+        
+        .debug-tools {
+            border-top: 1px solid #dee2e6;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        
+        .debug-tools button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        
+        kbd {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 10px;
+            font-family: monospace;
+            color: #495057;
+        }
     </style>
 </head>
 <body>
     <div id="info">
         <h3>PSAP Multi-Select Map - Search</h3>
-        <div id="status">Loading map...</div>
+        <div id="status" style="display: none;"></div>
         
         <!-- Search Container -->
         <div class="search-container">
@@ -237,17 +307,32 @@
             <div id="searchStats" class="search-stats"></div>
         </div>
         
-        <button onclick="clearMap()">Clear Map</button>
-        <button onclick="zoomToUS()">Zoom to US</button>
-        <button onclick="clearSearch()">Clear Search</button>
-        <button onclick="showAllLayers()">Show All Layers</button>
-        <button onclick="hideAllLayers()">Hide All Layers</button>
-        <button onclick="toggleSelectionMode()">Toggle Selection Mode</button>
-        <button onclick="downloadSelected()">Download Selected</button>
-        <button onclick="clearSelection()">Clear Selection</button>
-        <button onclick="loadCanadianData()">Load Canadian Data</button>
-        <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
-        <button onclick="showLogs()">View Logs</button>
+        <!-- Main Action Buttons -->
+        <div class="button-group">
+            <button onclick="clearMap()" class="btn-primary">Clear Map</button>
+            <button onclick="zoomToUS()" class="btn-primary">Zoom to US</button>
+            <button onclick="clearSearch()" class="btn-primary">Clear Search</button>
+        </div>
+        
+        <!-- Layer Control Buttons -->
+        <div class="button-group">
+            <button onclick="showAllLayers()" class="btn-secondary">Show All</button>
+            <button onclick="hideAllLayers()" class="btn-secondary">Hide All</button>
+            <button onclick="loadCanadianData()" class="btn-secondary">Load Canada</button>
+        </div>
+        
+        <!-- Selection Tools -->
+        <div class="button-group">
+            <button onclick="toggleSelectionMode()" class="btn-secondary">Selection Mode</button>
+            <button onclick="downloadSelected()" class="btn-secondary">Download</button>
+            <button onclick="clearSelection()" class="btn-secondary">Clear Selection</button>
+        </div>
+        
+        <!-- Debug Tools (Hidden by default) -->
+        <div class="debug-tools" style="display: none;">
+            <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
+            <button onclick="showLogs()">View Logs</button>
+        </div>
         
         <!-- USGS Layer Selector -->
         <div class="layer-selector">
@@ -274,7 +359,8 @@
             • All layers load automatically<br>
             • Use search box for specific locations<br>
             • Select USGS layers from dropdown for additional boundaries<br>
-            • Click on any boundary to view details
+            • Click on any boundary to view details<br>
+            • Press <kbd>Ctrl+D</kbd> to show debug tools
         </div>
     </div>
     
@@ -1439,17 +1525,26 @@
                 updateStatus('Zoomed to US', 'info');
             }
 
-            // Function to update status
+            // Function to update status (hidden from user, only logged)
             function updateStatus(message, type = 'info') {
-                const statusDiv = document.getElementById('status');
-                const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
-                statusDiv.innerHTML += `<div class="status ${className}">${message}</div>`;
-                statusDiv.scrollTop = statusDiv.scrollHeight;
+                // Only log the message, don't show to user interface
+                logMessage(message, type);
             }
 
             // Add search input event listener
             document.getElementById('searchInput').addEventListener('input', function(e) {
                 searchGraphics(e.target.value);
+            });
+            
+            // Add keyboard shortcut for debug tools
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey && e.key === 'd') {
+                    e.preventDefault();
+                    const debugTools = document.querySelector('.debug-tools');
+                    if (debugTools) {
+                        debugTools.style.display = debugTools.style.display === 'none' ? 'block' : 'none';
+                    }
+                }
             });
 
             // Add automatic boundary loading when map view changes
@@ -2121,7 +2216,7 @@
             window.clearSelection = clearSelection; // Add clear selection function
             window.loadCanadianData = loadCanadianData; // Add Canadian data loading function
             
-            updateStatus('Map ready! All layers will load automatically.', 'info');
+            logMessage('Map ready! All layers will load automatically.', 'info');
             
             // Auto-load PSAP data when page loads
             setTimeout(async () => {
