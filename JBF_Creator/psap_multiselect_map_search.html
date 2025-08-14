@@ -721,7 +721,7 @@
             // Function to load a single service
             async function loadService(service) {
                 try {
-                    updateStatus(`Loading ${service.name}...`, 'info');
+                    logMessage(`Loading ${service.name}...`, 'info');
                     
                     // Remove record limit to get ALL features
                     const queryUrl = `${service.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=10000`;
@@ -792,12 +792,12 @@
 
             // Function to load comprehensive geographic data
             async function loadComprehensiveData() {
-                updateStatus('Loading comprehensive geographic data...', 'info');
+                logMessage('Loading comprehensive geographic data...', 'info');
                 
                 try {
                     // Load all US counties using a publicly accessible GeoJSON source
                     const countiesUrl = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
-                    updateStatus('Fetching US counties data from GeoJSON...', 'info');
+                    logMessage('Fetching US counties data from GeoJSON...', 'info');
                     
                     const countiesResponse = await fetch(countiesUrl);
                     
@@ -806,7 +806,7 @@
                     }
                     
                     const countiesData = await countiesResponse.json();
-                    updateStatus(`Received counties data: ${countiesData.features ? countiesData.features.length : 0} features`, 'info');
+                    logMessage(`Received counties data: ${countiesData.features ? countiesData.features.length : 0} features`, 'info');
                     
                     if (countiesData.features && countiesData.features.length > 0) {
                                             // Debug: Show the first county's attributes
@@ -862,11 +862,11 @@
                             logMessage(`County geometry error: ${geoError.message}`, 'error');
                         }
                         });
-                        updateStatus(`✅ Loaded ${countyCount} US counties`, 'success');
+                        logMessage(`✅ Loaded ${countyCount} US counties`, 'success');
                         logMessage(`Added ${countyCount} counties to search database`, 'success');
                     } else {
-                        updateStatus('❌ No county features found in response', 'error');
-                        console.error('Counties response:', countiesData);
+                        logMessage('❌ No county features found in response', 'error');
+                        logMessage(`Counties response: ${JSON.stringify(countiesData)}`, 'error');
                     }
                     
                     // Load all US states using a simple approach
@@ -877,7 +877,7 @@
                         ]
                     };
                     
-                    updateStatus(`Processing ${statesData.features.length} US states...`, 'info');
+                    logMessage(`Processing ${statesData.features.length} US states...`, 'info');
                     
                     let stateCount = 0;
                     statesData.features.forEach(feature => {
@@ -923,7 +923,7 @@
                             logMessage(`State geometry error: ${geoError.message}`, 'error');
                         }
                     });
-                    updateStatus(`✅ No state boundaries loaded (counties are more useful)`, 'success');
+                    logMessage(`✅ No state boundaries loaded (counties are more useful)`, 'success');
                     logMessage(`No states loaded - focusing on counties`, 'info');
                     
                     // Final debug check
@@ -932,11 +932,11 @@
                     logMessage(`Final database after comprehensive load: ${allGraphics.length} total (${finalPSAPCount} PSAP, ${finalUSGSCount} USGS)`, 'success');
                     
                 } catch (error) {
-                    updateStatus(`❌ Error loading comprehensive data: ${error.message}`, 'error');
+                    logMessage(`❌ Error loading comprehensive data: ${error.message}`, 'error');
                     logMessage(`Comprehensive data loading error: ${error.message}`, 'error');
                     
                     // Fallback: Try loading a simple test dataset
-                    updateStatus('Trying fallback data loading...', 'info');
+                    logMessage('Trying fallback data loading...', 'info');
                     await loadFallbackUSGSData();
                 }
             }
@@ -944,7 +944,7 @@
             // Fallback function to load USGS data using a different approach
             async function loadFallbackUSGSData() {
                 try {
-                    updateStatus('Loading fallback USGS data...', 'info');
+                    logMessage('Loading fallback USGS data...', 'info');
                     
                     // Create some test county data manually
                     const testCounties = [
@@ -1005,11 +1005,11 @@
                         }
                     });
                     
-                                            updateStatus(`✅ Loaded ${countyCount} test counties as fallback`, 'success');
+                                            logMessage(`✅ Loaded ${countyCount} test counties as fallback`, 'success');
                         logMessage(`Added ${countyCount} test counties to search database`, 'success');
                     
                 } catch (error) {
-                    updateStatus(`❌ Fallback loading also failed: ${error.message}`, 'error');
+                    logMessage(`❌ Fallback loading also failed: ${error.message}`, 'error');
                     logMessage(`Fallback loading error: ${error.message}`, 'error');
                 }
             }
@@ -1423,7 +1423,7 @@
 
             // Function to show boundaries for current map view
             function showBoundariesForCurrentView() {
-                updateStatus('Loading boundaries for current view...', 'info');
+                logMessage('Loading boundaries for current view...', 'info');
                 
                 // Get the current map extent
                 const extent = view.extent;
@@ -1460,7 +1460,7 @@
                         if (!countyLayer) {
                             countyLayer = new GraphicsLayer({
                                 title: "US Counties",
-                                visible: true
+                                visible: false  // Hidden by default
                             });
                             map.add(countyLayer);
                         }
@@ -1468,6 +1468,7 @@
                         countyFeatures.forEach(graphic => {
                             countyLayer.add(graphic);
                         });
+                        countyLayer.visible = true;  // Make visible when adding features
                         updateStatus(`✅ Also showing ${countyFeatures.length} county boundaries for context`, 'success');
                     }
                 } else {
@@ -1481,7 +1482,7 @@
                         if (!countyLayer) {
                             countyLayer = new GraphicsLayer({
                                 title: "US Counties",
-                                visible: true
+                                visible: false  // Hidden by default
                             });
                             map.add(countyLayer);
                         }
@@ -1489,6 +1490,7 @@
                         countyFeatures.forEach(graphic => {
                             countyLayer.add(graphic);
                         });
+                        countyLayer.visible = true;  // Make visible when adding features
                         updateStatus(`✅ Showing ${countyFeatures.length} county boundaries for reference`, 'info');
                     }
                 }
