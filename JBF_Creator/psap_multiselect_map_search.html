@@ -967,114 +967,139 @@
                 }
             }
 
-            // Function to load Canadian Census Subdivisions
+            // Function to load Canadian Census Subdivisions with comprehensive pagination
             async function loadCanadianData() {
                 try {
-                    logMessage('Loading Canadian Census Subdivisions...', 'info');
+                    logMessage('Loading Canadian Census Subdivisions with comprehensive pagination...', 'info');
                     
-                    // Query the Canadian layer with a higher limit to get more comprehensive coverage
-                    // Try to get the data in a different format that might handle projection better
-                    const queryUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=2000&orderByFields=CSDNAME&outSR=4326`;
-                    logMessage(`Querying Canadian layer: ${queryUrl}`, 'info');
+                    // First, get the total count of features
+                    const countUrl = `${canadianLayerConfig.url}/query?where=1%3D1&returnCountOnly=true&f=json`;
+                    const countResponse = await fetch(countUrl);
                     
-                    const response = await fetch(queryUrl);
-                    
-                    if (!response.ok) {
-                        throw new Error(`Canadian layer HTTP ${response.status}: ${response.statusText}`);
+                    if (!countResponse.ok) {
+                        throw new Error(`Canadian layer count query failed: ${countResponse.status}`);
                     }
                     
-                    const data = await response.json();
-                    logMessage(`Received Canadian data: ${data.features ? data.features.length : 0} features`, 'info');
+                    const countData = await countResponse.json();
+                    const totalFeatures = countData.count || 0;
                     
-                    if (data.features && data.features.length > 0) {
-                        let canadianCount = 0;
-                        let errorCount = 0;
-                        
-                        logMessage(`Processing ${data.features.length} Canadian features...`, 'info');
-                        
-                        data.features.forEach((feature, index) => {
-                            try {
-                                if (feature.geometry && feature.geometry.rings) {
-                                    // For Canadian projection (3347), we need to handle the coordinates carefully
-                                    // The coordinates are in Canadian Albers Equal Area projection
-                                    let rings = feature.geometry.rings;
-                                    
-                                    // Since we're requesting data in WGS84 (4326), we can use the coordinates directly
-                                    // The server should handle the projection conversion for us
-                                    rings = rings; // Use coordinates as-is
-                                    
-                                    const polygon = new Polygon({
-                                        rings: rings,
-                                        spatialReference: { wkid: 4326 }
-                                    });
-                                    
-                                    const graphic = new Graphic({
-                                        geometry: polygon,
-                                        symbol: new SimpleFillSymbol({
-                                            color: [0, 150, 255, 0.2], // Blue fill
-                                            outline: new SimpleLineSymbol({
-                                                color: [0, 150, 255, 0.8], // Blue outline
-                                                width: 1
-                                            })
-                                        }),
-                                        attributes: {
-                                            CSDNAME: feature.attributes.CSDNAME || 'Unknown',
-                                            CSDTYPE: feature.attributes.CSDTYPE || 'Unknown',
-                                            PRNAME: feature.attributes.PRNAME || 'Unknown',
-                                            CDNAME: feature.attributes.CDNAME || 'Unknown',
-                                            layerType: "Canadian",
-                                            layerName: "Canada Census Subdivisions",
-                                            displayName: `${feature.attributes.CSDNAME || 'Unknown'}, ${feature.attributes.PRNAME || 'Unknown'}`
-                                        }
-                                    });
-                                    
-                                    // Add to a separate layer for Canadian data
-                                    if (!canadianLayer) {
-                                        canadianLayer = new GraphicsLayer({
-                                            title: "Canada Census Subdivisions",
-                                            visible: true
-                                        });
-                                        map.add(canadianLayer, 0);
-                                    }
-                                    
-                                    canadianLayer.add(graphic);
-                                    allGraphics.push(graphic);
-                                    canadianCount++;
-                                    
-                                    // Log progress every 100 features
-                                    if (canadianCount % 100 === 0) {
-                                        logMessage(`Processed ${canadianCount} Canadian features...`, 'info');
-                                    }
-                                }
-                            } catch (geoError) {
-                                errorCount++;
-                                if (errorCount <= 5) { // Only log first 5 errors to avoid spam
-                                    logMessage(`Canadian geometry error for feature ${index}: ${geoError.message}`, 'error');
-                                }
-                            }
+                    logMessage(`Total Canadian features available: ${totalFeatures}`, 'info');
+                    
+                    if (totalFeatures === 0) {
+                        logMessage('No Canadian features found in the layer', 'error');
+                        return;
+                    }
+                    
+                    // Create Canadian layer
+                    if (!canadianLayer) {
+                        canadianLayer = new GraphicsLayer({
+                            title: "Canada Census Subdivisions",
+                            visible: true
                         });
-                        
-                        logMessage(`✅ Loaded ${canadianCount} Canadian Census Subdivisions`, 'success');
-                        logMessage(`Added ${canadianCount} Canadian features to search database`, 'success');
-                        if (errorCount > 0) {
-                            logMessage(`⚠️ ${errorCount} features had geometry errors and were skipped`, 'warning');
+                        map.add(canadianLayer, 0);
+                    }
+                    
+                    // Load data in batches using pagination
+                    const batchSize = 1000;
+                    const totalBatches = Math.ceil(totalFeatures / batchSize);
+                    let totalLoaded = 0;
+                    let totalErrors = 0;
+                    
+                    logMessage(`Loading ${totalFeatures} features in ${totalBatches} batches...`, 'info');
+                    
+                    for (let batch = 0; batch < totalBatches; batch++) {
+                        try {
+                            const offset = batch * batchSize;
+                            const batchUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=${batchSize}&resultOffset=${offset}&orderByFields=CSDNAME&outSR=4326`;
+                            
+                            logMessage(`Loading batch ${batch + 1}/${totalBatches} (offset: ${offset})...`, 'info');
+                            
+                            const batchResponse = await fetch(batchUrl);
+                            
+                            if (!batchResponse.ok) {
+                                logMessage(`Batch ${batch + 1} failed: ${batchResponse.status}`, 'warning');
+                                continue;
+                            }
+                            
+                            const batchData = await batchResponse.json();
+                            
+                            if (batchData.features && batchData.features.length > 0) {
+                                let batchLoaded = 0;
+                                let batchErrors = 0;
+                                
+                                batchData.features.forEach((feature, index) => {
+                                    try {
+                                        if (feature.geometry && feature.geometry.rings) {
+                                            const rings = feature.geometry.rings;
+                                            
+                                            const polygon = new Polygon({
+                                                rings: rings,
+                                                spatialReference: { wkid: 4326 }
+                                            });
+                                            
+                                            const graphic = new Graphic({
+                                                geometry: polygon,
+                                                symbol: new SimpleFillSymbol({
+                                                    color: [0, 150, 255, 0.2],
+                                                    outline: new SimpleLineSymbol({
+                                                        color: [0, 150, 255, 0.8],
+                                                        width: 1
+                                                    })
+                                                }),
+                                                attributes: {
+                                                    CSDNAME: feature.attributes.CSDNAME || 'Unknown',
+                                                    CSDTYPE: feature.attributes.CSDTYPE || 'Unknown',
+                                                    PRNAME: feature.attributes.PRNAME || 'Unknown',
+                                                    CDNAME: feature.attributes.CDNAME || 'Unknown',
+                                                    layerType: "Canadian",
+                                                    layerName: "Canada Census Subdivisions",
+                                                    displayName: `${feature.attributes.CSDNAME || 'Unknown'}, ${feature.attributes.PRNAME || 'Unknown'}`
+                                                }
+                                            });
+                                            
+                                            canadianLayer.add(graphic);
+                                            allGraphics.push(graphic);
+                                            batchLoaded++;
+                                            totalLoaded++;
+                                        }
+                                    } catch (geoError) {
+                                        batchErrors++;
+                                        totalErrors++;
+                                        if (totalErrors <= 10) { // Only log first 10 errors
+                                            logMessage(`Geometry error in batch ${batch + 1}, feature ${index}: ${geoError.message}`, 'error');
+                                        }
+                                    }
+                                });
+                                
+                                logMessage(`Batch ${batch + 1} loaded: ${batchLoaded} features (${batchErrors} errors)`, 'info');
+                                
+                                // Update progress
+                                const progress = Math.round((totalLoaded / totalFeatures) * 100);
+                                logMessage(`Progress: ${totalLoaded}/${totalFeatures} features loaded (${progress}%)`, 'info');
+                                
+                                // Small delay to prevent overwhelming the server
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                
+                            } else {
+                                logMessage(`Batch ${batch + 1} returned no features`, 'warning');
+                            }
+                            
+                        } catch (batchError) {
+                            logMessage(`Batch ${batch + 1} failed: ${batchError.message}`, 'warning');
+                            totalErrors++;
                         }
-                        
-                        // Auto-zoom to Canadian data if we have features
-                        if (canadianCount > 0) {
-                            setTimeout(() => {
-                                view.goTo(canadianLayer.graphics.toArray(), { padding: 50 });
-                            }, 500);
-                        }
-                        
-                        // If we got less than 1000 features, try to get more data
-                        if (data.features.length < 1000) {
-                            logMessage('Got limited data, trying to load additional Canadian features...', 'info');
-                            await loadAdditionalCanadianData();
-                        }
-                    } else {
-                        logMessage('❌ No Canadian features found in response', 'error');
-                        logMessage(`Response data: ${JSON.stringify(data).substring(0, 500)}...`, 'error');
+                    }
+                    
+                    logMessage(`✅ Completed loading Canadian data: ${totalLoaded}/${totalFeatures} features loaded`, 'success');
+                    if (totalErrors > 0) {
+                        logMessage(`⚠️ ${totalErrors} features had errors and were skipped`, 'warning');
+                    }
+                    
+                    // Auto-zoom to Canadian data if we have features
+                    if (totalLoaded > 0) {
+                        setTimeout(() => {
+                            view.goTo(canadianLayer.graphics.toArray(), { padding: 50 });
+                        }, 500);
                     }
                     
                 } catch (error) {
