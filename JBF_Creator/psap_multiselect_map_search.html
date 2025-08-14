@@ -267,6 +267,13 @@
             border-color: #adb5bd;
         }
         
+        .btn-secondary.active {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF5252 100%);
+            color: white;
+            border-color: #FF5252;
+            box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3);
+        }
+        
         .debug-tools {
             border-top: 1px solid #dee2e6;
             padding-top: 10px;
@@ -1572,8 +1579,8 @@
                     if (response.results.length > 0) {
                         const graphic = response.results[0].graphic;
                         if (graphic && graphic.attributes) {
-                            // Check if it's a PSAP feature or USGS feature
-                            if (graphic.attributes.state || graphic.attributes.layerType === "USGS") {
+                            // Check if it's a PSAP, USGS, or Canadian feature
+                            if (graphic.attributes.state || graphic.attributes.layerType === "USGS" || graphic.attributes.layerType === "Canadian") {
                                 if (isSelectionMode) {
                                     // In selection mode, select/deselect the graphic
                                     selectGraphic(graphic);
@@ -1972,10 +1979,30 @@
                 isSelectionMode = !isSelectionMode;
                 const button = document.querySelector('button[onclick="toggleSelectionMode()"]');
                 if (button) {
-                    button.textContent = isSelectionMode ? 'Exit Selection Mode' : 'Toggle Selection Mode';
-                    button.style.backgroundColor = isSelectionMode ? '#FF6B6B' : '#29A8DD';
+                    button.textContent = isSelectionMode ? 'Exit Selection Mode' : 'Selection Mode';
+                    button.style.backgroundColor = isSelectionMode ? '#FF6B6B' : '';
+                    button.className = isSelectionMode ? 'btn-secondary active' : 'btn-secondary';
                 }
-                updateStatus(`Selection mode ${isSelectionMode ? 'enabled' : 'disabled'}`, 'info');
+                
+                // Show available layers for selection
+                if (isSelectionMode) {
+                    const availableLayers = [];
+                    const psapCount = allGraphics.filter(g => g.attributes.state).length;
+                    const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
+                    const canadianCount = allGraphics.filter(g => g.attributes.layerType === "Canadian").length;
+                    
+                    if (psapCount > 0) availableLayers.push(`${psapCount} PSAP boundaries`);
+                    if (usgsCount > 0) availableLayers.push(`${usgsCount} USGS boundaries`);
+                    if (canadianCount > 0) availableLayers.push(`${canadianCount} Canadian boundaries`);
+                    
+                    const layerInfo = availableLayers.length > 0 ? 
+                        `Available for selection: ${availableLayers.join(', ')}` : 
+                        'No boundaries available for selection';
+                    
+                    updateStatus(`Selection mode enabled. ${layerInfo}`, 'info');
+                } else {
+                    updateStatus('Selection mode disabled', 'info');
+                }
             }
 
             // Function to select a graphic
@@ -2027,7 +2054,10 @@
                     });
                 }
                 
-                updateStatus(`Selected ${selectedGraphics.length} features`, 'info');
+                const layerType = graphic.attributes.layerType || 'PSAP';
+                const name = graphic.attributes.displayName || graphic.attributes.NAME || graphic.attributes.CSDNAME || 'Unknown';
+                const action = isSelected ? 'deselected' : 'selected';
+                updateStatus(`${action} ${layerType} boundary: ${name} (${selectedGraphics.length} total selected)`, 'info');
             }
 
             // Function to clear selection
