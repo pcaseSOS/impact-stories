@@ -242,6 +242,9 @@
         <button onclick="clearSearch()">Clear Search</button>
         <button onclick="showAllLayers()">Show All Layers</button>
         <button onclick="hideAllLayers()">Hide All Layers</button>
+        <button onclick="toggleSelectionMode()">Toggle Selection Mode</button>
+        <button onclick="downloadSelected()">Download Selected</button>
+        <button onclick="clearSelection()">Clear Selection</button>
         <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
         <button onclick="showLogs()">View Logs</button>
         
@@ -344,6 +347,9 @@
             let stateLayer = null;
             let logMessages = []; // Array to store log messages
             let isLoggingEnabled = false; // Flag to control console logging
+            let selectedGraphics = []; // Array to store selected graphics
+            let isSelectionMode = false; // Flag to track selection mode
+            let searchActive = false; // Flag to track if search is active
 
             // Function to convert coordinates if needed
             function convertCoordinates(rings, fromWkid) {
@@ -388,8 +394,11 @@
             function searchGraphics(searchTerm) {
                 if (!searchTerm || searchTerm.length < 2) {
                     hideSearchResults();
+                    searchActive = false;
                     return;
                 }
+                
+                searchActive = true;
 
                 const results = [];
                 const term = searchTerm.toLowerCase();
@@ -624,6 +633,7 @@
             function clearSearch() {
                 document.getElementById('searchInput').value = '';
                 hideSearchResults();
+                searchActive = false;
                 // Don't hide layers when search is cleared - let them stay visible
             }
 
@@ -1075,6 +1085,11 @@
             // Add automatic boundary loading when map view changes
             let boundaryLoadTimeout;
             view.watch("extent", function(newExtent) {
+                // Don't auto-load if search is active
+                if (searchActive) {
+                    return;
+                }
+                
                 // Clear previous timeout
                 if (boundaryLoadTimeout) {
                     clearTimeout(boundaryLoadTimeout);
@@ -1107,9 +1122,14 @@
                         if (graphic && graphic.attributes) {
                             // Check if it's a PSAP feature or USGS feature
                             if (graphic.attributes.state || graphic.attributes.layerType === "USGS") {
-                                // Show the relevant layer for this graphic
-                                showLayerForGraphic(graphic);
-                                showFeaturePopup(graphic, screenPoint);
+                                if (isSelectionMode) {
+                                    // In selection mode, select/deselect the graphic
+                                    selectGraphic(graphic);
+                                } else {
+                                    // Normal mode, show popup
+                                    showLayerForGraphic(graphic);
+                                    showFeaturePopup(graphic, screenPoint);
+                                }
                             }
                         }
                     }
@@ -1492,6 +1512,130 @@
                 updateStatus('All boundaries cleared', 'info');
             }
 
+            // Function to toggle selection mode
+            function toggleSelectionMode() {
+                isSelectionMode = !isSelectionMode;
+                const button = document.querySelector('button[onclick="toggleSelectionMode()"]');
+                if (button) {
+                    button.textContent = isSelectionMode ? 'Exit Selection Mode' : 'Toggle Selection Mode';
+                    button.style.backgroundColor = isSelectionMode ? '#FF6B6B' : '#29A8DD';
+                }
+                updateStatus(`Selection mode ${isSelectionMode ? 'enabled' : 'disabled'}`, 'info');
+            }
+
+            // Function to select a graphic
+            function selectGraphic(graphic) {
+                if (!isSelectionMode) return;
+                
+                // Check if already selected
+                const isSelected = selectedGraphics.some(g => g === graphic);
+                
+                if (isSelected) {
+                    // Deselect
+                    selectedGraphics = selectedGraphics.filter(g => g !== graphic);
+                    // Reset symbol to original
+                    if (graphic.attributes.layerType === "PSAP") {
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [255, 0, 0, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [255, 0, 0, 0.8],
+                                width: 2
+                            })
+                        });
+                    } else if (graphic.attributes.layerType === "USGS") {
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [255, 255, 0, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [255, 255, 0, 0.8],
+                                width: 2
+                            })
+                        });
+                    }
+                } else {
+                    // Select
+                    selectedGraphics.push(graphic);
+                    // Highlight with selection symbol
+                    graphic.symbol = new SimpleFillSymbol({
+                        color: [0, 255, 0, 0.5], // Green for selected
+                        outline: new SimpleLineSymbol({
+                            color: [0, 255, 0, 1],
+                            width: 3
+                        })
+                    });
+                }
+                
+                updateStatus(`Selected ${selectedGraphics.length} features`, 'info');
+            }
+
+            // Function to clear selection
+            function clearSelection() {
+                // Reset symbols for all selected graphics
+                selectedGraphics.forEach(graphic => {
+                    if (graphic.attributes.layerType === "PSAP") {
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [255, 0, 0, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [255, 0, 0, 0.8],
+                                width: 2
+                            })
+                        });
+                    } else if (graphic.attributes.layerType === "USGS") {
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [255, 255, 0, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [255, 255, 0, 0.8],
+                                width: 2
+                            })
+                        });
+                    }
+                });
+                
+                selectedGraphics = [];
+                updateStatus('Selection cleared', 'info');
+            }
+
+            // Function to download selected features
+            function downloadSelected() {
+                if (selectedGraphics.length === 0) {
+                    updateStatus('No features selected for download', 'error');
+                    return;
+                }
+                
+                // Convert selected graphics to GeoJSON
+                const geojson = {
+                    type: "FeatureCollection",
+                    features: selectedGraphics.map(graphic => {
+                        const feature = {
+                            type: "Feature",
+                            properties: {
+                                ...graphic.attributes,
+                                layerType: graphic.attributes.layerType,
+                                layerName: graphic.attributes.layerName
+                            },
+                            geometry: {
+                                type: "Polygon",
+                                coordinates: graphic.geometry.rings
+                            }
+                        };
+                        return feature;
+                    })
+                };
+                
+                // Create download link
+                const dataStr = JSON.stringify(geojson, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `selected_features_${new Date().toISOString().split('T')[0]}.geojson`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                updateStatus(`Downloaded ${selectedGraphics.length} selected features`, 'success');
+            }
+
             // Function to log messages (hidden from console by default)
             function logMessage(message, type = 'info') {
                 const timestamp = new Date().toLocaleTimeString();
@@ -1583,6 +1727,9 @@
             window.logMessage = logMessage; // Add the new logging function
             window.toggleLogging = toggleLogging; // Add the new logging function
             window.showLogs = showLogs; // Add the new logging function
+            window.toggleSelectionMode = toggleSelectionMode; // Add selection mode function
+            window.downloadSelected = downloadSelected; // Add download function
+            window.clearSelection = clearSelection; // Add clear selection function
             
             updateStatus('Map ready! All layers will load automatically.', 'info');
             
