@@ -312,6 +312,13 @@
                 { name: "Texas", url: "https://services.arcgis.com/8vL8ZFWfQxhb4uIP/arcgis/rest/services/Texas_911_Control_Points_WFL1/FeatureServer/3", wkid: 102100 }
             ];
 
+            // Canadian Census Subdivision layer configuration
+            const canadianLayerConfig = {
+                name: "Canada Census Subdivisions",
+                url: "https://geo.statcan.gc.ca/geo_wa/rest/services/2025/lcsd000a25s_e/MapServer/0",
+                wkid: 3347
+            };
+
             // Create map and view
             const map = new Map({
                 basemap: "satellite"
@@ -345,6 +352,7 @@
             let searchResults = [];
             let countyLayer = null;
             let stateLayer = null;
+            let canadianLayer = null;
             let logMessages = []; // Array to store log messages
             let isLoggingEnabled = false; // Flag to control console logging
             let selectedGraphics = []; // Array to store selected graphics
@@ -926,10 +934,15 @@
                     logMessage(`✅ No state boundaries loaded (counties are more useful)`, 'success');
                     logMessage(`No states loaded - focusing on counties`, 'info');
                     
+                    // Load Canadian Census Subdivisions
+                    logMessage('Loading Canadian Census Subdivisions...', 'info');
+                    await loadCanadianData();
+                    
                     // Final debug check
                     const finalPSAPCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
                     const finalUSGSCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                    logMessage(`Final database after comprehensive load: ${allGraphics.length} total (${finalPSAPCount} PSAP, ${finalUSGSCount} USGS)`, 'success');
+                    const finalCanadianCount = allGraphics.filter(g => g.attributes.layerType === "Canadian").length;
+                    logMessage(`Final database after comprehensive load: ${allGraphics.length} total (${finalPSAPCount} PSAP, ${finalUSGSCount} USGS, ${finalCanadianCount} Canadian)`, 'success');
                     
                 } catch (error) {
                     logMessage(`❌ Error loading comprehensive data: ${error.message}`, 'error');
@@ -938,6 +951,84 @@
                     // Fallback: Try loading a simple test dataset
                     logMessage('Trying fallback data loading...', 'info');
                     await loadFallbackUSGSData();
+                }
+            }
+
+            // Function to load Canadian Census Subdivisions
+            async function loadCanadianData() {
+                try {
+                    logMessage('Loading Canadian Census Subdivisions...', 'info');
+                    
+                    // Query the Canadian layer
+                    const queryUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=*&returnGeometry=true&f=json&resultRecordCount=10000`;
+                    const response = await fetch(queryUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Canadian layer HTTP ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    logMessage(`Received Canadian data: ${data.features ? data.features.length : 0} features`, 'info');
+                    
+                    if (data.features && data.features.length > 0) {
+                        let canadianCount = 0;
+                        data.features.forEach(feature => {
+                            try {
+                                if (feature.geometry && feature.geometry.rings) {
+                                    // Convert from Canadian projection (3347) to Web Mercator
+                                    const rings = convertCoordinates(feature.geometry.rings, canadianLayerConfig.wkid);
+                                    
+                                    const polygon = new Polygon({
+                                        rings: rings,
+                                        spatialReference: { wkid: 3857 }
+                                    });
+                                    
+                                    const graphic = new Graphic({
+                                        geometry: polygon,
+                                        symbol: new SimpleFillSymbol({
+                                            color: [0, 150, 255, 0.05], // Very subtle blue fill
+                                            outline: new SimpleLineSymbol({
+                                                color: [0, 150, 255, 0.15], // Very subtle blue outline
+                                                width: 0.5
+                                            })
+                                        }),
+                                        attributes: {
+                                            CSDNAME: feature.attributes.CSDNAME,
+                                            CSDTYPE: feature.attributes.CSDTYPE,
+                                            PRNAME: feature.attributes.PRNAME,
+                                            CDNAME: feature.attributes.CDNAME,
+                                            layerType: "Canadian",
+                                            layerName: "Canada Census Subdivisions",
+                                            displayName: `${feature.attributes.CSDNAME}, ${feature.attributes.PRNAME}`
+                                        }
+                                    });
+                                    
+                                    // Add to a separate layer for Canadian data
+                                    if (!canadianLayer) {
+                                        canadianLayer = new GraphicsLayer({
+                                            title: "Canada Census Subdivisions",
+                                            visible: true  // Visible by default
+                                        });
+                                        // Add Canadian layer behind PSAP layers (at index 0)
+                                        map.add(canadianLayer, 0);
+                                    }
+                                    canadianLayer.add(graphic);
+                                    allGraphics.push(graphic);
+                                    canadianCount++;
+                                }
+                            } catch (geoError) {
+                                logMessage(`Canadian geometry error: ${geoError.message}`, 'error');
+                            }
+                        });
+                        
+                        logMessage(`✅ Loaded ${canadianCount} Canadian Census Subdivisions`, 'success');
+                        logMessage(`Added ${canadianCount} Canadian features to search database`, 'success');
+                    } else {
+                        logMessage('❌ No Canadian features found in response', 'error');
+                    }
+                    
+                } catch (error) {
+                    logMessage(`❌ Error loading Canadian data: ${error.message}`, 'error');
                 }
             }
 
@@ -1059,6 +1150,7 @@
                 psapLayer.removeAll();
                 if (countyLayer) countyLayer.removeAll();
                 if (stateLayer) stateLayer.removeAll();
+                if (canadianLayer) canadianLayer.removeAll();
                 allGraphics = [];
                 closePopup();
                 clearSearch();
@@ -1555,6 +1647,14 @@
                                 width: 0.5
                             })
                         });
+                    } else if (graphic.attributes.layerType === "Canadian") {
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [0, 150, 255, 0.05], // Very subtle blue fill
+                            outline: new SimpleLineSymbol({
+                                color: [0, 150, 255, 0.15], // Very subtle blue outline
+                                width: 0.5
+                            })
+                        });
                     }
                 } else {
                     // Select
@@ -1589,6 +1689,14 @@
                             color: [255, 255, 0, 0.05], // Very subtle yellow fill
                             outline: new SimpleLineSymbol({
                                 color: [255, 255, 0, 0.15], // Very subtle yellow outline
+                                width: 0.5
+                            })
+                        });
+                    } else if (graphic.attributes.layerType === "Canadian") {
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [0, 150, 255, 0.05], // Very subtle blue fill
+                            outline: new SimpleLineSymbol({
+                                color: [0, 150, 255, 0.15], // Very subtle blue outline
                                 width: 0.5
                             })
                         });
