@@ -973,7 +973,8 @@
                     logMessage('Loading Canadian Census Subdivisions...', 'info');
                     
                     // Query the Canadian layer with a limit to avoid overwhelming the system
-                    const queryUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=1000&orderByFields=CSDNAME`;
+                    // Try to get the data in a different format that might handle projection better
+                    const queryUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=500&orderByFields=CSDNAME&outSR=4326`;
                     logMessage(`Querying Canadian layer: ${queryUrl}`, 'info');
                     
                     const response = await fetch(queryUrl);
@@ -996,17 +997,9 @@
                                     // The coordinates are in Canadian Albers Equal Area projection
                                     let rings = feature.geometry.rings;
                                     
-                                    // Try to convert the coordinates to a usable format
-                                    // This is a simplified approach - the actual conversion is complex
-                                    rings = rings.map(ring => 
-                                        ring.map(coord => {
-                                            // Canadian Albers coordinates are typically in meters
-                                            // We'll scale them down to approximate lat/lon
-                                            const x = coord[0] * 0.00001; // Scale factor
-                                            const y = coord[1] * 0.00001; // Scale factor
-                                            return [x, y];
-                                        })
-                                    );
+                                    // Since we're requesting data in WGS84 (4326), we can use the coordinates directly
+                                    // The server should handle the projection conversion for us
+                                    rings = rings; // Use coordinates as-is
                                     
                                     const polygon = new Polygon({
                                         rings: rings,
