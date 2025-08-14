@@ -972,9 +972,9 @@
                 try {
                     logMessage('Loading Canadian Census Subdivisions...', 'info');
                     
-                    // Query the Canadian layer with a limit to avoid overwhelming the system
+                    // Query the Canadian layer with a higher limit to get more comprehensive coverage
                     // Try to get the data in a different format that might handle projection better
-                    const queryUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=500&orderByFields=CSDNAME&outSR=4326`;
+                    const queryUrl = `${canadianLayerConfig.url}/query?where=1%3D1&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=2000&orderByFields=CSDNAME&outSR=4326`;
                     logMessage(`Querying Canadian layer: ${queryUrl}`, 'info');
                     
                     const response = await fetch(queryUrl);
@@ -989,6 +989,8 @@
                     if (data.features && data.features.length > 0) {
                         let canadianCount = 0;
                         let errorCount = 0;
+                        
+                        logMessage(`Processing ${data.features.length} Canadian features...`, 'info');
                         
                         data.features.forEach((feature, index) => {
                             try {
@@ -1064,6 +1066,12 @@
                                 view.goTo(canadianLayer.graphics.toArray(), { padding: 50 });
                             }, 500);
                         }
+                        
+                        // If we got less than 1000 features, try to get more data
+                        if (data.features.length < 1000) {
+                            logMessage('Got limited data, trying to load additional Canadian features...', 'info');
+                            await loadAdditionalCanadianData();
+                        }
                     } else {
                         logMessage('❌ No Canadian features found in response', 'error');
                         logMessage(`Response data: ${JSON.stringify(data).substring(0, 500)}...`, 'error');
@@ -1077,6 +1085,121 @@
                 }
             }
             
+            // Function to load additional Canadian data with different queries
+            async function loadAdditionalCanadianData() {
+                try {
+                    logMessage('Loading additional Canadian data...', 'info');
+                    
+                    // Try different queries to get more comprehensive coverage
+                    const additionalQueries = [
+                        'where=CSDTYPE=\'CY\'', // Cities
+                        'where=CSDTYPE=\'T\'',  // Towns
+                        'where=CSDTYPE=\'M\'',  // Municipalities
+                        'where=CSDTYPE=\'RGM\'', // Regional municipalities
+                        'where=CSDTYPE=\'DM\'', // Districts
+                        'where=CSDTYPE=\'CT\'', // Census subdivisions
+                        'where=CSDTYPE=\'IRI\'', // Indian reserves
+                        'where=CSDTYPE=\'NO\'', // Northern communities
+                        'where=CSDTYPE=\'SV\'', // Specialized villages
+                        'where=CSDTYPE=\'VL\'', // Villages
+                        'where=CSDTYPE=\'TP\'', // Townships
+                        'where=CSDTYPE=\'RM\'', // Rural municipalities
+                        'where=CSDTYPE=\'CR\'', // Counties
+                        'where=CSDTYPE=\'RCR\'', // Regional counties
+                        'where=CSDTYPE=\'MD\'', // Municipal districts
+                        'where=CSDTYPE=\'SM\'', // Specialized municipalities
+                        'where=CSDTYPE=\'CU\'', // Cantons
+                        'where=CSDTYPE=\'BOR\'', // Boroughs
+                        'where=CSDTYPE=\'C\'',   // Cities (alternative)
+                        'where=CSDTYPE=\'TWP\'', // Townships (alternative)
+                        'where=CSDTYPE=\'MUN\'', // Municipalities (alternative)
+                        'where=CSDTYPE=\'PAR\'', // Parishes
+                        'where=CSDTYPE=\'COM\'', // Communities
+                        'where=CSDTYPE=\'SET\'', // Settlements
+                        'where=CSDTYPE=\'HAM\'', // Hamlets
+                        'where=CSDTYPE=\'N\'',   // Northern communities (alternative)
+                        'where=CSDTYPE=\'UNO\'', // Unorganized areas
+                        'where=CSDTYPE=\'S-E\'', // Specialized areas
+                        'where=CSDTYPE=\'LGD\'', // Local government districts
+                        'where=CSDTYPE=\'SNO\'', // Subdivisions of unorganized areas
+                        'where=CSDTYPE=\'L\'',   // Localities
+                        'where=CSDTYPE=\'RDA\'', // Regional districts
+                        'where=CSDTYPE=\'T\'',   // Territories
+                        'where=CSDTYPE=\'R'      // Regions
+                    ];
+                    
+                    let totalAdditional = 0;
+                    
+                    for (const query of additionalQueries) {
+                        try {
+                            const additionalUrl = `${canadianLayerConfig.url}/query?${query}&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=500&outSR=4326`;
+                            const response = await fetch(additionalUrl);
+                            
+                            if (response.ok) {
+                                const additionalData = await response.json();
+                                
+                                if (additionalData.features && additionalData.features.length > 0) {
+                                    logMessage(`Loading ${additionalData.features.length} additional features with query: ${query}`, 'info');
+                                    
+                                    let additionalCount = 0;
+                                    additionalData.features.forEach(feature => {
+                                        try {
+                                            if (feature.geometry && feature.geometry.rings) {
+                                                const rings = feature.geometry.rings;
+                                                
+                                                const polygon = new Polygon({
+                                                    rings: rings,
+                                                    spatialReference: { wkid: 4326 }
+                                                });
+                                                
+                                                const graphic = new Graphic({
+                                                    geometry: polygon,
+                                                    symbol: new SimpleFillSymbol({
+                                                        color: [0, 150, 255, 0.2],
+                                                        outline: new SimpleLineSymbol({
+                                                            color: [0, 150, 255, 0.8],
+                                                            width: 1
+                                                        })
+                                                    }),
+                                                    attributes: {
+                                                        CSDNAME: feature.attributes.CSDNAME || 'Unknown',
+                                                        CSDTYPE: feature.attributes.CSDTYPE || 'Unknown',
+                                                        PRNAME: feature.attributes.PRNAME || 'Unknown',
+                                                        CDNAME: feature.attributes.CDNAME || 'Unknown',
+                                                        layerType: "Canadian",
+                                                        layerName: "Canada Census Subdivisions",
+                                                        displayName: `${feature.attributes.CSDNAME || 'Unknown'}, ${feature.attributes.PRNAME || 'Unknown'}`
+                                                    }
+                                                });
+                                                
+                                                if (canadianLayer) {
+                                                    canadianLayer.add(graphic);
+                                                    allGraphics.push(graphic);
+                                                    additionalCount++;
+                                                    totalAdditional++;
+                                                }
+                                            }
+                                        } catch (geoError) {
+                                            // Skip errors for additional data
+                                        }
+                                    });
+                                    
+                                    logMessage(`Added ${additionalCount} additional features from query: ${query}`, 'info');
+                                }
+                            }
+                        } catch (error) {
+                            // Continue with next query if one fails
+                            logMessage(`Additional query failed: ${query}`, 'warning');
+                        }
+                    }
+                    
+                    logMessage(`✅ Added ${totalAdditional} additional Canadian features`, 'success');
+                    
+                } catch (error) {
+                    logMessage(`❌ Error loading additional Canadian data: ${error.message}`, 'error');
+                }
+            }
+
             // Fallback function for test Canadian data
             async function loadTestCanadianData() {
                 try {
