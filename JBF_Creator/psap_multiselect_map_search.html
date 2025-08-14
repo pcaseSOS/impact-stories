@@ -237,21 +237,10 @@
             <div id="searchStats" class="search-stats"></div>
         </div>
         
-        <button onclick="loadPSAPData()">Load PSAP Data</button>
         <button onclick="clearMap()">Clear Map</button>
         <button onclick="zoomToUS()">Zoom to US</button>
         <button onclick="clearSearch()">Clear Search</button>
-        <button onclick="showSearchStatus()">Show Search Status</button>
-        <button onclick="refreshSearchDatabase()">Refresh Search DB</button>
-        <button onclick="toggleCountyLayer()">Toggle Counties</button>
-        <button onclick="toggleStateLayer()">Toggle States</button>
         <button onclick="showAllLayers()">Show All Layers</button>
-        <button onclick="hideAllLayers()">Hide All Layers</button>
-        <button onclick="testCountySearch()">Test Monmouth Search</button>
-        <button onclick="showBoundariesForCurrentView()">Load PSAP Data for Current Area</button>
-        <button onclick="clearAllBoundaries()">Clear All Boundaries</button>
-        <button onclick="loadFallbackUSGSData()">Load Test Counties</button>
-        <button onclick="debugLayerStatus()">Debug Layer Status</button>
         <button onclick="hideAllLayers()">Hide All Layers</button>
         <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
         <button onclick="showLogs()">View Logs</button>
@@ -278,9 +267,9 @@
         
         <div style="margin-top: 10px; font-size: 11px; color: #001559;">
             <strong>How to use:</strong><br>
-            • PSAP data loads automatically when you zoom to an area<br>
+            • All layers load automatically<br>
             • Use search box for specific locations<br>
-            • Select USGS layers from dropdown for county/state boundaries<br>
+            • Select USGS layers from dropdown for additional boundaries<br>
             • Click on any boundary to view details
         </div>
     </div>
@@ -335,7 +324,7 @@
             // Create graphics layer for PSAP data
             const psapLayer = new GraphicsLayer({
                 title: "PSAP Boundaries",
-                visible: false  // Hidden by default
+                visible: true  // Visible by default
             });
             map.add(psapLayer);
 
@@ -781,7 +770,7 @@
                         }
                     });
                     
-                    updateStatus(`${service.name}: ✅ Loaded ${featureCount} features`, 'success');
+                                            logMessage(`${service.name}: ✅ Loaded ${featureCount} features`, 'success');
                     return featureCount;
                     
                 } catch (error) {
@@ -850,7 +839,7 @@
                                     if (!countyLayer) {
                                         countyLayer = new GraphicsLayer({
                                             title: "US Counties",
-                                            visible: false  // Hidden by default
+                                            visible: true  // Visible by default
                                         });
                                         map.add(countyLayer);
                                     }
@@ -1453,14 +1442,14 @@
                         psapLayer.add(graphic);
                     });
                     psapLayer.visible = true;
-                    updateStatus(`✅ Showing ${psapFeatures.length} PSAP boundaries for current area`, 'success');
+                    logMessage(`✅ Showing ${psapFeatures.length} PSAP boundaries for current area`, 'success');
                     
                     // Also show county boundaries for context
                     if (countyFeatures.length > 0) {
                         if (!countyLayer) {
                             countyLayer = new GraphicsLayer({
                                 title: "US Counties",
-                                visible: false  // Hidden by default
+                                visible: true  // Visible by default
                             });
                             map.add(countyLayer);
                         }
@@ -1468,21 +1457,20 @@
                         countyFeatures.forEach(graphic => {
                             countyLayer.add(graphic);
                         });
-                        countyLayer.visible = true;  // Make visible when adding features
-                        updateStatus(`✅ Also showing ${countyFeatures.length} county boundaries for context`, 'success');
+                        logMessage(`✅ Also showing ${countyFeatures.length} county boundaries for context`, 'success');
                     }
                 } else {
                     // No PSAP data in this area - guide user to search USGS layers
-                    updateStatus('❌ No PSAP data found in this area', 'error');
-                    updateStatus('💡 Try searching for specific locations using the search box above', 'info');
-                    updateStatus('💡 Or select a USGS layer from the dropdown to see county/state boundaries', 'info');
+                    logMessage('❌ No PSAP data found in this area', 'error');
+                    logMessage('💡 Try searching for specific locations using the search box above', 'info');
+                    logMessage('💡 Or select a USGS layer from the dropdown to see county/state boundaries', 'info');
                     
                     // Optionally show county boundaries anyway for reference
                     if (countyFeatures.length > 0) {
                         if (!countyLayer) {
                             countyLayer = new GraphicsLayer({
                                 title: "US Counties",
-                                visible: false  // Hidden by default
+                                visible: true  // Visible by default
                             });
                             map.add(countyLayer);
                         }
@@ -1490,8 +1478,7 @@
                         countyFeatures.forEach(graphic => {
                             countyLayer.add(graphic);
                         });
-                        countyLayer.visible = true;  // Make visible when adding features
-                        updateStatus(`✅ Showing ${countyFeatures.length} county boundaries for reference`, 'info');
+                        logMessage(`✅ Showing ${countyFeatures.length} county boundaries for reference`, 'info');
                     }
                 }
             }
@@ -1597,7 +1584,7 @@
             window.toggleLogging = toggleLogging; // Add the new logging function
             window.showLogs = showLogs; // Add the new logging function
             
-            updateStatus('Map ready! PSAP data will load automatically when you zoom to an area. Use search box for specific locations.', 'info');
+            updateStatus('Map ready! All layers will load automatically.', 'info');
             
             // Auto-load PSAP data when page loads
             setTimeout(async () => {
