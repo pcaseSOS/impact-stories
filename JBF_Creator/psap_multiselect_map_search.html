@@ -829,10 +829,10 @@
                                     const graphic = new Graphic({
                                         geometry: polygon,
                                         symbol: new SimpleFillSymbol({
-                                            color: [255, 255, 0, 0.3], // More visible yellow
+                                            color: [255, 255, 0, 0.05], // Very subtle yellow fill
                                             outline: new SimpleLineSymbol({
-                                                color: [255, 255, 0, 0.8], // More visible outline
-                                                width: 2
+                                                color: [255, 255, 0, 0.15], // Very subtle yellow outline
+                                                width: 0.5
                                             })
                                         }),
                                         attributes: {
@@ -974,10 +974,10 @@
                             const graphic = new Graphic({
                                 geometry: polygon,
                                 symbol: new SimpleFillSymbol({
-                                    color: [255, 255, 0, 0.3],
+                                    color: [255, 255, 0, 0.05], // Very subtle yellow fill
                                     outline: new SimpleLineSymbol({
-                                        color: [255, 255, 0, 0.8],
-                                        width: 2
+                                        color: [255, 255, 0, 0.15], // Very subtle yellow outline
+                                        width: 0.5
                                     })
                                 }),
                                 attributes: {
@@ -1549,10 +1549,10 @@
                         });
                     } else if (graphic.attributes.layerType === "USGS") {
                         graphic.symbol = new SimpleFillSymbol({
-                            color: [255, 255, 0, 0.3],
+                            color: [255, 255, 0, 0.05], // Very subtle yellow fill
                             outline: new SimpleLineSymbol({
-                                color: [255, 255, 0, 0.8],
-                                width: 2
+                                color: [255, 255, 0, 0.15], // Very subtle yellow outline
+                                width: 0.5
                             })
                         });
                     }
@@ -1586,10 +1586,10 @@
                         });
                     } else if (graphic.attributes.layerType === "USGS") {
                         graphic.symbol = new SimpleFillSymbol({
-                            color: [255, 255, 0, 0.3],
+                            color: [255, 255, 0, 0.05], // Very subtle yellow fill
                             outline: new SimpleLineSymbol({
-                                color: [255, 255, 0, 0.8],
-                                width: 2
+                                color: [255, 255, 0, 0.15], // Very subtle yellow outline
+                                width: 0.5
                             })
                         });
                     }
