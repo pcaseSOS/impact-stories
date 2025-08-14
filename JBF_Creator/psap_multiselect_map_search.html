@@ -245,6 +245,7 @@
         <button onclick="toggleSelectionMode()">Toggle Selection Mode</button>
         <button onclick="downloadSelected()">Download Selected</button>
         <button onclick="clearSelection()">Clear Selection</button>
+        <button onclick="loadCanadianData()">Load Canadian Data</button>
         <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
         <button onclick="showLogs()">View Logs</button>
         
@@ -986,10 +987,10 @@
                                     const graphic = new Graphic({
                                         geometry: polygon,
                                         symbol: new SimpleFillSymbol({
-                                            color: [0, 150, 255, 0.05], // Very subtle blue fill
+                                            color: [0, 150, 255, 0.2], // More visible blue fill for testing
                                             outline: new SimpleLineSymbol({
-                                                color: [0, 150, 255, 0.15], // Very subtle blue outline
-                                                width: 0.5
+                                                color: [0, 150, 255, 0.8], // More visible blue outline for testing
+                                                width: 1.5
                                             })
                                         }),
                                         attributes: {
@@ -1843,6 +1844,7 @@
             window.toggleSelectionMode = toggleSelectionMode; // Add selection mode function
             window.downloadSelected = downloadSelected; // Add download function
             window.clearSelection = clearSelection; // Add clear selection function
+            window.loadCanadianData = loadCanadianData; // Add Canadian data loading function
             
             updateStatus('Map ready! All layers will load automatically.', 'info');
             
