@@ -1175,6 +1175,12 @@
                         logMessage(`⚠️ ${totalErrors} features had errors and were skipped`, 'warning');
                     }
                     
+                    // Try to get additional data with different query strategies
+                    if (totalLoaded < totalFeatures * 0.9) { // If we got less than 90% of expected features
+                        logMessage('Attempting to load additional Canadian data with alternative queries...', 'info');
+                        await loadAdditionalCanadianData();
+                    }
+                    
                     // Auto-zoom to Canadian data if we have features
                     if (totalLoaded > 0) {
                         setTimeout(() => {
@@ -1193,58 +1199,58 @@
             // Function to load additional Canadian data with different queries
             async function loadAdditionalCanadianData() {
                 try {
-                    logMessage('Loading additional Canadian data...', 'info');
+                    logMessage('Loading additional Canadian data with targeted queries...', 'info');
                     
                     // Try different queries to get more comprehensive coverage
                     const additionalQueries = [
-                        'where=CSDTYPE=\'CY\'', // Cities
-                        'where=CSDTYPE=\'T\'',  // Towns
-                        'where=CSDTYPE=\'M\'',  // Municipalities
-                        'where=CSDTYPE=\'RGM\'', // Regional municipalities
-                        'where=CSDTYPE=\'DM\'', // Districts
-                        'where=CSDTYPE=\'CT\'', // Census subdivisions
-                        'where=CSDTYPE=\'IRI\'', // Indian reserves
-                        'where=CSDTYPE=\'NO\'', // Northern communities
-                        'where=CSDTYPE=\'SV\'', // Specialized villages
-                        'where=CSDTYPE=\'VL\'', // Villages
-                        'where=CSDTYPE=\'TP\'', // Townships
-                        'where=CSDTYPE=\'RM\'', // Rural municipalities
-                        'where=CSDTYPE=\'CR\'', // Counties
-                        'where=CSDTYPE=\'RCR\'', // Regional counties
-                        'where=CSDTYPE=\'MD\'', // Municipal districts
-                        'where=CSDTYPE=\'SM\'', // Specialized municipalities
-                        'where=CSDTYPE=\'CU\'', // Cantons
-                        'where=CSDTYPE=\'BOR\'', // Boroughs
-                        'where=CSDTYPE=\'C\'',   // Cities (alternative)
-                        'where=CSDTYPE=\'TWP\'', // Townships (alternative)
-                        'where=CSDTYPE=\'MUN\'', // Municipalities (alternative)
-                        'where=CSDTYPE=\'PAR\'', // Parishes
-                        'where=CSDTYPE=\'COM\'', // Communities
-                        'where=CSDTYPE=\'SET\'', // Settlements
-                        'where=CSDTYPE=\'HAM\'', // Hamlets
-                        'where=CSDTYPE=\'N\'',   // Northern communities (alternative)
-                        'where=CSDTYPE=\'UNO\'', // Unorganized areas
-                        'where=CSDTYPE=\'S-E\'', // Specialized areas
-                        'where=CSDTYPE=\'LGD\'', // Local government districts
-                        'where=CSDTYPE=\'SNO\'', // Subdivisions of unorganized areas
-                        'where=CSDTYPE=\'L\'',   // Localities
-                        'where=CSDTYPE=\'RDA\'', // Regional districts
-                        'where=CSDTYPE=\'T\'',   // Territories
-                        'where=CSDTYPE=\'R'      // Regions
+                        { where: "CSDTYPE='CY'", name: "Cities" },
+                        { where: "CSDTYPE='T'", name: "Towns" },
+                        { where: "CSDTYPE='M'", name: "Municipalities" },
+                        { where: "CSDTYPE='RGM'", name: "Regional Municipalities" },
+                        { where: "CSDTYPE='DM'", name: "Districts" },
+                        { where: "CSDTYPE='CT'", name: "Census Subdivisions" },
+                        { where: "CSDTYPE='IRI'", name: "Indian Reserves" },
+                        { where: "CSDTYPE='NO'", name: "Northern Communities" },
+                        { where: "CSDTYPE='SV'", name: "Specialized Villages" },
+                        { where: "CSDTYPE='VL'", name: "Villages" },
+                        { where: "CSDTYPE='TP'", name: "Townships" },
+                        { where: "CSDTYPE='RM'", name: "Rural Municipalities" },
+                        { where: "CSDTYPE='CR'", name: "Counties" },
+                        { where: "CSDTYPE='RCR'", name: "Regional Counties" },
+                        { where: "CSDTYPE='MD'", name: "Municipal Districts" },
+                        { where: "CSDTYPE='SM'", name: "Specialized Municipalities" },
+                        { where: "CSDTYPE='CU'", name: "Cantons" },
+                        { where: "CSDTYPE='BOR'", name: "Boroughs" },
+                        { where: "CSDTYPE='C'", name: "Cities (Alt)" },
+                        { where: "CSDTYPE='TWP'", name: "Townships (Alt)" },
+                        { where: "CSDTYPE='MUN'", name: "Municipalities (Alt)" },
+                        { where: "CSDTYPE='PAR'", name: "Parishes" },
+                        { where: "CSDTYPE='COM'", name: "Communities" },
+                        { where: "CSDTYPE='SET'", name: "Settlements" },
+                        { where: "CSDTYPE='HAM'", name: "Hamlets" },
+                        { where: "CSDTYPE='N'", name: "Northern Communities (Alt)" },
+                        { where: "CSDTYPE='UNO'", name: "Unorganized Areas" },
+                        { where: "CSDTYPE='S-E'", name: "Specialized Areas" },
+                        { where: "CSDTYPE='LGD'", name: "Local Government Districts" },
+                        { where: "CSDTYPE='SNO'", name: "Subdivisions of Unorganized Areas" },
+                        { where: "CSDTYPE='L'", name: "Localities" },
+                        { where: "CSDTYPE='RDA'", name: "Regional Districts" },
+                        { where: "CSDTYPE='R'", name: "Regions" }
                     ];
                     
                     let totalAdditional = 0;
+                    let successfulQueries = 0;
                     
                     for (const query of additionalQueries) {
                         try {
-                            const additionalUrl = `${canadianLayerConfig.url}/query?${query}&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=500&outSR=4326`;
+                            const additionalUrl = `${canadianLayerConfig.url}/query?where=${encodeURIComponent(query.where)}&outFields=CSDNAME,CSDTYPE,PRNAME,CDNAME&returnGeometry=true&f=json&resultRecordCount=500&outSR=4326`;
                             const response = await fetch(additionalUrl);
                             
                             if (response.ok) {
                                 const additionalData = await response.json();
                                 
                                 if (additionalData.features && additionalData.features.length > 0) {
-                                    logMessage(`Loading ${additionalData.features.length} additional features with query: ${query}`, 'info');
+                                    logMessage(`Loading ${additionalData.features.length} additional ${query.name} features...`, 'info');
                                     
                                     let additionalCount = 0;
                                     additionalData.features.forEach(feature => {
@@ -1289,16 +1295,17 @@
                                         }
                                     });
                                     
-                                    logMessage(`Added ${additionalCount} additional features from query: ${query}`, 'info');
+                                    logMessage(`Added ${additionalCount} additional ${query.name} features`, 'info');
+                                    successfulQueries++;
                                 }
                             }
                         } catch (error) {
                             // Continue with next query if one fails
-                            logMessage(`Additional query failed: ${query}`, 'warning');
+                            logMessage(`Additional query failed for ${query.name}: ${error.message}`, 'warning');
                         }
                     }
                     
-                    logMessage(`✅ Added ${totalAdditional} additional Canadian features`, 'success');
+                    logMessage(`✅ Added ${totalAdditional} additional Canadian features from ${successfulQueries} successful queries`, 'success');
                     
                 } catch (error) {
                     logMessage(`❌ Error loading additional Canadian data: ${error.message}`, 'error');
