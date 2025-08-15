@@ -1586,8 +1586,8 @@
                     if (response.results.length > 0) {
                         const graphic = response.results[0].graphic;
                         if (graphic && graphic.attributes) {
-                            // Check if it's a PSAP, USGS, or Canadian feature
-                            if (graphic.attributes.state || graphic.attributes.layerType === "USGS" || graphic.attributes.layerType === "Canadian") {
+                            // Check if it's any selectable feature (PSAP, USGS, Canadian, or any other layer)
+                            if (graphic.attributes.state || graphic.attributes.layerType || graphic.attributes.NAME || graphic.attributes.CSDNAME) {
                                 if (isSelectionMode) {
                                     // In selection mode, select/deselect the graphic
                                     selectGraphic(graphic);
@@ -2022,8 +2022,9 @@
                 if (isSelected) {
                     // Deselect
                     selectedGraphics = selectedGraphics.filter(g => g !== graphic);
-                    // Reset symbol to original
-                    if (graphic.attributes.layerType === "PSAP") {
+                    // Reset symbol to original based on layer type
+                    if (graphic.attributes.state) {
+                        // PSAP features have 'state' attribute
                         graphic.symbol = new SimpleFillSymbol({
                             color: [255, 0, 0, 0.3],
                             outline: new SimpleLineSymbol({
@@ -2045,6 +2046,15 @@
                             outline: new SimpleLineSymbol({
                                 color: [0, 150, 255, 0.15], // Very subtle blue outline
                                 width: 0.5
+                            })
+                        });
+                    } else {
+                        // Default fallback for any other layer type
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [128, 128, 128, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [128, 128, 128, 0.8],
+                                width: 1
                             })
                         });
                     }
@@ -2061,7 +2071,18 @@
                     });
                 }
                 
-                const layerType = graphic.attributes.layerType || 'PSAP';
+                // Determine layer type and name
+                let layerType = 'Unknown';
+                if (graphic.attributes.state) {
+                    layerType = 'PSAP';
+                } else if (graphic.attributes.layerType) {
+                    layerType = graphic.attributes.layerType;
+                } else if (graphic.attributes.NAME) {
+                    layerType = 'USGS';
+                } else if (graphic.attributes.CSDNAME) {
+                    layerType = 'Canadian';
+                }
+                
                 const name = graphic.attributes.displayName || graphic.attributes.NAME || graphic.attributes.CSDNAME || 'Unknown';
                 const action = isSelected ? 'deselected' : 'selected';
                 updateStatus(`${action} ${layerType} boundary: ${name} (${selectedGraphics.length} total selected)`, 'info');
@@ -2071,7 +2092,8 @@
             function clearSelection() {
                 // Reset symbols for all selected graphics
                 selectedGraphics.forEach(graphic => {
-                    if (graphic.attributes.layerType === "PSAP") {
+                    if (graphic.attributes.state) {
+                        // PSAP features have 'state' attribute
                         graphic.symbol = new SimpleFillSymbol({
                             color: [255, 0, 0, 0.3],
                             outline: new SimpleLineSymbol({
@@ -2093,6 +2115,15 @@
                             outline: new SimpleLineSymbol({
                                 color: [0, 150, 255, 0.15], // Very subtle blue outline
                                 width: 0.5
+                            })
+                        });
+                    } else {
+                        // Default fallback for any other layer type
+                        graphic.symbol = new SimpleFillSymbol({
+                            color: [128, 128, 128, 0.3],
+                            outline: new SimpleLineSymbol({
+                                color: [128, 128, 128, 0.8],
+                                width: 1
                             })
                         });
                     }
