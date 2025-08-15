@@ -657,11 +657,17 @@
                 const attributes = graphic.attributes;
                 logMessage(`showLayerForGraphic called with: ${JSON.stringify(attributes)}`, 'info');
                 
-                if (attributes.layerType === "PSAP") {
-                    psapLayer.visible = true;
-                    logMessage(`PSAP layer visibility set to: ${psapLayer.visible}`, 'info');
-                    updateStatus('PSAP layer shown for selected feature', 'info');
-                    highlightLayerTemporarily(psapLayer, 'PSAP');
+                if (attributes.state) {
+                    // PSAP features have 'state' attribute
+                    if (psapLayer) {
+                        psapLayer.visible = true;
+                        logMessage(`PSAP layer visibility set to: ${psapLayer.visible}`, 'info');
+                        updateStatus('PSAP layer shown for selected feature', 'info');
+                        highlightLayerTemporarily(psapLayer, 'PSAP');
+                    } else {
+                        logMessage('PSAP layer not found!', 'error');
+                        updateStatus('PSAP layer not available', 'error');
+                    }
                 } else if (attributes.layerType === "USGS") {
                     logMessage(`USGS feature detected, layerName: ${attributes.layerName}`, 'info');
                     if (attributes.layerName === "US Counties") {
@@ -696,6 +702,17 @@
                         }
                     } else {
                         logMessage(`Unknown USGS layer name: ${attributes.layerName}`, 'warning');
+                    }
+                } else if (attributes.layerType === "Canadian") {
+                    // Canadian features
+                    if (canadianLayer) {
+                        canadianLayer.visible = true;
+                        logMessage(`Canadian layer visibility set to: ${canadianLayer.visible}`, 'info');
+                        updateStatus('Canadian layer shown for selected feature', 'info');
+                        highlightLayerTemporarily(canadianLayer, 'Canadian');
+                    } else {
+                        logMessage('Canadian layer not found!', 'error');
+                        updateStatus('Canadian layer not available', 'error');
                     }
                 } else {
                     logMessage(`Unknown layer type: ${attributes.layerType}`, 'warning');
@@ -747,10 +764,18 @@
                 const attributes = graphic.attributes;
                 
                 // Set header based on feature type
-                if (attributes.layerType === "USGS") {
-                    header.textContent = `USGS ${attributes.layerName} - ${attributes.displayName || 'Feature'}`;
-                } else {
+                if (attributes.state) {
+                    // PSAP features
                     header.textContent = `${attributes.state} PSAP`;
+                } else if (attributes.layerType === "USGS") {
+                    // USGS features
+                    header.textContent = `USGS ${attributes.layerName} - ${attributes.displayName || 'Feature'}`;
+                } else if (attributes.layerType === "Canadian") {
+                    // Canadian features
+                    header.textContent = `Canadian ${attributes.CSDTYPE || 'Subdivision'} - ${attributes.CSDNAME || 'Feature'}`;
+                } else {
+                    // Fallback
+                    header.textContent = `${attributes.layerType || 'Unknown'} Feature`;
                 }
                 
                 // Build content
