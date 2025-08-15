@@ -2023,9 +2023,25 @@
                 // Show available layers for selection
                 if (isSelectionMode) {
                     const availableLayers = [];
-                    const psapCount = allGraphics.filter(g => g.attributes.state).length;
-                    const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                    const canadianCount = allGraphics.filter(g => g.attributes.layerType === "Canadian").length;
+                    
+                    // Debug: Log what's in allGraphics
+                    logMessage(`Total graphics in allGraphics: ${allGraphics.length}`, 'info');
+                    
+                    // Check for different attribute patterns
+                    const psapCount = allGraphics.filter(g => g.attributes && g.attributes.state).length;
+                    const usgsCount = allGraphics.filter(g => g.attributes && (g.attributes.layerType === "USGS" || g.attributes.NAME)).length;
+                    const canadianCount = allGraphics.filter(g => g.attributes && (g.attributes.layerType === "Canadian" || g.attributes.CSDNAME)).length;
+                    
+                    // Debug: Log individual counts
+                    logMessage(`PSAP count (state attribute): ${psapCount}`, 'info');
+                    logMessage(`USGS count (layerType=USGS or NAME attribute): ${usgsCount}`, 'info');
+                    logMessage(`Canadian count (layerType=Canadian or CSDNAME attribute): ${canadianCount}`, 'info');
+                    
+                    // Debug: Log sample attributes
+                    if (allGraphics.length > 0) {
+                        const sampleGraphic = allGraphics[0];
+                        logMessage(`Sample graphic attributes: ${JSON.stringify(sampleGraphic.attributes)}`, 'info');
+                    }
                     
                     if (psapCount > 0) availableLayers.push(`${psapCount} PSAP boundaries`);
                     if (usgsCount > 0) availableLayers.push(`${usgsCount} USGS boundaries`);
