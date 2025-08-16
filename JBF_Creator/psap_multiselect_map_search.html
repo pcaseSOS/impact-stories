@@ -1601,6 +1601,11 @@
 
             // Add click event handler
             view.on("click", function(event) {
+                // Don't process clicks on UI elements
+                if (event.target && (event.target.closest('#info') || event.target.closest('.popup'))) {
+                    return;
+                }
+                
                 // Close any existing popup
                 closePopup();
                 
@@ -1949,7 +1954,7 @@
                 logMessage(`Found ${visibleGraphics.length} features in current view`, 'info');
                 
                 // Group by layer type
-                const psapFeatures = visibleGraphics.filter(g => g.attributes.layerType === "PSAP");
+                const psapFeatures = visibleGraphics.filter(g => g.attributes.state); // PSAP features have 'state' attribute
                 const countyFeatures = visibleGraphics.filter(g => g.attributes.layerType === "USGS" && g.attributes.layerName === "US Counties");
                 
                 // Always try to show PSAP features first
@@ -2018,6 +2023,14 @@
                     button.textContent = isSelectionMode ? 'Exit Selection Mode' : 'Selection Mode';
                     button.style.backgroundColor = isSelectionMode ? '#FF6B6B' : '';
                     button.className = isSelectionMode ? 'btn-secondary active' : 'btn-secondary';
+                }
+                
+                // Ensure layers stay visible when entering selection mode
+                if (isSelectionMode) {
+                    if (psapLayer) psapLayer.visible = true;
+                    if (countyLayer) countyLayer.visible = true;
+                    if (canadianLayer) canadianLayer.visible = true;
+                    logMessage('Ensured all layers are visible for selection mode', 'info');
                 }
                 
                 // Show available layers for selection
