@@ -321,6 +321,7 @@
         <!-- Selection Tools -->
         <div class="button-group">
             <button onclick="toggleSelectionMode()" class="btn-secondary">Selection Mode</button>
+            <button onclick="showSelectionSummary()" class="btn-secondary">Show Selected</button>
             <button onclick="downloadSelected()" class="btn-secondary">Download</button>
             <button onclick="clearSelection()" class="btn-secondary">Clear Selection</button>
         </div>
@@ -2146,6 +2147,63 @@
                 updateStatus(`${action} ${layerType} boundary: ${name} (${selectedGraphics.length} total selected)`, 'info');
             }
 
+            // Function to show selection summary
+            function showSelectionSummary() {
+                if (selectedGraphics.length === 0) {
+                    updateStatus('No features currently selected', 'info');
+                    return;
+                }
+                
+                // Count features by layer type
+                const layerCounts = {};
+                const layerDetails = {};
+                
+                selectedGraphics.forEach(graphic => {
+                    let layerType = 'Unknown';
+                    let name = 'Unknown';
+                    
+                    if (graphic.attributes.state) {
+                        layerType = 'PSAP';
+                        name = graphic.attributes.displayName || graphic.attributes.name || graphic.attributes.state;
+                    } else if (graphic.attributes.layerType === "USGS") {
+                        layerType = 'USGS';
+                        name = graphic.attributes.displayName || graphic.attributes.NAME || 'USGS Feature';
+                    } else if (graphic.attributes.layerType === "Canadian") {
+                        layerType = 'Canadian';
+                        name = graphic.attributes.displayName || graphic.attributes.CSDNAME || 'Canadian Feature';
+                    } else if (graphic.attributes.NAME) {
+                        layerType = 'USGS';
+                        name = graphic.attributes.NAME;
+                    } else if (graphic.attributes.CSDNAME) {
+                        layerType = 'Canadian';
+                        name = graphic.attributes.CSDNAME;
+                    }
+                    
+                    layerCounts[layerType] = (layerCounts[layerType] || 0) + 1;
+                    
+                    if (!layerDetails[layerType]) {
+                        layerDetails[layerType] = [];
+                    }
+                    layerDetails[layerType].push(name);
+                });
+                
+                // Create summary message
+                const summary = Object.entries(layerCounts)
+                    .map(([type, count]) => `${count} ${type} features`)
+                    .join(', ');
+                
+                updateStatus(`Selected: ${summary}`, 'success');
+                
+                // Log detailed breakdown
+                logMessage(`=== SELECTION SUMMARY ===`, 'info');
+                logMessage(`Total selected: ${selectedGraphics.length} features`, 'info');
+                
+                Object.entries(layerDetails).forEach(([type, names]) => {
+                    logMessage(`${type} (${names.length}): ${names.slice(0, 5).join(', ')}${names.length > 5 ? '...' : ''}`, 'info');
+                });
+                logMessage(`========================`, 'info');
+            }
+
             // Function to clear selection
             function clearSelection() {
                 // Reset symbols for all selected graphics
@@ -2198,16 +2256,47 @@
                     return;
                 }
                 
+                // Count features by layer type
+                const layerCounts = {};
+                selectedGraphics.forEach(graphic => {
+                    let layerType = 'Unknown';
+                    if (graphic.attributes.state) {
+                        layerType = 'PSAP';
+                    } else if (graphic.attributes.layerType) {
+                        layerType = graphic.attributes.layerType;
+                    } else if (graphic.attributes.NAME) {
+                        layerType = 'USGS';
+                    } else if (graphic.attributes.CSDNAME) {
+                        layerType = 'Canadian';
+                    }
+                    
+                    layerCounts[layerType] = (layerCounts[layerType] || 0) + 1;
+                });
+                
                 // Convert selected graphics to GeoJSON
                 const geojson = {
                     type: "FeatureCollection",
                     features: selectedGraphics.map(graphic => {
+                        // Determine layer type for properties
+                        let layerType = 'Unknown';
+                        if (graphic.attributes.state) {
+                            layerType = 'PSAP';
+                        } else if (graphic.attributes.layerType) {
+                            layerType = graphic.attributes.layerType;
+                        } else if (graphic.attributes.NAME) {
+                            layerType = 'USGS';
+                        } else if (graphic.attributes.CSDNAME) {
+                            layerType = 'Canadian';
+                        }
+                        
                         const feature = {
                             type: "Feature",
                             properties: {
                                 ...graphic.attributes,
-                                layerType: graphic.attributes.layerType,
-                                layerName: graphic.attributes.layerName
+                                layerType: layerType,
+                                layerName: graphic.attributes.layerName || graphic.attributes.displayName || 'Unknown Layer',
+                                downloadDate: new Date().toISOString(),
+                                downloadSource: 'PSAP Multi-Select Map'
                             },
                             geometry: {
                                 type: "Polygon",
@@ -2224,13 +2313,24 @@
                 const url = URL.createObjectURL(dataBlob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `selected_features_${new Date().toISOString().split('T')[0]}.geojson`;
+                
+                // Create descriptive filename
+                const layerTypes = Object.keys(layerCounts).join('_');
+                const timestamp = new Date().toISOString().split('T')[0];
+                link.download = `selected_boundaries_${layerTypes}_${selectedGraphics.length}_features_${timestamp}.geojson`;
+                
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
                 
-                updateStatus(`Downloaded ${selectedGraphics.length} selected features`, 'success');
+                // Show detailed success message
+                const layerBreakdown = Object.entries(layerCounts)
+                    .map(([type, count]) => `${count} ${type}`)
+                    .join(', ');
+                
+                updateStatus(`✅ Downloaded ${selectedGraphics.length} features (${layerBreakdown})`, 'success');
+                logMessage(`Downloaded ${selectedGraphics.length} features: ${layerBreakdown}`, 'success');
             }
 
             // Function to log messages (hidden from console by default)
@@ -2325,6 +2425,7 @@
             window.toggleLogging = toggleLogging; // Add the new logging function
             window.showLogs = showLogs; // Add the new logging function
             window.toggleSelectionMode = toggleSelectionMode; // Add selection mode function
+            window.showSelectionSummary = showSelectionSummary; // Add selection summary function
             window.downloadSelected = downloadSelected; // Add download function
             window.clearSelection = clearSelection; // Add clear selection function
             window.loadCanadianData = loadCanadianData; // Add Canadian data loading function
