@@ -511,13 +511,14 @@
                 
                 // Debug: Log search database status
                 logMessage(`Searching ${allGraphics.length} features for: "${searchTerm}"`, 'info');
-                const psapCount = allGraphics.filter(g => g.attributes.layerType === "PSAP").length;
-                const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS").length;
-                logMessage(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features`, 'info');
+                const psapCount = allGraphics.filter(g => g.attributes.state).length;
+                const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS" || g.attributes.NAME).length;
+                const canadianCount = allGraphics.filter(g => g.attributes.layerType === "Canadian" || g.attributes.CSDNAME).length;
+                logMessage(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features, ${canadianCount} Canadian features`, 'info');
                 
                 // Debug: Show some USGS features if we have them
                 if (usgsCount > 0) {
-                    const sampleUSGS = allGraphics.filter(g => g.attributes.layerType === "USGS").slice(0, 2);
+                    const sampleUSGS = allGraphics.filter(g => g.attributes.layerType === "USGS" || g.attributes.NAME).slice(0, 2);
                     sampleUSGS.forEach((g, i) => {
                         logMessage(`USGS Sample ${i+1}: ${JSON.stringify(g.attributes)}`, 'info');
                     });
@@ -551,16 +552,22 @@
                     if (matchFound) {
                         // Create a title for the result
                         let title;
-                        if (attributes.layerType === "USGS") {
-                            // USGS feature
-                            title = `USGS ${attributes.layerName} - ${attributes.displayName || 'Feature'}`;
-                        } else {
+                        if (attributes.state) {
                             // PSAP feature
                             title = attributes.state;
                             if (attributes.name) title += ` - ${attributes.name}`;
                             else if (attributes.psap_name) title += ` - ${attributes.psap_name}`;
                             else if (attributes.agency_name) title += ` - ${attributes.agency_name}`;
                             else title += ` PSAP`;
+                        } else if (attributes.layerType === "USGS" || attributes.NAME) {
+                            // USGS feature
+                            title = `USGS ${attributes.layerName || 'Feature'} - ${attributes.displayName || attributes.NAME || 'Feature'}`;
+                        } else if (attributes.layerType === "Canadian" || attributes.CSDNAME) {
+                            // Canadian feature
+                            title = `Canadian ${attributes.CSDTYPE || 'Subdivision'} - ${attributes.CSDNAME || 'Feature'}`;
+                        } else {
+                            // Fallback
+                            title = `${attributes.layerType || 'Unknown'} - ${attributes.displayName || attributes.NAME || 'Feature'}`;
                         }
 
                         results.push({
