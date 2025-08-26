@@ -326,6 +326,13 @@
             <button onclick="clearSelection()" class="btn-secondary">Clear Selection</button>
         </div>
         
+        <!-- Drawing Tools -->
+        <div class="button-group">
+            <button onclick="toggleDrawingMode()" class="btn-secondary">Drawing Mode</button>
+            <button onclick="clearDrawnShapes()" class="btn-secondary">Clear Drawn</button>
+            <button onclick="downloadDrawnShapes()" class="btn-secondary">Download Drawn</button>
+        </div>
+        
         <!-- Debug Tools (Hidden by default) -->
         <div class="debug-tools" style="display: none;">
             <button id="toggleLoggingBtn" onclick="toggleLogging()">Enable Logging</button>
@@ -359,6 +366,7 @@
             • Select USGS layers from dropdown for additional boundaries<br>
             • Click on any boundary to view details<br>
             • Use selection tools to download boundaries<br>
+            • Use drawing tools to create custom shapes<br>
             • Press <kbd>Ctrl+D</kbd> to show debug tools
         </div>
     </div>
@@ -382,8 +390,10 @@
             "esri/geometry/Polygon",
             "esri/symbols/SimpleFillSymbol",
             "esri/symbols/SimpleLineSymbol",
-            "esri/geometry/SpatialReference"
-        ], function(Map, MapView, GraphicsLayer, FeatureLayer, Graphic, Polygon, SimpleFillSymbol, SimpleLineSymbol, SpatialReference) {
+            "esri/geometry/SpatialReference",
+            "esri/widgets/Sketch",
+            "esri/widgets/Sketch/SketchViewModel"
+        ], function(Map, MapView, GraphicsLayer, FeatureLayer, Graphic, Polygon, SimpleFillSymbol, SimpleLineSymbol, SpatialReference, Sketch, SketchViewModel) {
             
             // Working services with improved coordinate handling
             const workingServices = [
@@ -511,10 +521,11 @@
                 
                 // Debug: Log search database status
                 logMessage(`Searching ${allGraphics.length} features for: "${searchTerm}"`, 'info');
-                const psapCount = allGraphics.filter(g => g.attributes.state).length;
+                                                    const psapCount = allGraphics.filter(g => g.attributes.state).length;
                 const usgsCount = allGraphics.filter(g => g.attributes.layerType === "USGS" || g.attributes.NAME).length;
                 const canadianCount = allGraphics.filter(g => g.attributes.layerType === "Canadian" || g.attributes.CSDNAME).length;
-                logMessage(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features, ${canadianCount} Canadian features`, 'info');
+                const drawnCount = allGraphics.filter(g => g.attributes.layerType === "Drawn").length;
+                logMessage(`Search database: ${psapCount} PSAP features, ${usgsCount} USGS features, ${canadianCount} Canadian features, ${drawnCount} drawn shapes`, 'info');
                 
                 // Debug: Show some USGS features if we have them
                 if (usgsCount > 0) {
@@ -1671,6 +1682,12 @@
 
             // Variable to track current USGS layer
             let currentUSGSLayer = null;
+            
+            // Drawing variables
+            let drawingLayer = null;
+            let sketchViewModel = null;
+            let isDrawingMode = false;
+            let drawnShapes = [];
 
             // Function to toggle USGS layer
             function toggleUSGSLayer() {
@@ -2080,6 +2097,7 @@
                     if (psapCount > 0) availableLayers.push(`${psapCount} PSAP boundaries`);
                     if (usgsCount > 0) availableLayers.push(`${usgsCount} USGS boundaries`);
                     if (canadianCount > 0) availableLayers.push(`${canadianCount} Canadian boundaries`);
+                    if (drawnCount > 0) availableLayers.push(`${drawnCount} drawn shapes`);
                     
                     const layerInfo = availableLayers.length > 0 ? 
                         `Available for selection: ${availableLayers.join(', ')}` : 
@@ -2492,8 +2510,165 @@
             window.showSelectionSummary = showSelectionSummary; // Add selection summary function
             window.downloadSelected = downloadSelected; // Add download function
             window.clearSelection = clearSelection; // Add clear selection function
+            
+            // Drawing functions
+            window.toggleDrawingMode = toggleDrawingMode;
+            window.clearDrawnShapes = clearDrawnShapes;
+            window.downloadDrawnShapes = downloadDrawnShapes;
             window.loadCanadianData = loadCanadianData; // Add Canadian data loading function
             
+            // Initialize drawing layer and sketch widget
+            function initializeDrawingTools() {
+                if (!drawingLayer) {
+                    drawingLayer = new GraphicsLayer({
+                        title: "Drawn Shapes",
+                        visible: true
+                    });
+                    map.add(drawingLayer);
+                    
+                    // Create sketch view model
+                    sketchViewModel = new SketchViewModel({
+                        view: view,
+                        layer: drawingLayer
+                    });
+                    
+                    // Listen for create events
+                    sketchViewModel.on("create", function(event) {
+                        if (event.state === "complete") {
+                            const graphic = event.graphic;
+                            graphic.symbol = new SimpleFillSymbol({
+                                color: [255, 0, 255, 0.3], // Purple for drawn shapes
+                                outline: new SimpleLineSymbol({
+                                    color: [255, 0, 255, 0.8],
+                                    width: 2
+                                })
+                            });
+                            
+                            // Add metadata
+                            graphic.attributes = {
+                                ...graphic.attributes,
+                                layerType: "Drawn",
+                                layerName: "Custom Drawn Shape",
+                                displayName: `Custom Shape ${drawnShapes.length + 1}`,
+                                drawnDate: new Date().toISOString(),
+                                drawnBy: "User"
+                            };
+                            
+                            drawnShapes.push(graphic);
+                            allGraphics.push(graphic);
+                            
+                            logMessage(`Created custom shape: ${graphic.attributes.displayName}`, 'success');
+                            updateStatus(`Created custom shape: ${graphic.attributes.displayName}`, 'success');
+                        }
+                    });
+                    
+                    logMessage('Drawing tools initialized', 'info');
+                }
+            }
+
+            // Function to toggle drawing mode
+            function toggleDrawingMode() {
+                if (!drawingLayer) {
+                    initializeDrawingTools();
+                }
+                
+                isDrawingMode = !isDrawingMode;
+                const button = document.querySelector('button[onclick="toggleDrawingMode()"]');
+                if (button) {
+                    button.textContent = isDrawingMode ? 'Exit Drawing Mode' : 'Drawing Mode';
+                    button.style.backgroundColor = isDrawingMode ? '#FF6B6B' : '';
+                    button.className = isDrawingMode ? 'btn-secondary active' : 'btn-secondary';
+                }
+                
+                if (isDrawingMode) {
+                    // Start drawing mode
+                    sketchViewModel.create("polygon");
+                    updateStatus('Drawing mode enabled - click on map to start drawing polygon', 'info');
+                    logMessage('Drawing mode enabled', 'info');
+                } else {
+                    // Exit drawing mode
+                    sketchViewModel.cancel();
+                    updateStatus('Drawing mode disabled', 'info');
+                    logMessage('Drawing mode disabled', 'info');
+                }
+            }
+
+            // Function to clear drawn shapes
+            function clearDrawnShapes() {
+                if (drawingLayer) {
+                    drawingLayer.removeAll();
+                    drawnShapes = [];
+                    // Remove from allGraphics
+                    allGraphics = allGraphics.filter(g => g.attributes.layerType !== "Drawn");
+                    updateStatus('All drawn shapes cleared', 'info');
+                    logMessage('All drawn shapes cleared', 'info');
+                }
+            }
+
+            // Function to download drawn shapes
+            function downloadDrawnShapes() {
+                if (drawnShapes.length === 0) {
+                    updateStatus('No drawn shapes to download', 'error');
+                    return;
+                }
+                
+                // Convert drawn shapes to GeoJSON with proper projection
+                const geojson = {
+                    type: "FeatureCollection",
+                    crs: {
+                        type: "name",
+                        properties: {
+                            name: "urn:ogc:def:crs:OGC:1.3:CRS84" // WGS84
+                        }
+                    },
+                    features: drawnShapes.map(graphic => {
+                        // Ensure coordinates are in WGS84
+                        let coordinates = graphic.geometry.rings;
+                        const sourceWKID = graphic.geometry.spatialReference ? graphic.geometry.spatialReference.wkid : 4326;
+                        
+                        // Convert coordinates to WGS84 if needed
+                        if (sourceWKID !== 4326) {
+                            coordinates = convertToWGS84(graphic.geometry.rings, sourceWKID);
+                        }
+                        
+                        const feature = {
+                            type: "Feature",
+                            properties: {
+                                ...graphic.attributes,
+                                layerType: "Drawn",
+                                layerName: "Custom Drawn Shape",
+                                downloadDate: new Date().toISOString(),
+                                downloadSource: 'PSAP Multi-Select Map - Custom Drawing'
+                            },
+                            geometry: {
+                                type: "Polygon",
+                                coordinates: coordinates
+                            }
+                        };
+                        return feature;
+                    })
+                };
+                
+                // Create download link
+                const dataStr = JSON.stringify(geojson, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                
+                // Create descriptive filename
+                const timestamp = new Date().toISOString().split('T')[0];
+                link.download = `custom_drawn_shapes_${drawnShapes.length}_features_${timestamp}.geojson`;
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                updateStatus(`✅ Downloaded ${drawnShapes.length} custom drawn shapes`, 'success');
+                logMessage(`Downloaded ${drawnShapes.length} custom drawn shapes`, 'success');
+            }
+
             logMessage('Map ready! All layers will load automatically.', 'info');
             
             // Auto-load PSAP data when page loads
