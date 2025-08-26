@@ -1593,6 +1593,16 @@
                     return;
                 }
                 
+                // Don't auto-load if there are already visible graphics (from search results)
+                const hasVisibleGraphics = (psapLayer && psapLayer.graphics.length > 0) || 
+                                         (countyLayer && countyLayer.graphics.length > 0) ||
+                                         (canadianLayer && canadianLayer.graphics.length > 0);
+                
+                if (hasVisibleGraphics) {
+                    logMessage('Skipping auto-load - graphics already visible from search results', 'info');
+                    return;
+                }
+                
                 // Clear previous timeout
                 if (boundaryLoadTimeout) {
                     clearTimeout(boundaryLoadTimeout);
@@ -1947,9 +1957,12 @@
                 const extent = view.extent;
                 logMessage(`Current map extent: ${JSON.stringify(extent)}`, 'info');
                 
-                // Clear existing graphics
-                psapLayer.removeAll();
-                if (countyLayer) countyLayer.removeAll();
+                // Only clear existing graphics if they're not from search results
+                // (This prevents clearing search results when auto-loading boundaries)
+                if (!searchActive) {
+                    psapLayer.removeAll();
+                    if (countyLayer) countyLayer.removeAll();
+                }
                 
                 // Find all graphics within the current extent
                 const visibleGraphics = allGraphics.filter(graphic => {
