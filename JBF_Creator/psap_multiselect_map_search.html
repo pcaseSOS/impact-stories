@@ -2269,6 +2269,32 @@
                 updateStatus('Selection cleared', 'info');
             }
 
+            // Helper function to convert coordinates to WGS84
+            function convertToWGS84(rings, sourceWKID) {
+                // If already in WGS84, return as-is
+                if (sourceWKID === 4326) {
+                    return rings;
+                }
+                
+                // For Web Mercator (EPSG:3857/102100), convert to WGS84
+                if (sourceWKID === 3857 || sourceWKID === 102100) {
+                    return rings.map(ring => 
+                        ring.map(coord => {
+                            const x = coord[0];
+                            const y = coord[1];
+                            const lon = (x / 20037508.34) * 180;
+                            const lat = (Math.atan(Math.exp(y * Math.PI / 20037508.34)) * 2 - Math.PI / 2) * (180 / Math.PI);
+                            return [lon, lat];
+                        })
+                    );
+                }
+                
+                // For Canadian Albers (EPSG:3347), this is more complex
+                // For now, return as-is and let the user know
+                logMessage(`Warning: Complex projection conversion needed for WKID ${sourceWKID}`, 'warning');
+                return rings;
+            }
+
             // Function to download selected features
             function downloadSelected() {
                 if (selectedGraphics.length === 0) {
@@ -2293,9 +2319,15 @@
                     layerCounts[layerType] = (layerCounts[layerType] || 0) + 1;
                 });
                 
-                // Convert selected graphics to GeoJSON
+                // Convert selected graphics to GeoJSON with proper projection
                 const geojson = {
                     type: "FeatureCollection",
+                    crs: {
+                        type: "name",
+                        properties: {
+                            name: "urn:ogc:def:crs:OGC:1.3:CRS84" // WGS84
+                        }
+                    },
                     features: selectedGraphics.map(graphic => {
                         // Determine layer type for properties
                         let layerType = 'Unknown';
@@ -2309,6 +2341,16 @@
                             layerType = 'Canadian';
                         }
                         
+                        // Ensure coordinates are in WGS84 (EPSG:4326)
+                        let coordinates = graphic.geometry.rings;
+                        const sourceWKID = graphic.geometry.spatialReference ? graphic.geometry.spatialReference.wkid : 4326;
+                        
+                        // Convert coordinates to WGS84 if needed
+                        if (sourceWKID !== 4326) {
+                            logMessage(`Converting coordinates from WKID ${sourceWKID} to WGS84 for download`, 'info');
+                            coordinates = convertToWGS84(graphic.geometry.rings, sourceWKID);
+                        }
+                        
                         const feature = {
                             type: "Feature",
                             properties: {
@@ -2316,11 +2358,13 @@
                                 layerType: layerType,
                                 layerName: graphic.attributes.layerName || graphic.attributes.displayName || 'Unknown Layer',
                                 downloadDate: new Date().toISOString(),
-                                downloadSource: 'PSAP Multi-Select Map'
+                                downloadSource: 'PSAP Multi-Select Map',
+                                originalProjection: graphic.geometry.spatialReference ? 
+                                    `WKID:${graphic.geometry.spatialReference.wkid}` : 'Unknown'
                             },
                             geometry: {
                                 type: "Polygon",
-                                coordinates: graphic.geometry.rings
+                                coordinates: coordinates
                             }
                         };
                         return feature;
